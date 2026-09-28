@@ -14,22 +14,27 @@
 <div class="kpi"><b>{{ tpls|length }}</b><span>نموذج فعّال</span></div>
 </div>
 
-<h2>إفراج الخط والتشغيلة</h2>
-{% if running %}<div class="tablewrap"><table>
-<tr><th>رقم التشغيلة</th><th>النوع</th><th>الصنف</th><th>الخط</th><th>إفراج QC</th><th>إفراج QA</th></tr>
-{% for x in running %}{% set w = x.w %}{% set ac = 'FLD' if x.area=='folding' else 'SLT' %}
-<tr><td><a href="{{ url_for('trace_view', b=w.batch_no) }}"><b>{{ w.batch_no }}</b></a></td>
-<td>{{ 'طي' if x.area=='folding' else 'أسليتر' }}</td><td>{{ w.item_code or '—' }}</td><td>{{ w.fold_machine or 'SL-01' }}</td>
-{% for dept in ['QC','QA'] %}{% set r = x.rs.get((dept, x.area)) %}<td>
-{% if r %}<a href="{{ url_for('quality_records', batch=w.batch_no, tpl=dept~'-'~ac~'-REL') }}"><span class="pill {{ 'ok' if r.decision=='مفرج' else 'bad' }}">{{ r.decision }}</span></a>
-{% elif (can('qc_sign') if dept=='QA' else can('qc_record')) %}<a class="smallbtn" href="{{ url_for('quality_new', code=dept~'-'~ac~'-REL', b=w.batch_no) }}">تسجيل إفراج</a>
-{% else %}<span class="pill warn">بانتظار</span>{% endif %}</td>{% endfor %}</tr>{% endfor %}</table></div>
-{% else %}<div class="empty">لا توجد تشغيلات مفتوحة.</div>{% endif %}
+<h2>فحوص وإفراجات التشغيلات المفتوحة</h2>
+<div class="sub">لكل تشغيلة النماذج التي تنطبق على مسارها (معقم / غير معقم). الأخضر مطابق أو مفرج، الأحمر غير مطابق، الرمادي لم يُسجَّل.</div>
+{% for x in running %}{% set w = x.w %}
+<div class="card" style="padding:12px 16px">
+<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:baseline;margin-bottom:8px">
+<a href="{{ url_for('trace_view', b=w.batch_no) }}"><b style="font-size:16px">{{ w.batch_no }}</b></a>
+<span class="mini">{% if (w.order_type or 'إنتاج')=='تقطيع' %}أسليتر{% else %}{{ w.item_code }} · {{ w.size }} · {{ w.route }}{% endif %}</span></div>
+<div class="chips">
+{% for c in x.checks %}{% set t = c.tpl %}{% set r = c.rec %}
+{% set okperm = can('qc_sign') if t.dept=='QA' else can('qc_record') %}
+{% set st = ('bad' if (r and (r.result=='غير مطابق' or r.decision=='غير مفرج')) else ('ok' if r else 'none')) %}
+<a class="chip {{ st }}" href="{% if r %}{{ url_for('quality_record', rid=r.id) }}{% elif okperm %}{{ url_for('quality_new', code=t.code, b=w.batch_no) }}{% else %}#{% endif %}"
+   title="{{ t.title }}">{{ t.dept }} · {{ t.title.split(' — ')[0] }}{% if t.kind=='release' %} ⚑{% endif %}
+   <i>{% if r %}{{ r.decision or r.result }}{% else %}{% if okperm %}+ تسجيل{% else %}بانتظار{% endif %}{% endif %}</i></a>
+{% endfor %}</div></div>
+{% else %}<div class="empty">لا توجد تشغيلات مفتوحة.</div>{% endfor %}
 
 <h2>السجلات اليومية والدورية — الاستحقاق</h2>
 <div class="tablewrap"><table>
 <tr><th>النموذج</th><th>الخط</th><th>الفاصل</th><th>آخر تسجيل</th><th>الحالة</th><th></th></tr>
-{% for x in due %}<tr><td class="r">{{ x.tpl.title }}</td><td>{{ x.line.machine_code }}</td>
+{% for x in due %}<tr><td class="r">{{ x.tpl.title }}</td><td>{{ x.line.machine_code or '—' }}</td>
 <td>{{ ('كل %g ساعة'|format(x.tpl.freq_hours)) if x.tpl.freq_hours else '—' }}</td>
 <td>{% if x.last %}<a href="{{ url_for('quality_record', rid=x.last.id) }}">{{ x.last.rec_date }} {{ x.last.rec_time or '' }}</a>
  <span class="pill {{ cls_for(x.last.result) }}">{{ x.last.result }}</span>{% else %}—{% endif %}</td>

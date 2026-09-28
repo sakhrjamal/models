@@ -25,15 +25,25 @@ USERS_DDL = """CREATE TABLE users (
     last_login     TEXT
 )"""
 
+TPL_DDL = """CREATE TABLE qc_templates (
+  code        TEXT PRIMARY KEY,
+  title       TEXT NOT NULL,
+  dept        TEXT NOT NULL CHECK(dept IN ('QC','QA')),
+  kind        TEXT NOT NULL CHECK(kind IN ('release','inspection','daily','periodic')),
+  area        TEXT NOT NULL,
+  route       TEXT NOT NULL DEFAULT 'all' CHECK(route IN ('all','sterile','non_sterile')),
+  freq_hours  REAL,
+  needs_batch INTEGER NOT NULL DEFAULT 0,
+  fields_json TEXT NOT NULL,
+  requires    TEXT,
+  active      INTEGER NOT NULL DEFAULT 1,
+  version     INTEGER NOT NULL DEFAULT 1,
+  note        TEXT,
+  updated_by  TEXT,
+  updated_at  TEXT DEFAULT (datetime('now','localtime'))
+)"""
+
 DDL = [
-    """CREATE TABLE IF NOT EXISTS qc_templates (
-        code TEXT PRIMARY KEY, title TEXT NOT NULL,
-        dept TEXT NOT NULL CHECK(dept IN ('QC','QA')),
-        kind TEXT NOT NULL CHECK(kind IN ('release','daily','periodic')),
-        area TEXT NOT NULL, freq_hours REAL, needs_batch INTEGER NOT NULL DEFAULT 0,
-        fields_json TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1,
-        version INTEGER NOT NULL DEFAULT 1, note TEXT, updated_by TEXT,
-        updated_at TEXT DEFAULT (datetime('now','localtime')))""",
     """CREATE TABLE IF NOT EXISTS qc_records (
         id INTEGER PRIMARY KEY AUTOINCREMENT, rec_no TEXT NOT NULL UNIQUE,
         template_code TEXT NOT NULL REFERENCES qc_templates(code),
@@ -69,16 +79,43 @@ def rebuild_users(con):
     con.execute('DROP TABLE users_old')
 
 
+def ensure_templates_table(con):
+    """ينشئ جدول القوالب، أو يعيد بناءه (بنسخ الصفوف) إن كان بصيغة أقدم: بلا route/requires
+    أو بقيد kind الأضيق."""
+    row = con.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='qc_templates'").fetchone()
+    if not row:
+        con.execute(TPL_DDL)
+        return
+    if "'inspection'" in row[0] and 'requires' in row[0]:
+        return
+    con.execute('ALTER TABLE qc_templates RENAME TO qc_templates_old')
+    con.execute(TPL_DDL)
+    con.execute("""INSERT INTO qc_templates(code,title,dept,kind,area,freq_hours,needs_batch,fields_json,
+                        active,version,note,updated_by,updated_at)
+                   SELECT code,title,dept,kind,area,freq_hours,needs_batch,fields_json,
+                          active,version,note,updated_by,updated_at FROM qc_templates_old""")
+    con.execute('DROP TABLE qc_templates_old')
+
+
 def seed_templates(con):
+    """يضيف القوالب الناقصة، ويحدّث فقط ما لم يعدّله أحد (updated_by='system' والإصدار 1)،
+    فلا يُكتب فوق تعديلات الجودة."""
     import qc_seed
     n = 0
     for t in qc_seed.templates():
+        row = (t['code'], t['title'], t['dept'], t['kind'], t['area'], t['route'], t['freq_hours'],
+               t['needs_batch'], json.dumps(t['fields'], ensure_ascii=False),
+               json.dumps(t['requires']), t['note'])
         cur = con.execute("""INSERT OR IGNORE INTO qc_templates
-                (code,title,dept,kind,area,freq_hours,needs_batch,fields_json,note,updated_by)
-                VALUES(?,?,?,?,?,?,?,?,?,?)""",
-                (t['code'], t['title'], t['dept'], t['kind'], t['area'], t['freq_hours'],
-                 t['needs_batch'], json.dumps(t['fields'], ensure_ascii=False), t['note'], 'system'))
-        n += cur.rowcount
+                (code,title,dept,kind,area,route,freq_hours,needs_batch,fields_json,requires,note,updated_by)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,'system')""", row)
+        if cur.rowcount:
+            n += 1
+        else:
+            cur = con.execute("""UPDATE qc_templates SET title=?,dept=?,kind=?,area=?,route=?,freq_hours=?,
+                    needs_batch=?,fields_json=?,requires=?,note=? WHERE code=? AND updated_by='system' AND version=1""",
+                    row[1:] + (row[0],))
+            n += cur.rowcount
     return n
 
 
@@ -93,6 +130,7 @@ def run(verbose=False):
             rebuild_users(con)
             if verbose:
                 print('  + أُعيد بناء جدول المستخدمين (أدوار جديدة).')
+        ensure_templates_table(con)
         for stmt in DDL:
             con.execute(stmt)
         for k, v, note in SETTINGS:

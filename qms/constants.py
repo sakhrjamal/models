@@ -16,7 +16,7 @@ ROLE_AR = {
     'operator': 'إدخال إنتاج',
     'qc':       'مراقب جودة (QC)',
     'qa':       'ضمان جودة (QA)',
-    'manager':  'مدير المصنع',
+    'manager':  'مدير المصنع (كل الصلاحيات)',
     'admin':    'مدير النظام',
 }
 PERMS = {
@@ -31,13 +31,16 @@ PERMS = {
     # qc_template تعديل قوالب الجودة
     # admin      المستخدمون والنسخ الاحتياطي
     'viewer':   {'view'},
-    'operator': {'view', 'enter'},
-    'qc':       {'view', 'qc_record'},
-    'qa':       {'view', 'enter', 'qc_record', 'qc_sign', 'qc_template', 'audit', 'wo_close'},
-    'manager':  {'view', 'wo_issue', 'wo_close', 'reports', 'audit'},
-    'admin':    {'view', 'enter', 'wo_issue', 'wo_close', 'reports', 'audit',
-                 'qc_record', 'qc_sign', 'qc_template', 'admin'},
+    'operator': {'view', 'enter'},                       # الإنتاج: إدخال بيانات التشغيل فقط
+    'qc':       {'view', 'qc_record'},                   # مراقب الجودة: الفحوص والسجلات وفحص الخام
+    'qa':       {'view', 'qc_record', 'qc_sign', 'qc_template', 'audit', 'wo_close'},   # ضمان الجودة
+    'manager':  None,                                    # المستخدم الرئيسي: كل الصلاحيات (تُملأ أدناه)
+    'admin':    None,
 }
+ALL_PERMS = {'view', 'enter', 'wo_issue', 'wo_close', 'reports', 'audit',
+             'qc_record', 'qc_sign', 'qc_template', 'admin'}
+PERMS['manager'] = set(ALL_PERMS)
+PERMS['admin'] = set(ALL_PERMS)
 
 # ----------------------------------------------------------- حالات المخزون
 STOCK_HOLD     = 'حجر'

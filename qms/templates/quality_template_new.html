@@ -7,6 +7,7 @@
 <div><label>الإدارة *</label><select name="dept" required>{% for k,v in DEPT_AR.items() %}<option value="{{ k }}">{{ k }} — {{ v }}</option>{% endfor %}</select></div>
 <div><label>النوع *</label><select name="kind" required>{% for k,v in KIND_AR.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
 <div><label>المنطقة *</label><select name="area" required>{% for k,v in AREA_AR.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
+<div><label>المنتج *</label><select name="route" required>{% for k,v in ROUTE_AR.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
 <div><label>فاصل الاستحقاق (ساعات)</label><input type="number" step="any" min="0.5" name="freq_hours"></div>
 <div class="full"><button class="btn">إنشاء ثم إضافة البنود</button></div></form></div>
 {% endblock %}

@@ -2,18 +2,19 @@
 <div class="crumb"><a href="{{ url_for('quality_home') }}">الجودة</a><span class="sep">›</span><span class="here">{{ t.code }}</span></div>
 <h1>{{ t.title }}</h1>
 <div class="sub">{{ DEPT_AR[t.dept] }} · {{ KIND_AR[t.kind] }} · {{ AREA_AR[t.area] }} · الإصدار {{ t.version }}
-{% if t.freq_hours %} · يُسجَّل كل {{ '%g'|format(t.freq_hours) }} ساعة{% endif %}</div>
+{% if t.route != 'all' %} · منتج {{ ROUTE_AR[t.route] }}{% endif %}{% if t.freq_hours %} · يُسجَّل كل {{ '%g'|format(t.freq_hours) }} ساعة{% endif %}</div>
+{% if req_titles %}<div class="hint">شرط الإفراج — سجلات مطابقة لهذه التشغيلة: {{ req_titles|join('؛ ') }}</div>{% endif %}
 {% if t.note %}<div class="hint">{{ t.note }}</div>{% endif %}
 <div class="card"><form method="post">
 <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:13px">
 <div><label>التاريخ *</label><input type="date" name="rec_date" value="{{ today() }}" required></div>
 <div><label>الوقت</label><input type="time" name="rec_time" value="{{ now_time }}"></div>
 <div><label>الوردية *</label><select name="shift" required><option>أ</option><option>ب</option><option>ج</option></select></div>
-<div><label>{{ 'ماكينة الطي' if t.area=='folding' else 'خط الأسليتر' }} *</label>
+{% if lines %}<div><label>الخط / الماكينة *</label>
 <select name="line_code" required><option value="">— اختر —</option>
-{% for l in lines %}<option value="{{ l.machine_code }}" {{ 'selected' if l.machine_code==line_sel }}>{{ l.machine_code }} · {{ l.name }}</option>{% endfor %}</select></div>
-<div><label>رقم التشغيلة {{ '*' if (t.needs_batch or is_release) }}</label>
-<select name="batch_no" {{ 'required' if (t.needs_batch or is_release) }}><option value="">— {{ 'بدون تشغيلة' if not (t.needs_batch or is_release) else 'اختر' }} —</option>
+{% for l in lines %}<option value="{{ l.machine_code }}" {{ 'selected' if l.machine_code==line_sel }}>{{ l.machine_code }} · {{ l.name }}</option>{% endfor %}</select></div>{% endif %}
+<div><label>رقم التشغيلة {{ '*' if batch_needed }}</label>
+<select name="batch_no" {{ 'required' if batch_needed }} onchange="location.search='?b='+encodeURIComponent(this.value)+'&line='+encodeURIComponent((document.querySelector('[name=line_code]')||{}).value||'')"><option value="">— {{ 'بدون تشغيلة' if not batch_needed else 'اختر' }} —</option>
 {% for b in batches %}<option value="{{ b.batch_no }}" {{ 'selected' if b.batch_no==batch_sel }}>{{ b.batch_no }}{% if b.item_code %} · {{ b.item_code }}{% endif %}</option>{% endfor %}</select></div>
 <div><label>القائم بالفحص *</label><input name="inspector" required value="{{ me.full_name }}"></div>
 </div>
@@ -22,13 +23,17 @@
 <div><b>{{ f.label }}</b>{% if f.required %}<span class="req">*</span>{% endif %}
 {% if f.unit %}<span class="mini"> ({{ f.unit }})</span>{% endif %}
 {% if f.type=='number' and (f.min is defined or f.max is defined) %}<div class="lim">الحد المقبول:
-{% if f.min is defined %}من {{ '%g'|format(f.min) }}{% endif %} {% if f.max is defined %}إلى {{ '%g'|format(f.max) }}{% endif %}</div>{% endif %}</div>
+{% if f.min is defined %}من {{ '%g'|format(f.min) }}{% endif %} {% if f.max is defined %}إلى {{ '%g'|format(f.max) }}{% endif %}</div>{% endif %}
+{% if f.type=='dim' %}<div class="lim">المعياري: {% if ctx.get(f.nominal_from) is not none %}<b>{{ '%g'|format(ctx[f.nominal_from]) }} ± {{ '%g'|format(f.tol) }} سم</b> ({{ '%g'|format(f.tol*10) }} ملم){% else %}اختر التشغيلة لتظهر السماحية{% endif %}</div>{% endif %}
+{% if f.type=='match' %}<div class="lim">اكتب كما هو مطبوع فعليًا — يُقارَن آليًا بـ{{ MATCHES_AR[f.match_to] }}</div>{% endif %}
+{% if f.type=='expect' %}<div class="lim">أدخل ما عددته فعليًا — يُقارَن بالمسجّل في التغليف</div>{% endif %}</div>
 <div>
 {% if f.type=='check' %}<div class="chk">
 <label class="og"><input type="radio" name="f_{{ f.id }}" value="مطابق" {{ 'required' if f.required }}> مطابق</label>
 <label class="ob"><input type="radio" name="f_{{ f.id }}" value="غير مطابق"> غير مطابق</label>
 <label><input type="radio" name="f_{{ f.id }}" value="لا ينطبق"> لا ينطبق</label></div>
-{% elif f.type=='number' %}<input type="number" step="any" name="f_{{ f.id }}" {{ 'required' if f.required }}>
+{% elif f.type in ('number','dim','expect') %}<input type="number" step="any" name="f_{{ f.id }}" {{ 'required' if f.required }}>
+{% elif f.type=='match' %}<input name="f_{{ f.id }}" {{ 'required' if f.required }} autocomplete="off" placeholder="كما هو مطبوع">
 {% elif f.type=='select' %}<select name="f_{{ f.id }}" {{ 'required' if f.required }}><option value="">—</option>
 {% for o in f.options %}<option>{{ o }}</option>{% endfor %}</select>
 {% elif f.type=='textarea' %}<textarea name="f_{{ f.id }}" rows="2" {{ 'required' if f.required }}></textarea>

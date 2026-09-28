@@ -384,14 +384,16 @@ CREATE TABLE IF NOT EXISTS counters (
 -- ---------- v12: قوالب وسجلات الجودة ----------
 -- القالب: تعريف نموذج (بنود + حدود) — يُعدَّل من الواجهة دون تعديل الكود
 CREATE TABLE IF NOT EXISTS qc_templates (
-  code        TEXT PRIMARY KEY,          -- QC-FLD-DLY
+  code        TEXT PRIMARY KEY,
   title       TEXT NOT NULL,
   dept        TEXT NOT NULL CHECK(dept IN ('QC','QA')),
-  kind        TEXT NOT NULL CHECK(kind IN ('release','daily','periodic')),
-  area        TEXT NOT NULL,             -- slitter / folding
-  freq_hours  REAL,                      -- فاصل الاستحقاق للسجل اليومي/الدوري
+  kind        TEXT NOT NULL CHECK(kind IN ('release','inspection','daily','periodic')),
+  area        TEXT NOT NULL,
+  route       TEXT NOT NULL DEFAULT 'all' CHECK(route IN ('all','sterile','non_sterile')),
+  freq_hours  REAL,
   needs_batch INTEGER NOT NULL DEFAULT 0,
   fields_json TEXT NOT NULL,
+  requires    TEXT,
   active      INTEGER NOT NULL DEFAULT 1,
   version     INTEGER NOT NULL DEFAULT 1,
   note        TEXT,

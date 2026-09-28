@@ -7,12 +7,16 @@
 <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:13px">
 <div class="full"><label>العنوان *</label><input name="title" required value="{{ t.title }}"></div>
 <div><label>فاصل الاستحقاق (ساعات) — للسجل اليومي/الدوري</label><input type="number" step="any" min="0.5" name="freq_hours" value="{{ t.freq_hours if t.freq_hours else '' }}"></div>
+<div><label>المنتج</label><select name="route">{% for k,v in ROUTE_AR.items() %}<option value="{{ k }}" {{ 'selected' if t.route==k }}>{{ v }}</option>{% endfor %}</select></div>
 <div><label><input type="checkbox" name="needs_batch" style="width:auto" {{ 'checked' if t.needs_batch }}> رقم التشغيلة إلزامي</label></div>
 <div><label><input type="checkbox" name="active" style="width:auto" {{ 'checked' if t.active }}> نموذج فعّال</label></div>
 <div class="full"><label>ملاحظة</label><input name="note" value="{{ t.note or '' }}"></div>
+{% if t.kind=='release' %}<div class="full"><label>شرط الإفراج: سجلات مطابقة مطلوبة للتشغيلة من</label>
+<select name="requires" multiple size="6">{% for o in others %}<option value="{{ o.code }}" {{ 'selected' if o.code in t.req_list }}>{{ o.code }} — {{ o.title }}</option>{% endfor %}</select>
+<div class="mini">اضغط Ctrl لاختيار أكثر من نموذج. لا يُقبل «مفرج» قبل وجود سجل مطابق لكل منها.</div></div>{% endif %}
 </div>
 <h2>البنود</h2>
-<div class="tablewrap"><table id="ft"><thead><tr><th>#</th><th>العنوان *</th><th>النوع</th><th>الوحدة</th><th>أدنى</th><th>أقصى</th><th>خيارات (مفصولة بفاصلة)</th><th>إلزامي</th><th></th></tr></thead>
+<div class="tablewrap"><table id="ft"><thead><tr><th>#</th><th>العنوان *</th><th>النوع</th><th>الوحدة</th><th>أدنى</th><th>أقصى</th><th>مرجع / سماحية / خيارات</th><th>إلزامي</th><th></th></tr></thead>
 <tbody id="fbody"></tbody></table></div>
 <div style="margin:10px 0"><button type="button" class="btn back" onclick="addRow()">+ إضافة بند</button></div>
 <input type="hidden" name="fields_json" id="fields_json">
@@ -22,20 +26,27 @@
 const TYPES={{ FIELD_TYPES|tojson }};
 const INIT={{ t.fields|tojson }};
 const esc=x=>String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const NOM={{ NOMINALS|tojson }}, EXP={{ EXPECTS|tojson }}, MAT={{ MATCHES|tojson }};
+function sel(cls,map,cur){return '<select class="'+cls+'"><option value="">—</option>'+Object.keys(map).map(k=>'<option value="'+k+'"'+(k===cur?' selected':'')+'>'+map[k]+'</option>').join('')+'</select>';}
 function addRow(f){
   f=f||{type:'check',required:true};
   const tr=document.createElement('tr');tr.dataset.id=f.id||'';
   tr.innerHTML='<td class="rn"></td><td><input class="lb" value="'+esc(f.label)+'" style="min-width:220px"></td>'+
-   '<td><select class="ty">'+Object.keys(TYPES).map(k=>'<option value="'+k+'"'+(k===f.type?' selected':'')+'>'+TYPES[k]+'</option>').join('')+'</select></td>'+
+   '<td><select class="ty" onchange="vis(this.closest(\'tr\'))">'+Object.keys(TYPES).map(k=>'<option value="'+k+'"'+(k===f.type?' selected':'')+'>'+TYPES[k]+'</option>').join('')+'</select></td>'+
    '<td><input class="un" value="'+esc(f.unit)+'" style="width:70px"></td>'+
    '<td><input class="mn" type="number" step="any" value="'+esc(f.min)+'" style="width:80px"></td>'+
    '<td><input class="mx" type="number" step="any" value="'+esc(f.max)+'" style="width:80px"></td>'+
-   '<td><input class="op" value="'+esc((f.options||[]).join(', '))+'" data-fail="'+esc((f.fail_values||[]).join(', '))+'"></td>'+
+   '<td><span class="p-dim">'+sel('nf',NOM,f.nominal_from)+' ± <input class="tol" type="number" step="any" value="'+esc(f.tol)+'" style="width:70px" placeholder="سم"></span>'+
+   '<span class="p-expect">'+sel('ef',EXP,f.expect_from)+'</span><span class="p-match">'+sel('mt',MAT,f.match_to)+'</span>'+
+   '<span class="p-select"><input class="op" value="'+esc((f.options||[]).join(', '))+'" data-fail="'+esc((f.fail_values||[]).join(', '))+'" placeholder="خيار1, خيار2"></span></td>'+
    '<td><input class="rq" type="checkbox" style="width:auto"'+(f.required?' checked':'')+'></td>'+
    '<td style="white-space:nowrap"><button type="button" class="smallbtn g" onclick="mv(this,-1)">▲</button> <button type="button" class="smallbtn g" onclick="mv(this,1)">▼</button> '+
    '<button type="button" style="background:none;border:0;color:#b3261e;cursor:pointer;font-size:18px" onclick="this.closest(\'tr\').remove();num()">×</button></td>';
-  document.getElementById('fbody').appendChild(tr);num();
+  document.getElementById('fbody').appendChild(tr);vis(tr);num();
 }
+function vis(tr){const t=tr.querySelector('.ty').value;
+  ['dim','expect','match','select'].forEach(k=>tr.querySelector('.p-'+k).style.display=(k===t)?'inline':'none');
+  tr.querySelector('.mn').disabled=tr.querySelector('.mx').disabled=(t!=='number');}
 function num(){document.querySelectorAll('#fbody tr').forEach((r,i)=>r.querySelector('.rn').textContent=i+1);}
 function mv(b,d){const r=b.closest('tr'),p=d<0?r.previousElementSibling:r.nextElementSibling;
   if(!p)return; d<0?p.before(r):p.after(r);num();}
@@ -45,6 +56,8 @@ document.getElementById('tplForm').addEventListener('submit',()=>{
     const o={id:r.dataset.id,label:r.querySelector('.lb').value.trim(),type:r.querySelector('.ty').value,
       required:r.querySelector('.rq').checked,unit:r.querySelector('.un').value,
       min:r.querySelector('.mn').value,max:r.querySelector('.mx').value,
+      nominal_from:r.querySelector('.nf').value,tol:r.querySelector('.tol').value,
+      expect_from:r.querySelector('.ef').value,match_to:r.querySelector('.mt').value,
       options:r.querySelector('.op').value,fail_values:r.querySelector('.op').dataset.fail};
     if(o.label) out.push(o);});
   document.getElementById('fields_json').value=JSON.stringify(out);

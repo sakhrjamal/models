@@ -20,7 +20,7 @@
                      ('الطي',d.fold_out|length>0),('الكراتين',d.cartons|length>0),('الفرز',d.sorting|length>0),
                      ('التغليف',d.packaging|length>0),('التعقيم',d.loads|length>0),
                      ('التهوية',d.cycles|selectattr('aeration')|list|length>0),('استلام بعد التعقيم',d.psr|length>0),
-                     ('الإفراج',d.release is not none)] %}
+                     ('الإفراج',(d.release is not none) or (d.qc_release is not none))] %}
   <div class="step {{ 'done' if ok else 'none' }}">{{ name }}<b>{{ '✔' if ok else '—' }}</b></div>{% endfor %}
 </div>
 {% if d.kind == 'تقطيع' %}<div class="hint">هذا <b>أمر تقطيع (أسليتر)</b> — رقم التشغيلة الخاص بمرحلة القص. المراحل اللاحقة (طي، فرز، تغليف، تعقيم، إفراج)
@@ -137,6 +137,7 @@
 {% set val = r['r%d'%i] %}
 <tr><td>{{ i }}</td><td class="r">{{ n }}</td>
 <td><span class="pill {{ cls_for(val) }}">{{ val or 'لم تصدر' }}</span></td></tr>{% endfor %}</table></div>
+{% elif d.qc_release %}<div class="msg ok">أُفرج عن التشغيلة (منتج غير معقم) بسجل ضمان الجودة <a href="{{ url_for('quality_records', batch=d.batch_no) }}">{{ d.qc_release.rec_no }}</a> بتاريخ {{ d.qc_release.rec_date }} — {{ d.qc_release.inspector }}</div>
 {% else %}<div class="hint">لم تصدر شهادة إفراج لهذه التشغيلة — المنتج يبقى بحالة حجر ولا يُشحن.</div>{% endif %}
 {% endif %}
 {% if d.shipments %}<h2>٩ — الشحن</h2><table><tr><th>السند</th><th>التاريخ</th><th>العميل</th><th>الكمية</th><th>الشهادة</th></tr>

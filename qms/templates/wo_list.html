@@ -21,7 +21,7 @@
 {% else %}<span class="mini">أسليتر</span>{% endif %}</td>
 <td>{{ r.batch_start_date or '—' }}</td>
 <td><span class="pill {{ cls_for(r.status) }}">{{ r.status }}</span></td>
-<td>{% if r.decision %}<span class="pill {{ cls_for(r.decision) }}">{{ r.decision }}</span>{% else %}<span class="pill warn">—</span>{% endif %}</td>
+<td>{% set dec = r.decision or (p.decision if p else None) %}{% if dec %}<span class="pill {{ cls_for(dec) }}">{{ dec }}</span>{% else %}<span class="pill warn">—</span>{% endif %}</td>
 {% if can('wo_close') %}<td class="noprint">
   <form method="post" action="{{ url_for('wo_close', batch_no=r.batch_no) }}" style="display:inline"
         onsubmit="return confirm('{{ 'إعادة فتح' if r.status=='مغلقة' else 'إغلاق' }} التشغيلة {{ r.batch_no }}؟')">

@@ -14,8 +14,15 @@ import qc_seed
 KIND_AR = {k: v['ar'] for k, v in qc_seed.KINDS.items()}
 AREA_AR = {k: v['ar'] for k, v in qc_seed.AREAS.items()}
 DEPT_AR = qc_seed.DEPTS
-FIELD_TYPES = {'check': 'مطابق / غير مطابق', 'number': 'رقم', 'text': 'نص قصير',
-               'textarea': 'نص طويل', 'select': 'قائمة اختيار'}
+ROUTE_AR = qc_seed.ROUTES
+FIELD_TYPES = {'check': 'مطابق / غير مطابق', 'number': 'رقم', 'dim': 'بُعد بسماحية عن المقاس',
+               'expect': 'رقم = قيمة التشغيلة', 'match': 'نص مطبوع يُطابَق آليًا',
+               'text': 'نص قصير', 'textarea': 'نص طويل', 'select': 'قائمة اختيار'}
+NOMINALS = {'size_l': 'طول مقاس الأمر', 'size_w': 'عرض مقاس الأمر'}
+EXPECTS = {'per_envelope': 'مسحات في المغلف', 'env_per_box': 'مغلفات في البوكس',
+           'boxes_per_carton': 'بوكسات في الكرتونة'}
+MATCHES = {'batch_no': 'رقم التشغيلة', 'item_code': 'كود الصنف', 'batch_date': 'تاريخ التشغيلة',
+           'cycle_no': 'رقم دورة التعقيم'}
 SIG_QC_RECORD = 'اعتماد سجل جودة'
 
 
@@ -24,16 +31,86 @@ def get_template(code):
     t = db.one('SELECT * FROM qc_templates WHERE code=?', (code,))
     if t:
         t['fields'] = json.loads(t['fields_json'] or '[]')
+        t['req_list'] = json.loads(t.get('requires') or '[]')
     return t
 
 
-def evaluate(fields, form):
-    """يقرأ قيم النموذج ويقيّمها. يعيد (values, fails, missing).
+def has_lines(area):
+    return bool(qc_seed.AREAS.get(area, {}).get('stage'))
 
-    fails: قائمة (label, سبب) للبنود الخارجة عن المطلوب.
-    missing: بنود إلزامية فارغة.
+
+def route_of(w):
+    return qc_seed.ROUTE_OF.get((w or {}).get('route'))
+
+
+def build_ctx(bn):
+    """القيم المرجعية للتشغيلة التي تُقارَن بها بنود dim / expect / match."""
+    w = db.one('SELECT * FROM work_orders WHERE batch_no=?', (bn,)) if bn else None
+    if not w:
+        return {}
+    ctx = dict(batch_no=w['batch_no'], item_code=w.get('item_code'), batch_date=w.get('batch_start_date'))
+    size = w.get('size')
+    if not size and w.get('fold_machine'):
+        size = (db.one('SELECT size_locked FROM machines WHERE machine_code=?', (w['fold_machine'],)) or {}).get('size_locked')
+    nums = re.findall(r'\d+(?:\.\d+)?', size or '')
+    if nums:
+        ctx['size_w'] = float(nums[0])
+        ctx['size_l'] = float(nums[1] if len(nums) > 1 else nums[0])
+    pk = db.one("""SELECT per_envelope, env_per_box, boxes_per_carton FROM packaging
+                   WHERE batch_no=? ORDER BY doc_no DESC LIMIT 1""", (bn,))
+    if pk:
+        ctx.update({k: v for k, v in pk.items() if v})
+    ctx['cycle_nos'] = [r['cycle_no'] for r in db.q(
+        'SELECT DISTINCT cycle_no FROM cycle_loads WHERE batch_no=?', (bn,))]
+    return ctx
+
+
+def _norm(x):
+    return re.sub(r'[\s\-_/.\\:،,]', '', str(x or '')).upper()
+
+
+def _contains_token(printed, expected):
+    """expected داخل printed كرمز كامل (لا يكفي أن يكون جزءًا من رقم أطول)."""
+    p, e = _norm(printed), _norm(expected)
+    if not e:
+        return True
+    i = p.find(e)
+    while i != -1:
+        before_ok = i == 0 or not (p[i - 1].isdigit() and e[0].isdigit())
+        after = p[i + len(e):i + len(e) + 1]
+        after_ok = not (after and after.isdigit() and e[-1].isdigit())
+        if before_ok and after_ok:
+            return True
+        i = p.find(e, i + 1)
+    return False
+
+
+def _date_matches(printed, iso):
+    """مطابقة تاريخ مطبوع لتاريخ التشغيلة. التاريخ الكامل يُقارَن بدقة (لا يكفي الشهر والسنة
+    إن طُبع يوم مختلف)، ويُقبل الشهر/السنة فقط إن طُبع الشهر والسنة وحدهما."""
+    try:
+        d = datetime.date.fromisoformat(iso)
+    except (TypeError, ValueError):
+        return True
+    digits = re.sub(r'\D', '', str(printed or ''))
+    by_len = {8: ('%d%m%Y', '%Y%m%d'), 6: ('%d%m%y', '%y%m%d', '%m%Y', '%Y%m'), 4: ('%m%y',)}
+    if digits and len(digits) in by_len:
+        return digits in {d.strftime(f) for f in by_len[len(digits)]}
+    txt = _norm(printed)
+    return any(x in txt for x in (d.strftime('%b%y').upper(), d.strftime('%b%Y').upper()))
+
+
+def evaluate(fields, form, ctx=None):
+    """يقرأ قيم النموذج ويقيّمها. يعيد (values, fails, missing, expected).
+
+    fails: قائمة {id,label,reason}. expected: {id: القيمة المتوقعة للعرض والتدقيق}.
     """
-    values, fails, missing = {}, [], []
+    ctx = ctx or {}
+    values, fails, missing, expected = {}, [], [], {}
+
+    def fail(f, reason):
+        fails.append(dict(id=f['id'], label=f['label'], reason=reason))
+
     for f in fields:
         fid, raw = f['id'], (form.get(f'f_{f["id"]}') or '').strip()
         values[fid] = raw or None
@@ -42,36 +119,72 @@ def evaluate(fields, form):
                 missing.append(f['label'])
             continue
         t = f.get('type', 'text')
-        if t == 'number':
+        if t in ('number', 'dim', 'expect'):
             v = num(raw)
             if v is None:
                 missing.append(f'{f["label"]} (رقم غير صالح)')
                 values[fid] = None
                 continue
             values[fid] = v
-            if f.get('min') is not None and v < float(f['min']):
-                fails.append((f['label'], f'{v:g} أقل من الحد الأدنى {float(f["min"]):g}'))
-            if f.get('max') is not None and v > float(f['max']):
-                fails.append((f['label'], f'{v:g} أعلى من الحد الأقصى {float(f["max"]):g}'))
+            if t == 'number':
+                if f.get('min') is not None and v < float(f['min']):
+                    fail(f, f'{v:g} أقل من الحد الأدنى {float(f["min"]):g}')
+                if f.get('max') is not None and v > float(f['max']):
+                    fail(f, f'{v:g} أعلى من الحد الأقصى {float(f["max"]):g}')
+            elif t == 'dim':
+                nom, tol = ctx.get(f.get('nominal_from')), float(f.get('tol') or 0)
+                if nom is not None:
+                    expected[fid] = f'{nom:g} ± {tol:g}'
+                    if abs(v - nom) > tol + 1e-9:
+                        fail(f, f'{v:g} خارج {nom:g} ± {tol:g} سم')
+            else:
+                exp = ctx.get(f.get('expect_from'))
+                if exp is not None:
+                    expected[fid] = f'{exp:g}'
+                    if abs(v - float(exp)) > 1e-9:
+                        fail(f, f'المدخل {v:g} والمتوقع {float(exp):g}')
+        elif t == 'match':
+            to = f.get('match_to')
+            if to == 'batch_no' and ctx.get('batch_no'):
+                expected[fid] = ctx['batch_no']
+                ok = _contains_token(raw, ctx['batch_no'])
+            elif to == 'item_code' and ctx.get('item_code'):
+                expected[fid] = ctx['item_code']
+                ok = _contains_token(raw, ctx['item_code'])
+            elif to == 'batch_date' and ctx.get('batch_date'):
+                expected[fid] = ctx['batch_date']
+                ok = _date_matches(raw, ctx['batch_date'])
+            elif to == 'cycle_no' and ctx.get('cycle_nos') is not None:
+                expected[fid] = '، '.join(ctx['cycle_nos']) or '—'
+                ok = _norm(raw) in {_norm(c) for c in ctx['cycle_nos']}
+            else:
+                continue
+            if not ok:
+                fail(f, f'المطبوع «{raw}» لا يطابق المتوقع «{expected[fid]}»')
         elif t == 'check' and constants.is_nonconform(raw):
-            fails.append((f['label'], 'غير مطابق'))
+            fail(f, 'غير مطابق')
         elif t == 'select' and raw in (f.get('fail_values') or []):
-            fails.append((f['label'], raw))
-    return values, fails, missing
+            fail(f, raw)
+    return values, fails, missing, expected
 
 
 def lines_for(area):
-    stage = qc_seed.AREAS[area]['stage'] if area in qc_seed.AREAS else None
+    stage = qc_seed.AREAS.get(area, {}).get('stage')
+    if not stage:
+        return []
     return db.q("SELECT machine_code, name FROM machines WHERE stage=? AND active=1 ORDER BY machine_code",
                 (stage,))
 
 
-def batches_for(area):
+def batches_for(area, route='all'):
     kind = 'تقطيع' if area == 'slitter' else 'إنتاج'
-    return db.q("""SELECT batch_no, item_code, size, ply, fold_machine, batch_start_date, status
+    rows = db.q("""SELECT batch_no, item_code, size, ply, fold_machine, route, batch_start_date, status
                    FROM work_orders WHERE COALESCE(order_type,'إنتاج')=?
                      AND status IN ('صادر','قيد التنفيذ')
                    ORDER BY batch_start_date DESC, batch_no DESC LIMIT 60""", (kind,))
+    if route != 'all':
+        rows = [r for r in rows if route_of(r) == route]
+    return rows
 
 
 def _parse_ts(d, t):
@@ -82,19 +195,17 @@ def _parse_ts(d, t):
 
 
 def due_items():
-    """جدول الاستحقاق: كل قالب يومي/دوري × كل خط في منطقته ← آخر تسجيل وهل هو مستحق.
-
-    يستخدمه قسم الجودة ولوحة المدير.
-    """
+    """جدول الاستحقاق: كل قالب يومي/دوري × كل خط في منطقته ← آخر تسجيل وهل هو مستحق."""
     now = datetime.datetime.now()
     out = []
     for t in db.q("""SELECT * FROM qc_templates WHERE active=1 AND kind IN ('daily','periodic')
                      ORDER BY area, dept, kind"""):
         freq = t.get('freq_hours')
-        for ln in lines_for(t['area']):
+        for ln in (lines_for(t['area']) or [dict(machine_code=None, name='—')]):
             last = db.one("""SELECT id, rec_no, rec_date, rec_time, result FROM qc_records
-                             WHERE template_code=? AND line_code=? ORDER BY rec_date DESC, COALESCE(rec_time,'') DESC, id DESC
-                             LIMIT 1""", (t['code'], ln['machine_code']))
+                             WHERE template_code=? AND COALESCE(line_code,'')=COALESCE(?,'')
+                             ORDER BY rec_date DESC, COALESCE(rec_time,'') DESC, id DESC LIMIT 1""",
+                          (t['code'], ln['machine_code']))
             ts = _parse_ts(last['rec_date'], last['rec_time']) if last else None
             if not last:
                 state, hrs = 'لم يُسجَّل بعد', None
@@ -111,12 +222,35 @@ def due_items():
     return out
 
 
-def release_status(batch_no):
-    """إفراجات الجودة المسجّلة لتشغيلة: {(dept, area): decision}"""
-    rows = db.q("""SELECT t.dept, t.area, r.decision, r.rec_no FROM qc_records r
-                   JOIN qc_templates t ON t.code=r.template_code
-                   WHERE t.kind='release' AND r.batch_no=? ORDER BY r.id""", (batch_no,))
-    return {(x['dept'], x['area']): x for x in rows}
+def latest_record(code, batch_no):
+    return db.one("""SELECT id, rec_no, result, decision FROM qc_records
+                     WHERE template_code=? AND batch_no=? ORDER BY id DESC LIMIT 1""", (code, batch_no))
+
+
+def batch_checks(w):
+    """قائمة فحوص/إفراجات تشغيلة: كل قالب ينطبق عليها وآخر سجل لها."""
+    if (w.get('order_type') or 'إنتاج') == 'تقطيع':
+        tpls = db.q("""SELECT * FROM qc_templates WHERE active=1 AND area='slitter'
+                       AND kind IN ('release','inspection') ORDER BY dept DESC, code""")
+    else:
+        r = route_of(w) or 'all'
+        tpls = [t for t in db.q("""SELECT * FROM qc_templates WHERE active=1 AND area<>'slitter'
+                                   AND kind IN ('release','inspection') ORDER BY area, dept DESC, code""")
+                if t['route'] in ('all', r)]
+    return [dict(tpl=t, rec=latest_record(t['code'], w['batch_no'])) for t in tpls]
+
+
+def pack_release_ok(bn):
+    """هل للتشغيلة المعقمة إفراج ضمان جودة للتعقيم؟"""
+    r = latest_record('QA-PKS-REL', bn)
+    return bool(r and r['decision'] == 'مفرج')
+
+
+def final_release(bn):
+    """إفراج المنتج غير المعقم (QA-PKN-REL) إن وُجد."""
+    return db.one("""SELECT rec_no, rec_date, decision, inspector FROM qc_records
+                     WHERE template_code='QA-PKN-REL' AND batch_no=? AND decision='مفرج'
+                     ORDER BY id DESC LIMIT 1""", (bn,))
 
 
 # ------------------------------------------------------------------ المسارات
@@ -137,12 +271,9 @@ def register(app):
         bad = db.q("""SELECT r.*, t.title FROM qc_records r JOIN qc_templates t ON t.code=r.template_code
                       WHERE r.result='غير مطابق' AND r.rec_date>=? ORDER BY r.id DESC LIMIT 15""", (week,))
         running = []
-        for kind, area in (('إنتاج', 'folding'), ('تقطيع', 'slitter')):
-            for w in db.q("""SELECT batch_no, item_code, fold_machine FROM work_orders
-                             WHERE COALESCE(order_type,'إنتاج')=? AND status IN ('صادر','قيد التنفيذ')
-                             ORDER BY batch_start_date DESC LIMIT 25""", (kind,)):
-                rs = release_status(w['batch_no'])
-                running.append(dict(w=w, area=area, rs=rs))
+        for w in db.q("""SELECT * FROM work_orders WHERE status IN ('صادر','قيد التنفيذ')
+                         ORDER BY COALESCE(order_type,'إنتاج') DESC, batch_start_date DESC LIMIT 40"""):
+            running.append(dict(w=w, checks=batch_checks(w)))
         tpls = db.q("SELECT * FROM qc_templates WHERE active=1 ORDER BY area, dept, kind")
         return render_template('quality_home.html', nav='quality', due=due, recent=recent, bad=bad,
                                running=running, tpls=tpls, KIND_AR=KIND_AR, AREA_AR=AREA_AR,
@@ -157,34 +288,42 @@ def register(app):
         if not auth.can(need):
             abort(403)
         is_release = t['kind'] == 'release'
-        area = t['area']
+        area, lines = t['area'], lines_for(t['area'])
+        batch_needed = bool(t['needs_batch'] or is_release)
         if request.method == 'POST':
             f = request.form
             back = url_for('quality_new', code=code, b=f.get('batch_no') or '', line=f.get('line_code') or '')
             rec_date = s(f.get('rec_date'))
             shift, line = s(f.get('shift')), s(f.get('line_code'))
             batch, inspector = s(f.get('batch_no')), s(f.get('inspector'))
-            if not (rec_date and shift and line and inspector):
+            if not (rec_date and shift and inspector) or (lines and not line):
                 flash('التاريخ والوردية والخط واسم القائم بالفحص بيانات إلزامية', 'bad')
                 return redirect(back)
-            if (t['needs_batch'] or is_release) and not batch:
+            if lines and line not in {l['machine_code'] for l in lines}:
+                flash('الخط غير صحيح لهذا النموذج', 'bad')
+                return redirect(back)
+            if batch_needed and not batch:
                 flash('رقم التشغيلة إلزامي لهذا النموذج', 'bad')
                 return redirect(back)
-            item_code = None
+            item_code, w = None, None
             if batch:
                 w = db.one('SELECT * FROM work_orders WHERE batch_no=?', (batch,))
                 if not w:
                     flash('رقم التشغيلة غير موجود', 'bad')
                     return redirect(back)
                 is_sl = (w.get('order_type') or 'إنتاج') == 'تقطيع'
-                if (area == 'slitter') != is_sl:
-                    flash('رقم التشغيلة لا يناسب هذا الخط: الأسليتر برقم SL، والطي برقم أمر الإنتاج', 'bad')
+                if area == 'slitter' and not is_sl or (area != 'slitter' and is_sl):
+                    flash('رقم التشغيلة لا يناسب هذا النموذج: الأسليتر برقم SL وباقي المراحل برقم أمر الإنتاج', 'bad')
+                    return redirect(back)
+                if t['route'] != 'all' and route_of(w) != t['route']:
+                    flash(f'هذا النموذج خاص بالمنتج {ROUTE_AR[t["route"]]} والتشغيلة {batch} مسارها {w.get("route")}', 'bad')
                     return redirect(back)
                 if area == 'folding' and w.get('fold_machine') and w['fold_machine'] != line:
                     flash(f'التشغيلة {batch} مخصصة لماكينة {w["fold_machine"]} لا {line}', 'bad')
                     return redirect(back)
                 item_code = w.get('item_code')
-            values, fails, missing = evaluate(t['fields'], f)
+            ctx = build_ctx(batch)
+            values, fails, missing, expected = evaluate(t['fields'], f, ctx)
             if missing:
                 flash('بنود إلزامية ناقصة: ' + '، '.join(missing), 'bad')
                 return redirect(back)
@@ -195,12 +334,25 @@ def register(app):
                     flash('اختر قرار الإفراج', 'bad')
                     return redirect(back)
                 if decision == 'مفرج' and fails:
-                    flash('لا يجوز الإفراج مع وجود بند غير مطابق: ' + '، '.join(x[0] for x in fails), 'bad')
+                    flash('لا يجوز الإفراج مع وجود بند غير مطابق: ' + '، '.join(x['label'] for x in fails), 'bad')
                     return redirect(back)
+                if decision == 'مفرج' and t['req_list']:
+                    lacking = []
+                    for rc in t['req_list']:
+                        last = latest_record(rc, batch)
+                        if not last or last['result'] != 'مطابق':
+                            rt = db.one('SELECT title FROM qc_templates WHERE code=?', (rc,))
+                            lacking.append((rt or {}).get('title', rc))
+                    if lacking:
+                        flash('لا يجوز الإفراج قبل وجود سجل مطابق لـ: ' + '؛ '.join(lacking), 'bad')
+                        return redirect(back)
                 if not auth.check_esign(f.get('esign_pw')):
                     flash('التوقيع الإلكتروني غير صحيح — أعد إدخال كلمة مرورك لاعتماد الإفراج', 'bad')
                     return redirect(back)
             result = 'غير مطابق' if fails else 'مطابق'
+            stored = dict(values)
+            stored['__fails'] = fails
+            stored['__exp'] = expected
             scope, fmt = doc_scope(t['code'], rec_date)
             with db.tx() as con:
                 rec_no = db.alloc(con, scope, fmt)
@@ -209,29 +361,37 @@ def register(app):
                         decision,inspector,notes,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (rec_no, t['code'], t['version'], t['fields_json'], rec_date,
                      s(f.get('rec_time')) or datetime.datetime.now().strftime('%H:%M'), shift, batch, line,
-                     item_code, json.dumps(values, ensure_ascii=False), result, len(fails), decision,
+                     item_code, json.dumps(stored, ensure_ascii=False), result, len(fails), decision,
                      inspector, s(f.get('notes')), g.user['username']))
                 if is_release:
                     con.execute(*auth.signature_row(SIG_QC_RECORD, 'qc_records', rec_no))
-            db.log('create', 'qc_records', rec_no, f'{t["code"]}; {batch or "-"}; {line}; {result}'
+                # إفراج المنتج غير المعقم هو الإفراج النهائي للتشغيلة
+                if is_release and decision == 'مفرج' and area == 'packaging' and t['route'] == 'non_sterile':
+                    con.execute("UPDATE work_orders SET status=? WHERE batch_no=? AND status IN (?,?)",
+                                (constants.WO_DONE, batch, constants.WO_ISSUED, constants.WO_RUNNING))
+            db.log('create', 'qc_records', rec_no, f'{t["code"]}; {batch or "-"}; {line or "-"}; {result}'
                    + (f'; {decision}' if decision else ''))
             if fails:
-                flash(f'سُجّل {rec_no} — غير مطابق: ' + '، '.join(f'{a} ({b})' for a, b in fails), 'bad')
+                flash(f'سُجّل {rec_no} — غير مطابق: ' + '، '.join(f'{x["label"]} ({x["reason"]})' for x in fails), 'bad')
             else:
                 flash(f'سُجّل {rec_no} — مطابق' + (f' · القرار: {decision}' if decision else ''), 'ok')
             return redirect(url_for('quality_record', rid=cur.lastrowid))
 
         line_sel = request.args.get('line') or ''
         batch_sel = request.args.get('b') or ''
-        lines = lines_for(area)
         if not line_sel and len(lines) == 1:
             line_sel = lines[0]['machine_code']
         wsel = db.one('SELECT * FROM work_orders WHERE batch_no=?', (batch_sel,)) if batch_sel else None
         if wsel and area == 'folding' and not line_sel:
             line_sel = wsel.get('fold_machine') or ''
+        ctx = build_ctx(batch_sel) if batch_sel else {}
         return render_template('quality_form.html', nav='quality', t=t, KIND_AR=KIND_AR, AREA_AR=AREA_AR,
-                               DEPT_AR=DEPT_AR, lines=lines, batches=batches_for(area),
+                               DEPT_AR=DEPT_AR, ROUTE_AR=ROUTE_AR, lines=lines,
+                               batches=batches_for(area, t['route']), ctx=ctx, MATCHES_AR=MATCHES,
                                line_sel=line_sel, batch_sel=batch_sel, is_release=is_release,
+                               batch_needed=batch_needed, req_titles=[
+                                   (db.one('SELECT title FROM qc_templates WHERE code=?', (c,)) or {}).get('title', c)
+                                   for c in t['req_list']],
                                now_time=datetime.datetime.now().strftime('%H:%M'))
 
     @route('/quality/record/<int:rid>', 'quality_record')
@@ -242,17 +402,20 @@ def register(app):
             abort(404)
         spec = json.loads(r['spec_json'] or '[]')
         vals = json.loads(r['values_json'] or '{}')
+        fails = {x['id']: x['reason'] for x in (vals.get('__fails') or [])}
+        exp = vals.get('__exp') or {}
+        legacy = '__fails' not in vals
         rows = []
         for f in spec:
             v = vals.get(f['id'])
-            bad = False
-            if v is not None:
+            bad = f['id'] in fails
+            if legacy and v is not None:
                 if f.get('type') == 'check':
                     bad = constants.is_nonconform(v)
                 elif f.get('type') == 'number':
                     bad = (f.get('min') is not None and v < float(f['min'])) or \
                           (f.get('max') is not None and v > float(f['max']))
-            rows.append(dict(f=f, v=v, bad=bad))
+            rows.append(dict(f=f, v=v, bad=bad, why=fails.get(f['id']), exp=exp.get(f['id'])))
         return render_template('quality_record.html', nav='quality', r=r, rows=rows, KIND_AR=KIND_AR,
                                DEPT_AR=DEPT_AR, AREA_AR=AREA_AR,
                                sigs=auth.signatures_for('qc_records', r['rec_no']))
@@ -281,11 +444,11 @@ def register(app):
     @route('/quality/templates', 'quality_templates')
     def quality_templates():
         rows = db.q("""SELECT t.*, (SELECT COUNT(*) FROM qc_records r WHERE r.template_code=t.code) n
-                       FROM qc_templates t ORDER BY t.area, t.dept, t.kind""")
+                       FROM qc_templates t ORDER BY t.area, t.dept, t.kind, t.code""")
         for r in rows:
             r['nfields'] = len(json.loads(r['fields_json'] or '[]'))
         return render_template('quality_templates.html', nav='quality', rows=rows, KIND_AR=KIND_AR,
-                               AREA_AR=AREA_AR, DEPT_AR=DEPT_AR)
+                               AREA_AR=AREA_AR, DEPT_AR=DEPT_AR, ROUTE_AR=ROUTE_AR)
 
     def _parse_fields(raw):
         """يتحقق من تعريف البنود القادم من المحرّر. يعيد (fields, خطأ)."""
@@ -306,6 +469,9 @@ def register(app):
             seen.add(fid)
             typ = f.get('type') if f.get('type') in FIELD_TYPES else 'text'
             item = dict(id=fid, label=label, type=typ, required=bool(f.get('required')))
+            unit = (f.get('unit') or '').strip()
+            if unit:
+                item['unit'] = unit
             if typ == 'number':
                 for k in ('min', 'max'):
                     v = num(f.get(k))
@@ -313,9 +479,22 @@ def register(app):
                         item[k] = v
                 if 'min' in item and 'max' in item and item['min'] > item['max']:
                     return None, f'البند «{label}»: الحد الأدنى أكبر من الأقصى'
-                if (f.get('unit') or '').strip():
-                    item['unit'] = f['unit'].strip()
-            if typ == 'select':
+            elif typ == 'dim':
+                if f.get('nominal_from') not in NOMINALS:
+                    return None, f'البند «{label}»: اختر المقاس المرجعي (طول/عرض)'
+                tol = num(f.get('tol'))
+                if tol is None or tol < 0:
+                    return None, f'البند «{label}»: السماحية مطلوبة (سم)'
+                item.update(nominal_from=f['nominal_from'], tol=tol, unit=unit or 'سم')
+            elif typ == 'expect':
+                if f.get('expect_from') not in EXPECTS:
+                    return None, f'البند «{label}»: اختر القيمة المرجعية'
+                item['expect_from'] = f['expect_from']
+            elif typ == 'match':
+                if f.get('match_to') not in MATCHES:
+                    return None, f'البند «{label}»: اختر ما يُطابَق به'
+                item['match_to'] = f['match_to']
+            elif typ == 'select':
                 opts = [o.strip() for o in (f.get('options') or '').replace('،', ',').split(',') if o.strip()] \
                     if isinstance(f.get('options'), str) else [str(o) for o in (f.get('options') or [])]
                 if len(opts) < 2:
@@ -344,17 +523,22 @@ def register(app):
             if freq is not None and freq <= 0:
                 flash('فاصل الاستحقاق يجب أن يكون أكبر من صفر أو فارغًا', 'bad')
                 return redirect(url_for('quality_template_edit', code=code))
+            route_ = f.get('route') if f.get('route') in ROUTE_AR else t['route']
+            allc = {r['code'] for r in db.q('SELECT code FROM qc_templates')} - {code}
+            req = [c for c in f.getlist('requires') if c in allc]
             db.run("""UPDATE qc_templates SET title=?, freq_hours=?, needs_batch=?, fields_json=?, active=?,
-                      note=?, version=version+1, updated_by=?, updated_at=datetime('now','localtime')
-                      WHERE code=?""",
+                      note=?, route=?, requires=?, version=version+1, updated_by=?,
+                      updated_at=datetime('now','localtime') WHERE code=?""",
                    (title, freq, 1 if f.get('needs_batch') else 0,
                     json.dumps(fields, ensure_ascii=False), 1 if f.get('active') else 0,
-                    s(f.get('note')), g.user['username'], code))
+                    s(f.get('note')), route_, json.dumps(req), g.user['username'], code))
             db.log('update', 'qc_templates', code, f'v{t["version"] + 1}; {len(fields)} fields')
             flash(f'حُفظ القالب {code} (الإصدار {t["version"] + 1}) — السجلات السابقة تحتفظ بنسختها', 'ok')
             return redirect(url_for('quality_templates'))
+        others = db.q("SELECT code, title FROM qc_templates WHERE code<>? ORDER BY code", (code,))
         return render_template('quality_template_edit.html', nav='quality', t=t, KIND_AR=KIND_AR,
-                               AREA_AR=AREA_AR, DEPT_AR=DEPT_AR, FIELD_TYPES=FIELD_TYPES,
+                               AREA_AR=AREA_AR, DEPT_AR=DEPT_AR, ROUTE_AR=ROUTE_AR, FIELD_TYPES=FIELD_TYPES,
+                               NOMINALS=NOMINALS, EXPECTS=EXPECTS, MATCHES=MATCHES, others=others,
                                used=db.one('SELECT COUNT(*) n FROM qc_records WHERE template_code=?', (code,))['n'])
 
     @route('/quality/templates/new', 'quality_template_new', methods=['GET', 'POST'])
@@ -363,21 +547,23 @@ def register(app):
         if request.method == 'POST':
             f = request.form
             code = re.sub(r'[^A-Za-z0-9_-]', '', (f.get('code') or '')).upper()
-            dept, kind, area = f.get('dept'), f.get('kind'), f.get('area')
+            dept, kind, area, rt = f.get('dept'), f.get('kind'), f.get('area'), f.get('route') or 'all'
             title = s(f.get('title'))
-            if not code or not title or dept not in DEPT_AR or kind not in KIND_AR or area not in AREA_AR:
+            if not code or not title or dept not in DEPT_AR or kind not in KIND_AR or area not in AREA_AR \
+                    or rt not in ROUTE_AR:
                 flash('الرمز والعنوان والإدارة والنوع والمنطقة بيانات إلزامية', 'bad')
                 return redirect(url_for('quality_template_new'))
             if db.one('SELECT 1 FROM qc_templates WHERE code=?', (code,)):
                 flash('رمز النموذج مستخدم مسبقًا', 'bad')
                 return redirect(url_for('quality_template_new'))
-            db.run("""INSERT INTO qc_templates(code,title,dept,kind,area,freq_hours,needs_batch,fields_json,note,updated_by)
-                      VALUES(?,?,?,?,?,?,?,?,?,?)""",
-                   (code, title, dept, kind, area, num(f.get('freq_hours')), 1 if kind == 'release' else 0,
-                    json.dumps([qc_seed.NOTES], ensure_ascii=False), 'نموذج جديد — أضف بنوده من المحرّر',
-                    g.user['username']))
+            db.run("""INSERT INTO qc_templates(code,title,dept,kind,area,route,freq_hours,needs_batch,fields_json,
+                      requires,note,updated_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   (code, title, dept, kind, area, rt, num(f.get('freq_hours')),
+                    1 if kind in ('release', 'inspection') else 0,
+                    json.dumps([qc_seed.NOTES], ensure_ascii=False), '[]',
+                    'نموذج جديد — أضف بنوده من المحرّر', g.user['username']))
             db.log('create', 'qc_templates', code)
             flash('أُنشئ النموذج — أضف بنوده الآن', 'ok')
             return redirect(url_for('quality_template_edit', code=code))
         return render_template('quality_template_new.html', nav='quality', KIND_AR=KIND_AR,
-                               AREA_AR=AREA_AR, DEPT_AR=DEPT_AR)
+                               AREA_AR=AREA_AR, DEPT_AR=DEPT_AR, ROUTE_AR=ROUTE_AR)

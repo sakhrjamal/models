@@ -3,9 +3,9 @@
 <h1>قوالب الجودة</h1>
 <div class="sub">كل نموذج بيانات قابلة للتعديل: البنود والحدود والفاصل. تعديل القالب لا يغيّر السجلات القديمة.</div>
 {% if can('qc_template') %}<div class="card noprint actions"><a class="btn" href="{{ url_for('quality_template_new') }}">نموذج جديد</a></div>{% endif %}
-<div class="hint">النماذج الـ 12 الأولى <b>مبدئية</b> — بنودها عامة وبلا حدود رقمية، بانتظار اعتماد تفاصيل نظام الجودة.</div>
-<div class="tablewrap"><table><tr><th>الرمز</th><th>العنوان</th><th>المنطقة</th><th>الإدارة</th><th>النوع</th><th>الفاصل</th><th>البنود</th><th>الإصدار</th><th>السجلات</th><th>الحالة</th><th></th></tr>
-{% for r in rows %}<tr><td>{{ r.code }}</td><td class="r">{{ r.title }}</td><td>{{ AREA_AR[r.area] }}</td><td>{{ r.dept }}</td><td>{{ KIND_AR[r.kind] }}</td>
+<div class="hint">ما ورد من إدارة المصنع مثبّت (سماحية الأبعاد ±4 ملم، تسلسل الحواف، الشوائب والشعر، مطابقة الطباعة، العدد…). البنود المقترحة من عندنا والحدود الرقمية الأخرى تُراجَع وتُعدَّل من هنا.</div>
+<div class="tablewrap"><table><tr><th>الرمز</th><th>العنوان</th><th>المنطقة</th><th>المنتج</th><th>الإدارة</th><th>النوع</th><th>الفاصل</th><th>البنود</th><th>الإصدار</th><th>السجلات</th><th>الحالة</th><th></th></tr>
+{% for r in rows %}<tr><td>{{ r.code }}</td><td class="r">{{ r.title }}</td><td>{{ AREA_AR[r.area] }}</td><td>{{ ROUTE_AR[r.route] }}</td><td>{{ r.dept }}</td><td>{{ KIND_AR[r.kind] }}</td>
 <td>{{ ('كل %g ساعة'|format(r.freq_hours)) if r.freq_hours else '—' }}</td><td>{{ r.nfields }}</td><td>{{ r.version }}</td><td>{{ r.n }}</td>
 <td><span class="pill {{ 'ok' if r.active else 'warn' }}">{{ 'فعّال' if r.active else 'موقوف' }}</span></td>
 <td class="noprint">{% if can('qc_template') %}<a class="smallbtn" href="{{ url_for('quality_template_edit', code=r.code) }}">تعديل</a>{% endif %}</td></tr>{% endfor %}</table></div>

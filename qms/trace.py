@@ -63,6 +63,8 @@ def batch_chain(batch_no):
     d['loads']    = q('SELECT * FROM cycle_loads WHERE batch_no=? ORDER BY id', (b,))
     d['psr']      = q('SELECT * FROM post_ster_receipts WHERE batch_no=? ORDER BY doc_no', (b,))
     d['release']  = one('SELECT * FROM releases WHERE batch_no=?', (b,))
+    d['qc_release'] = one("""SELECT rec_no, rec_date, inspector FROM qc_records WHERE template_code='QA-PKN-REL'
+                            AND batch_no=? AND decision='مفرج' ORDER BY id DESC LIMIT 1""", (b,))
     d['shipments']= q('SELECT * FROM shipments WHERE batch_no=? ORDER BY id', (b,))
     d['slit_batches'] = slit_batches
 
@@ -114,9 +116,11 @@ def verdict(d):
         return f'أمر تقطيع — {n} سب رول، المسحوب للطي {used}'
     if d.get('release'):
         return d['release'].get('decision') or 'معلّقة'
+    if d.get('qc_release'):
+        return 'مفرج عنها — منتج غير معقم (إفراج ضمان الجودة)'
     if not d.get('loads'):
         if d['wo'].get('route') == 'غير معقم':
-            return 'مسار غير معقم — لا يمر بالتعقيم'
+            return 'مسار غير معقم — بانتظار فحص المنتج والكراتين وإفراج الجودة'
         return 'لم تدخل التعقيم بعد'
     bio = {c.get('bi_result') for c in d['cycles']}
     if 'موجب — غير مطابق' in bio:

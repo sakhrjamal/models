@@ -67,7 +67,7 @@
   </table>
   {% if inspection.notes %}<div class="hint"><b>ملاحظات QC:</b> {{ inspection.notes }}</div>{% endif %}
 </div>
-{% elif not can('qc_sign') %}
+{% elif not can('qc_record') %}
 <div class="card hint">لم يُسجَّل فحص جودة بعد. اعتماد قرار الجودة متاح لمستخدمي «الجودة» فقط.</div>
 {% else %}
 <form method="post" class="card grid">

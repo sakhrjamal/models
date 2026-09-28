@@ -42,7 +42,7 @@
 
 {% if due %}<h2>سجلات جودة مستحقة</h2>
 <table><tr><th>النموذج</th><th>الخط</th><th>الحالة</th></tr>
-{% for x in due %}<tr><td class="r">{{ x.tpl.title }}</td><td>{{ x.line.machine_code }}</td><td><span class="pill warn">{{ x.state }}</span></td></tr>{% endfor %}</table>{% endif %}
+{% for x in due %}<tr><td class="r">{{ x.tpl.title }}</td><td>{{ x.line.machine_code or '—' }}</td><td><span class="pill warn">{{ x.state }}</span></td></tr>{% endfor %}</table>{% endif %}
 {% if bad %}<h2>سجلات غير مطابقة</h2>
 <table><tr><th>السجل</th><th>النموذج</th><th>التاريخ</th><th>التشغيلة</th><th>الخط</th></tr>
 {% for r in bad %}<tr><td><a href="{{ url_for('quality_record', rid=r.id) }}">{{ r.rec_no }}</a></td><td class="r">{{ r.title }}</td><td>{{ r.rec_date }}</td><td>{{ r.batch_no or '—' }}</td><td>{{ r.line_code or '—' }}</td></tr>{% endfor %}</table>{% endif %}

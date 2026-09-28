@@ -418,7 +418,7 @@ def receipt_view(grn_no):
         f = request.form
         act = f.get('act')
         if act == 'inspect':
-            auth.need('qc_sign')
+            auth.need('qc_record')
             if rec.get('inspection_no'):
                 flash('يوجد فحص جودة مسجل لهذا الاستلام بالفعل', 'bad')
                 return redirect(url_for('receipt_view', grn_no=grn_no))
@@ -1253,6 +1253,14 @@ def cycle_new():
             if not p or p.get('route') != 'معقم' or p.get('doc_status') != 'مكتمل':
                 flash(f'سند التغليف {doc} غير مؤهل للتعقيم', 'bad')
                 return redirect(url_for('cycle_new'))
+            if not quality.pack_release_ok(p['batch_no']):
+                mode = db.setting('qc_gate_mode', 'warn')
+                msg = f'التشغيلة {p["batch_no"]} بلا إفراج ضمان الجودة للتعقيم (QA-PKS-REL)'
+                if mode == 'block':
+                    flash(msg + ' — لا يجوز تحميلها في الدورة', 'bad')
+                    return redirect(url_for('cycle_new'))
+                if mode == 'warn':
+                    flash('تنبيه: ' + msg, 'warn')
             used = db.one('SELECT IFNULL(SUM(boxes_in),0) n FROM cycle_loads WHERE pack_doc_no=?', (doc,))['n'] or 0
             remaining = max((p.get('boxes') or 0) - used, 0)
             boxes = num(f.get(f'boxes_{doc}'), remaining) or 0

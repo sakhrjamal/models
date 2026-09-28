@@ -202,3 +202,11 @@ header .usermenu .logout:hover{background:rgba(255,255,255,.12)}
 .tabs a.on{background:var(--brand);color:#fff}
 .tabs a:hover{text-decoration:none}
 @media (max-width:640px){.qfield{grid-template-columns:1fr}}
+
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{display:inline-flex;gap:8px;align-items:center;padding:6px 12px;border-radius:20px;border:1px solid var(--line);
+  background:#f1f5f9;color:var(--muted);font-size:12.5px}
+.chip i{font-style:normal;font-weight:700}
+.chip.ok{background:var(--okbg);border-color:#b6e0c4;color:var(--ok)}
+.chip.bad{background:var(--badbg);border-color:#f0c2be;color:var(--bad)}
+.chip:hover{text-decoration:none;box-shadow:0 1px 5px rgba(20,40,70,.15)}

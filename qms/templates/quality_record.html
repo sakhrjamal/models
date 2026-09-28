@@ -13,11 +13,11 @@
 <div class="row"><div class="k">الصنف</div><div class="v">{{ r.item_code or '—' }}</div></div>
 <div class="row"><div class="k">القائم بالفحص</div><div class="v">{{ r.inspector or '—' }}</div></div>
 </div></div>
-<table><tr><th>البند</th><th>القيمة</th><th>الحد</th><th>التقييم</th></tr>
+<table><tr><th>البند</th><th>القيمة</th><th>المتوقع / الحد</th><th>التقييم</th></tr>
 {% for x in rows %}<tr><td class="r">{{ x.f.label }}</td>
 <td>{% if x.v is none %}—{% else %}{{ x.v }}{% if x.f.unit %} {{ x.f.unit }}{% endif %}{% endif %}</td>
-<td>{% if x.f.type=='number' and (x.f.min is defined or x.f.max is defined) %}{% if x.f.min is defined %}{{ '%g'|format(x.f.min) }}{% endif %} – {% if x.f.max is defined %}{{ '%g'|format(x.f.max) }}{% endif %}{% else %}—{% endif %}</td>
-<td>{% if x.v is none %}—{% else %}<span class="pill {{ 'bad' if x.bad else 'ok' }}">{{ 'غير مطابق' if x.bad else 'مطابق' }}</span>{% endif %}</td></tr>{% endfor %}</table>
+<td>{% if x.exp %}{{ x.exp }}{% elif x.f.type=='number' and (x.f.min is defined or x.f.max is defined) %}{% if x.f.min is defined %}{{ '%g'|format(x.f.min) }}{% endif %} – {% if x.f.max is defined %}{{ '%g'|format(x.f.max) }}{% endif %}{% else %}—{% endif %}</td>
+<td>{% if x.v is none %}—{% else %}<span class="pill {{ 'bad' if x.bad else 'ok' }}">{{ 'غير مطابق' if x.bad else 'مطابق' }}</span>{% if x.why %}<div class="mini">{{ x.why }}</div>{% endif %}{% endif %}</td></tr>{% endfor %}</table>
 {% if r.notes %}<div class="card" style="margin-top:12px"><b>ملاحظات:</b> {{ r.notes }}</div>{% endif %}
 {% if sigs %}<h2>التوقيع الإلكتروني</h2><table><tr><th>الموقّع</th><th>الدور</th><th>المعنى</th><th>الوقت</th></tr>
 {% for x in sigs %}<tr><td>{{ x.full_name }}</td><td>{{ ROLE_AR.get(x.role, x.role) }}</td><td>{{ x.meaning }}</td><td>{{ x.signed_at }}</td></tr>{% endfor %}</table>{% endif %}
