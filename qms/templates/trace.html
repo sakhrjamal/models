@@ -143,6 +143,9 @@
 {% if d.shipments %}<h2>٩ — الشحن</h2><table><tr><th>السند</th><th>التاريخ</th><th>العميل</th><th>الكمية</th><th>الشهادة</th></tr>
 {% for r in d.shipments %}<tr><td>{{ r.doc_no }}</td><td>{{ r.sdate }}</td><td>{{ r.customer }}</td>
 <td>{{ r.qty }}</td><td>{{ r.release_no or '—' }}</td></tr>{% endfor %}</table>{% endif %}
+{% if d.ncr %}<h2>١١ — عدم المطابقة</h2><table><tr><th>الرقم</th><th>التاريخ</th><th>المرحلة</th><th>الوصف</th><th>التصرّف</th><th>الحالة</th></tr>
+{% for n in d.ncr %}<tr><td><a href="{{ url_for('ncr_view', dev_no=n.dev_no) }}">{{ n.dev_no }}</a></td><td>{{ n.ddate }}</td><td>{{ n.stage or '—' }}</td><td class="r">{{ (n.description or '')[:80] }}</td><td>{{ n.disposition or '—' }}</td>
+<td><span class="pill {{ 'ok' if n.status=='مغلق' else 'bad' }}">{{ n.status }}</span></td></tr>{% endfor %}</table>{% endif %}
 {% if d.qc %}<h2>١٠ — سجلات الجودة أثناء التشغيل</h2>
 <table><tr><th>السجل</th><th>النموذج</th><th>التاريخ</th><th>الوردية</th><th>التشغيلة</th><th>الخط</th><th>النتيجة</th><th>القرار</th><th>الفاحص</th></tr>
 {% for r in d.qc %}<tr><td><a href="{{ url_for('quality_record', rid=r.id) }}">{{ r.rec_no }}</a></td><td class="r">{{ r.title }}</td>

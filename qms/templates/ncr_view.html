@@ -1,0 +1,31 @@
+{% extends "base.html" %}{% block title %}{{ d.dev_no }}{% endblock %}{% block body %}
+<div class="crumb"><a href="{{ url_for('ncr_list') }}">عدم المطابقة</a><span class="sep">›</span><span class="here">{{ d.dev_no }}</span></div>
+<h1>{{ d.dev_no }} <span class="pill {{ 'ok' if d.status=='مغلق' else ('warn' if d.status=='قيد المعالجة' else 'bad') }}">{{ d.status }}</span></h1>
+<div class="card"><div class="kv">
+<div class="row"><div class="k">التاريخ</div><div class="v">{{ d.ddate }}</div></div>
+<div class="row"><div class="k">التشغيلة</div><div class="v">{% if d.batch_no %}<a href="{{ url_for('trace_view', b=d.batch_no) }}">{{ d.batch_no }}</a>{% else %}—{% endif %}</div></div>
+<div class="row"><div class="k">المرحلة</div><div class="v">{{ d.stage or '—' }}</div></div>
+<div class="row"><div class="k">سجل الجودة المصدر</div><div class="v">{% if rec %}<a href="{{ url_for('quality_record', rid=rec.id) }}">{{ rec.rec_no }}</a>{% else %}يدوي{% endif %}</div></div>
+<div class="row"><div class="k">فُتحت بواسطة</div><div class="v">{{ d.created_by or '—' }}</div></div>
+{% if d.status=='مغلق' %}<div class="row"><div class="k">أُغلقت</div><div class="v">{{ d.close_date }} — {{ d.closed_by }}</div></div>{% endif %}
+</div><div style="margin-top:10px"><b>الوصف:</b> {{ d.description }}</div></div>
+{% if d.status!='مغلق' and can('qc_record') %}
+<form method="post" class="card"><div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:13px">
+<div><label>الخطورة</label><select name="severity">{% for x in severity %}<option {{ 'selected' if x==d.severity }}>{{ x }}</option>{% endfor %}</select></div>
+<div><label>تصرّف المنتج</label><select name="disposition"><option value="">—</option>{% for x in dispositions %}<option {{ 'selected' if x==d.disposition }}>{{ x }}</option>{% endfor %}</select></div>
+<div><label>المسؤول عن المعالجة</label><input name="owner" value="{{ d.owner or '' }}"></div>
+<div><label>الكمية المتأثرة</label><input type="number" step="any" name="qty_affected" value="{{ d.qty_affected if d.qty_affected is not none else '' }}"></div>
+<div class="full"><label>السبب الجذري</label><textarea name="root_cause" rows="2">{{ d.root_cause or '' }}</textarea></div>
+<div class="full"><label>الإجراء التصحيحي / الوقائي</label><textarea name="action" rows="2">{{ d.action or '' }}</textarea></div>
+</div>
+<div class="wizard-actions"><div class="l"><button class="btn" name="act" value="update">حفظ (قيد المعالجة)</button></div>
+{% if can('qc_sign') %}<div style="display:flex;gap:8px;align-items:center"><input type="password" name="esign_pw" placeholder="كلمة مرورك للتوقيع" style="width:190px" autocomplete="current-password">
+<button class="btn big" name="act" value="close" formnovalidate>اعتماد وإغلاق</button></div>{% endif %}</div></form>
+{% else %}<div class="card"><div class="kv">
+<div class="row"><div class="k">الخطورة</div><div class="v">{{ d.severity or '—' }}</div></div>
+<div class="row"><div class="k">تصرّف المنتج</div><div class="v">{{ d.disposition or '—' }}</div></div>
+<div class="row"><div class="k">المسؤول</div><div class="v">{{ d.owner or '—' }}</div></div></div>
+<p><b>السبب الجذري:</b> {{ d.root_cause or '—' }}</p><p><b>الإجراء:</b> {{ d.action or '—' }}</p></div>{% endif %}
+{% if sigs %}<h2>التوقيع الإلكتروني</h2><table><tr><th>الموقّع</th><th>الدور</th><th>المعنى</th><th>الوقت</th></tr>
+{% for x in sigs %}<tr><td>{{ x.full_name }}</td><td>{{ ROLE_AR.get(x.role, x.role) }}</td><td>{{ x.meaning }}</td><td>{{ x.signed_at }}</td></tr>{% endfor %}</table>{% endif %}
+{% endblock %}

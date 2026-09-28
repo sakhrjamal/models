@@ -6,7 +6,7 @@
 import os, secrets, datetime, re
 from flask import (Flask, render_template, request, redirect, url_for,
                    flash, abort, session, g)
-import db, trace, forms, auth, backup, constants
+import db, trace, forms, auth, backup, constants, ncr
 
 app = Flask(__name__)
 
@@ -1510,6 +1510,9 @@ def release_new():
             return redirect(url_for('release_new', b=batch))
         checks = {i: constants.canon(s(f.get(f'r{i}')), constants.CI_RESULTS) or s(f.get(f'r{i}'))
                   for i, _ in REL_CHECKS}
+        if decision == constants.REL_RELEASE and ncr.open_for_batch(batch):
+            flash('لا يجوز الإفراج مع عدم مطابقة مفتوحة: ' + '، '.join(x['dev_no'] for x in ncr.open_for_batch(batch)), 'bad')
+            return redirect(url_for('release_new', b=batch))
         if decision == constants.REL_RELEASE and any(constants.is_nonconform(v) for v in checks.values()):
             flash('لا يجوز الإفراج مع وجود بند غير مطابق — صحّح القرار أو البند', 'bad')
             return redirect(url_for('release_new', b=batch))
@@ -1668,6 +1671,7 @@ def backup_admin():
 
 
 # ---------------------------------------------------------------- الجودة ولوحة المدير والتقارير
-import quality, manager
+import quality, manager, ncr
+ncr.register(app)
 quality.register(app)
 manager.register(app)

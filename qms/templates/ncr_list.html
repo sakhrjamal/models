@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% block title %}عدم المطابقة{% endblock %}{% block body %}
+<h1>عدم المطابقة (NCR)</h1>
+<div class="sub">تُفتح تلقائيًا من أي سجل جودة غير مطابق، وتمنع إفراج التشغيلة حتى تُغلق بسبب جذري وإجراء وتصرّف بالمنتج</div>
+<div class="card noprint"><form class="searchbar" method="get">
+<select name="status" style="width:auto"><option value="open" {{ 'selected' if st=='open' }}>غير المغلقة</option>
+<option value="مغلق" {{ 'selected' if st=='مغلق' }}>المغلقة</option><option value="all" {{ 'selected' if st=='all' }}>الكل</option></select>
+<input type="text" name="batch" placeholder="رقم التشغيلة" value="{{ a.get('batch','') }}" style="flex:0 1 220px;font-size:14px;padding:8px">
+<button class="btn">تصفية</button>
+{% if can('enter') or can('qc_record') %}<a class="btn g" href="{{ url_for('ncr_new') }}">فتح عدم مطابقة يدويًا</a>{% endif %}</form></div>
+{% if rows %}<div class="tablewrap"><table><tr><th>الرقم</th><th>التاريخ</th><th>التشغيلة</th><th>المرحلة</th><th>الوصف</th><th>الخطورة</th><th>التصرّف</th><th>الحالة</th></tr>
+{% for r in rows %}<tr><td><a href="{{ url_for('ncr_view', dev_no=r.dev_no) }}"><b>{{ r.dev_no }}</b></a></td><td>{{ r.ddate }}</td>
+<td>{% if r.batch_no %}<a href="{{ url_for('trace_view', b=r.batch_no) }}">{{ r.batch_no }}</a>{% else %}—{% endif %}</td>
+<td>{{ r.stage or '—' }}</td><td class="r">{{ (r.description or '')[:90] }}</td><td>{{ r.severity or '—' }}</td><td>{{ r.disposition or '—' }}</td>
+<td><span class="pill {{ 'ok' if r.status=='مغلق' else ('warn' if r.status=='قيد المعالجة' else 'bad') }}">{{ r.status }}</span></td></tr>{% endfor %}</table></div>
+{% else %}<div class="empty">لا توجد حالات.</div>{% endif %}{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% block title %}عدم مطابقة جديدة{% endblock %}{% block body %}
+<div class="crumb"><a href="{{ url_for('ncr_list') }}">عدم المطابقة</a><span class="sep">›</span><span class="here">جديدة</span></div>
+<h1>فتح عدم مطابقة</h1>
+<div class="card"><form class="grid" method="post">
+<div><label>رقم التشغيلة</label><select name="batch_no"><option value="">— بلا تشغيلة —</option>
+{% for x in batches %}<option value="{{ x.batch_no }}" {{ 'selected' if x.batch_no==b }}>{{ x.batch_no }}{% if x.item_code %} · {{ x.item_code }}{% endif %}</option>{% endfor %}</select></div>
+<div><label>المرحلة *</label><select name="stage" required>{% for x in stages %}<option>{{ x }}</option>{% endfor %}</select></div>
+<div><label>الخطورة</label><select name="severity">{% for x in severity %}<option {{ 'selected' if x=='ثانوية' }}>{{ x }}</option>{% endfor %}</select></div>
+<div><label>الكمية المتأثرة</label><input type="number" step="any" min="0" name="qty_affected"></div>
+<div class="full"><label>وصف عدم المطابقة *</label><textarea name="description" rows="3" required></textarea></div>
+<div class="full"><button class="btn">فتح</button></div></form></div>{% endblock %}

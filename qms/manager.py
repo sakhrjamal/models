@@ -84,10 +84,19 @@ def _r_quality(d1, d2):
     return 'سجلات الجودة', cols, rows
 
 
+def _r_ncr(d1, d2):
+    cols = ['الرقم', 'التاريخ', 'التشغيلة', 'المرحلة', 'الوصف', 'الخطورة', 'التصرّف', 'المسؤول', 'الحالة', 'تاريخ الإغلاق']
+    rows = [[r['dev_no'], r['ddate'], r['batch_no'] or '—', r['stage'], r['description'], r['severity'],
+             r['disposition'] or '—', r['owner'] or '—', r['status'], r['close_date'] or '—']
+            for r in db.q("SELECT * FROM deviations WHERE ddate BETWEEN ? AND ? ORDER BY id", (d1, d2))]
+    return 'عدم المطابقة', cols, rows
+
+
 REPORTS = {
     'batches': ('سجل تشغيلات الإنتاج', 'كل أمر إنتاج بتقدّمه ومراحله وقرار إفراجه', _r_batches),
     'daily':   ('الإنتاج اليومي', 'حصيلة كل يوم عبر الأسليتر والطي والفرز والتغليف', _r_daily),
     'slit':    ('أوامر التقطيع', 'إنتاج الأسليتر ومخزون السب رول المتاح والمسحوب', _r_slit),
+    'ncr':     ('عدم المطابقة', 'الحالات المفتوحة والمغلقة والتصرّف بالمنتج', _r_ncr),
     'quality': ('سجلات الجودة', 'السجلات اليومية والدورية والإفراج ونتائجها', _r_quality),
 }
 
@@ -124,7 +133,8 @@ def register(app):
             wait_bi=db.one("""SELECT COUNT(*) n FROM cycles WHERE IFNULL(bi_result,'')<>'سالب — مطابق'
                               AND status<>'مرفوضة'""")['n'],
             rolls_hold=db.one("SELECT COUNT(*) n FROM rolls WHERE stock_status='حجر'")['n'],
-            qc_due=len(due), qc_bad=len(bad))
+            qc_due=len(due), qc_bad=len(bad),
+            ncr_open=db.one("SELECT COUNT(*) n FROM deviations WHERE status<>'مغلق'")['n'])
         return render_template('manager_home.html', nav='mgr', k=k, open_orders=open_orders,
                                open_sl=open_sl, due=due[:8], bad=bad)
 

@@ -7,7 +7,7 @@
 import json, re, datetime
 from flask import render_template, request, redirect, url_for, flash, abort, g
 
-import db, auth, constants
+import db, auth, constants, ncr
 from util import s, num, doc_scope
 import qc_seed
 
@@ -336,6 +336,11 @@ def register(app):
                 if decision == 'مفرج' and fails:
                     flash('لا يجوز الإفراج مع وجود بند غير مطابق: ' + '، '.join(x['label'] for x in fails), 'bad')
                     return redirect(back)
+                if decision == 'مفرج':
+                    opened = ncr.open_for_batch(batch)
+                    if opened:
+                        flash('لا يجوز الإفراج مع عدم مطابقة مفتوحة: ' + '، '.join(x['dev_no'] for x in opened), 'bad')
+                        return redirect(back)
                 if decision == 'مفرج' and t['req_list']:
                     lacking = []
                     for rc in t['req_list']:
@@ -365,6 +370,11 @@ def register(app):
                      inspector, s(f.get('notes')), g.user['username']))
                 if is_release:
                     con.execute(*auth.signature_row(SIG_QC_RECORD, 'qc_records', rec_no))
+                ncr_no = None
+                if fails:
+                    ncr_no = ncr.create(con, batch, AREA_AR[area], f'{t["title"]}: ' + '؛ '.join(
+                        f'{x["label"]} ({x["reason"]})' for x in fails), rec_no,
+                        'رئيسية' if is_release else 'ثانوية')
                 # إفراج المنتج غير المعقم هو الإفراج النهائي للتشغيلة
                 if is_release and decision == 'مفرج' and area == 'packaging' and t['route'] == 'non_sterile':
                     con.execute("UPDATE work_orders SET status=? WHERE batch_no=? AND status IN (?,?)",
@@ -372,7 +382,7 @@ def register(app):
             db.log('create', 'qc_records', rec_no, f'{t["code"]}; {batch or "-"}; {line or "-"}; {result}'
                    + (f'; {decision}' if decision else ''))
             if fails:
-                flash(f'سُجّل {rec_no} — غير مطابق: ' + '، '.join(f'{x["label"]} ({x["reason"]})' for x in fails), 'bad')
+                flash(f'سُجّل {rec_no} — غير مطابق وفُتحت {ncr_no}: ' + '، '.join(f'{x["label"]} ({x["reason"]})' for x in fails), 'bad')
             else:
                 flash(f'سُجّل {rec_no} — مطابق' + (f' · القرار: {decision}' if decision else ''), 'ok')
             return redirect(url_for('quality_record', rid=cur.lastrowid))

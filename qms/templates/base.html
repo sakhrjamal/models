@@ -22,6 +22,7 @@
     <a href="{{ url_for('cycles') }}"     class="{{ 'on' if nav=='cycles' }}">دورات التعقيم</a>
     <a href="{{ url_for('releases') }}"   class="{{ 'on' if nav=='rel' }}">شهادات الإفراج</a>
     <a href="{{ url_for('quality_home') }}" class="{{ 'on' if nav=='quality' }}">الجودة</a>
+    <a href="{{ url_for('ncr_list') }}" class="{{ 'on' if nav=='ncr' }}">عدم المطابقة</a>
     {% if can('audit') %}<a href="{{ url_for('audit_view') }}" class="{{ 'on' if nav=='admin' }}">سجل التدقيق</a>{% endif %}
     {% if can('admin') %}<a href="{{ url_for('users_admin') }}">المستخدمون</a>
     <a href="{{ url_for('backup_admin') }}">النسخ الاحتياطي</a>{% endif %}

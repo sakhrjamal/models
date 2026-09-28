@@ -334,12 +334,15 @@ CREATE TABLE IF NOT EXISTS shipments (          -- WH-FRM-007
 );
 CREATE INDEX IF NOT EXISTS ix_ship_batch ON shipments(batch_no);
 
-CREATE TABLE IF NOT EXISTS deviations (         -- QC-FRM-006
+CREATE TABLE IF NOT EXISTS deviations (         -- QC-FRM-006 عدم المطابقة NCR
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   dev_no TEXT, ddate TEXT, batch_no TEXT, stage TEXT,
   description TEXT, root_cause TEXT, action TEXT,
-  status TEXT DEFAULT 'مفتوح', owner TEXT, close_date TEXT
+  status TEXT DEFAULT 'مفتوح', owner TEXT, close_date TEXT,
+  source_rec TEXT, severity TEXT, disposition TEXT, qty_affected REAL,
+  created_by TEXT, closed_by TEXT
 );
+CREATE INDEX IF NOT EXISTS ix_dev_batch ON deviations(batch_no);
 
 -- ---------- سجل التدقيق ----------
 CREATE TABLE IF NOT EXISTS audit_log (

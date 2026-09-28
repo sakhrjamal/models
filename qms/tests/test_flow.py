@@ -240,6 +240,14 @@ class Flow(unittest.TestCase):
         d = dict(base); d.update(kw)
         return who.post(f'/quality/new/{code}', d)
 
+    def _close_ncrs(self, batch):
+        n = 0
+        for d in db.q("SELECT dev_no FROM deviations WHERE batch_no=? AND status<>'مغلق'", (batch,)):
+            self.qa.post(f"/ncr/{d['dev_no']}", {'act': 'close', 'root_cause': 'سبب', 'action': 'إجراء',
+                                                  'disposition': 'إعادة تشغيل / إعادة فحص', 'esign_pw': 'pass123'})
+            n += 1
+        return n
+
     def test_4_quality(self):
         if not getattr(type(self), 'pb', None):
             self.skipTest('يتطلب test_2')
@@ -277,6 +285,20 @@ class Flow(unittest.TestCase):
         rel = dict(base, f_clearance='مطابق', f_machine_size='مطابق', f_subroll_tags='مطابق',
                    f_first_piece='غير مطابق', f_cleanliness='مطابق', decision='مفرج', esign_pw='pass123')
         self.assertIn('لا يجوز الإفراج', body(self._qpost(self.qc, 'QC-FLD-REL', rel)))
+        # سجل الأبعاد غير المطابق فتح NCR تمنع الإفراج حتى تُغلق
+        opened = db.q("SELECT * FROM deviations WHERE batch_no=? AND status<>'مغلق'", (pb,))
+        self.assertEqual(len(opened), 1)
+        self.assertEqual(opened[0]['source_rec'], rec['rec_no'])
+        self.assertIn('عدم مطابقة مفتوحة', body(self._qpost(self.qc, 'QC-FLD-REL', dict(rel, f_first_piece='مطابق', esign_pw='pass123'))))
+        # إغلاق بلا سبب جذري أو توقيع مرفوض؛ QC لا يغلق
+        dn = opened[0]['dev_no']
+        self.assertIn('لا يُغلق قبل', body(self.qa.post(f'/ncr/{dn}', {'act': 'close', 'esign_pw': 'pass123'})))
+        self.assertEqual(self.qc.post(f'/ncr/{dn}', {'act': 'close'}, follow=False).status_code, 403)
+        full = {'root_cause': 'س', 'action': 'ج', 'disposition': 'فرز وفصل المطابق'}
+        self.assertIn('التوقيع', body(self.qa.post(f'/ncr/{dn}', dict(full, act='close', esign_pw='bad'))))
+        self.assertEqual(self._close_ncrs(pb), 1)
+        self.assertEqual(db.one('SELECT status s FROM deviations WHERE dev_no=?', (dn,))['s'], 'مغلق')
+        self.assertIn('مغلقة', body(self.qa.post(f'/ncr/{dn}', dict(full, act='update'))))
         rel.update(f_first_piece='مطابق', esign_pw='wrong')
         self.assertIn('التوقيع الإلكتروني غير صحيح', body(self._qpost(self.qc, 'QC-FLD-REL', rel)))
         rel['esign_pw'] = 'pass123'
@@ -313,7 +335,9 @@ class Flow(unittest.TestCase):
                   decision='مفرج', esign_pw='pass123')
         # آخر سجل للمغلفات مطابق ← يمر؛ نُفشل شرطًا بإضافة سجل غير مطابق أحدث
         self._qpost(self.qc, 'QC-PKS-ENV', env, f_count_env='9')
-        self.assertIn('لا يجوز الإفراج قبل', body(self._qpost(self.qa, 'QA-PKS-REL', qs)))
+        self.assertIn('عدم مطابقة مفتوحة', body(self._qpost(self.qa, 'QA-PKS-REL', qs)))
+        self.assertGreaterEqual(self._close_ncrs(pb), 1)
+        self.assertIn('لا يجوز الإفراج قبل', body(self._qpost(self.qa, 'QA-PKS-REL', qs)))   # آخر فحص مغلفات غير مطابق
         self._qpost(self.qc, 'QC-PKS-ENV', env)
         self._qpost(self.qa, 'QA-PKS-REL', qs)
         import quality
@@ -340,6 +364,8 @@ class Flow(unittest.TestCase):
         self._qpost(self.qc, 'QC-PKN-CTN', ctn)
         fp = dict(prd, batch_no=nb)
         self._qpost(self.qc, 'QC-FLD-PRD', fp)
+        self.assertIn('عدم مطابقة مفتوحة', body(self._qpost(self.qa, 'QA-PKN-REL', qa)))
+        self.assertEqual(self._close_ncrs(nb), 1)
         self._qpost(self.qa, 'QA-PKN-REL', qa)
         self.assertEqual(db.one('SELECT status s FROM work_orders WHERE batch_no=?', (nb,))['s'], 'مكتملة')
         tp = body(self.mgr.get(f'/trace?b={nb}'))
@@ -347,6 +373,19 @@ class Flow(unittest.TestCase):
         self.assertIn('QA-PKN-REL', tp)
         from forms import batch_progress
         self.assertEqual(batch_progress(nb)['decision'], 'مفرج عنها')
+
+        # NCR يدوية من الإنتاج، وصفحات وتقرير
+        self.op.post('/ncr/new', {'batch_no': pb, 'stage': 'الطي', 'severity': 'ثانوية', 'description': 'تالف زائد',
+                                  'qty_affected': '30'})
+        man = db.one("SELECT * FROM deviations WHERE description='تالف زائد'")
+        self.assertIsNotNone(man)
+        self.assertIsNone(man['source_rec'])
+        self.assertEqual(self.view.get('/ncr/new').status_code, 403)
+        self.assertIn(man['dev_no'], body(self.mgr.get(f'/trace?b={pb}')))
+        self.assertIn(man['dev_no'], body(self.mgr.get('/ncr')))
+        self.assertEqual(self.mgr.get(f"/ncr/{man['dev_no']}").status_code, 200)
+        self.assertIn(man['dev_no'], body(self.mgr.get(f'/reports/ncr?dfrom={TODAY}&dto={TODAY}')))
+        self._close_ncrs(pb)
 
         # ---- تعديل القالب يرفع الإصدار ولا يغيّر نسخة السجل القديم
         t = db.one("SELECT * FROM qc_templates WHERE code='QC-FLD-PRD'")

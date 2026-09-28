@@ -19,6 +19,7 @@
 <div class="kpi {{ 'warn' if k.rolls_hold else '' }}"><b>{{ k.rolls_hold }}</b><span>رول خام بالحجر</span></div>
 <div class="kpi {{ 'warn' if k.qc_due else 'ok' }}"><b>{{ k.qc_due }}</b><span>سجل جودة مستحق</span></div>
 <div class="kpi {{ 'bad' if k.qc_bad else 'ok' }}"><b>{{ k.qc_bad }}</b><span>غير مطابق (7 أيام)</span></div>
+<a class="kpi {{ 'bad' if k.ncr_open else 'ok' }}" href="{{ url_for('ncr_list') }}" style="display:block;color:inherit"><b>{{ k.ncr_open }}</b><span>عدم مطابقة مفتوحة</span></a>
 </div>
 
 <h2>أوامر الإنتاج المفتوحة</h2>

@@ -119,6 +119,21 @@ def seed_templates(con):
     return n
 
 
+NCR_COLS = [('source_rec', 'TEXT'), ('severity', 'TEXT'), ('disposition', 'TEXT'),
+            ('qty_affected', 'REAL'), ('created_by', 'TEXT'), ('closed_by', 'TEXT')]
+
+
+def ensure_ncr(con):
+    """يضيف أعمدة عدم المطابقة الجديدة إلى جدول deviations القائم."""
+    have = {r[1] for r in con.execute('PRAGMA table_info(deviations)')}
+    if not have:
+        return
+    for col, typ in NCR_COLS:
+        if col not in have:
+            con.execute(f'ALTER TABLE deviations ADD COLUMN {col} {typ}')
+    con.execute('CREATE INDEX IF NOT EXISTS ix_dev_batch ON deviations(batch_no)')
+
+
 def run(verbose=False):
     if not os.path.exists(db.DB_PATH):
         return
@@ -131,6 +146,7 @@ def run(verbose=False):
             if verbose:
                 print('  + أُعيد بناء جدول المستخدمين (أدوار جديدة).')
         ensure_templates_table(con)
+        ensure_ncr(con)
         for stmt in DDL:
             con.execute(stmt)
         for k, v, note in SETTINGS:
