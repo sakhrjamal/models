@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% block title %}صرف مواد التعبئة{% endblock %}{% block body %}
+<h1>صرف مواد التعبئة</h1>
+<div class="sub">فيلم / بوكس / كرتون خارجي لكل تشغيلة بلوط المادة — يظهر في تتبع التشغيلة</div>
+<div class="card noprint"><form class="searchbar"><select name="b" onchange="this.form.submit()" style="flex:1;min-width:260px;font-size:16px;padding:10px">
+<option value="">— اختر رقم التشغيلة —</option>{% for x in batches %}<option value="{{ x.batch_no }}" {{ 'selected' if x.batch_no==bn }}>{{ x.batch_no }} · {{ x.item_code }}</option>{% endfor %}</select></form></div>
+{% if b %}{% include "_batchbar.html" %}
+{% if can('enter') %}<div class="card noprint"><form class="grid" method="post"><input type="hidden" name="batch_no" value="{{ bn }}">
+<div><label>التاريخ *</label><input type="date" name="issue_date" value="{{ today() }}" required></div>
+<div class="full"><label>المادة * {% if hint %}<span class="mini">(المقترحة لهذا الصنف أولًا)</span>{% endif %}</label>
+<select name="item_code" required><option value="">— اختر —</option>{% for m in mats %}<option value="{{ m.item_code }}">{{ '★ ' if m.item_code in hint }}{{ m.item_code }} · {{ m.description }}</option>{% endfor %}</select></div>
+<div><label>نوع المادة</label><select name="mat_kind">{% for k in kinds %}<option>{{ k }}</option>{% endfor %}</select></div>
+<div><label>الكمية المصروفة *</label><input type="number" step="any" min="0.0001" name="qty_issued" required></div>
+<div><label>لوط المادة *</label><input name="lot" required></div>
+<div><label>أمين المخزن *</label><input name="storekeeper" required value="{{ me.full_name }}"></div>
+<div><label>مرجع الصرف (نظام المخزون)</label><input name="saptco_ref"></div>
+<div class="full"><button class="btn">تسجيل الصرف</button></div></form></div>{% endif %}
+{% if rows %}<table><tr><th>التاريخ</th><th>المادة</th><th>النوع</th><th>الكمية</th><th>اللوط</th><th>أمين المخزن</th><th>المرجع</th></tr>
+{% for r in rows %}<tr><td>{{ r.issue_date }}</td><td class="r">{{ r.item_code }} · {{ r.description }}</td><td>{{ r.mat_kind }}</td>
+<td>{{ '{:,.0f}'.format(r.qty_issued) }} {{ r.uom }}</td><td>{{ r.lot }}</td><td>{{ r.storekeeper }}</td><td>{{ r.saptco_ref or '—' }}</td></tr>{% endfor %}</table>
+{% else %}<div class="empty">لا يوجد صرف مسجّل لهذه التشغيلة.</div>{% endif %}{% endif %}{% endblock %}

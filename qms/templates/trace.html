@@ -140,9 +140,11 @@
 {% elif d.qc_release %}<div class="msg ok">أُفرج عن التشغيلة (منتج غير معقم) بسجل ضمان الجودة <a href="{{ url_for('quality_records', batch=d.batch_no) }}">{{ d.qc_release.rec_no }}</a> بتاريخ {{ d.qc_release.rec_date }} — {{ d.qc_release.inspector }}</div>
 {% else %}<div class="hint">لم تصدر شهادة إفراج لهذه التشغيلة — المنتج يبقى بحالة حجر ولا يُشحن.</div>{% endif %}
 {% endif %}
-{% if d.shipments %}<h2>٩ — الشحن</h2><table><tr><th>السند</th><th>التاريخ</th><th>العميل</th><th>الكمية</th><th>الشهادة</th></tr>
+{% if d.materials %}<h2>مواد التعبئة المصروفة</h2><table><tr><th>التاريخ</th><th>المادة</th><th>الكمية</th><th>اللوط</th><th>أمين المخزن</th></tr>
+{% for m in d.materials %}<tr><td>{{ m.issue_date }}</td><td class="r">{{ m.item_code }} · {{ m.description }}</td><td>{{ m.qty_issued }}</td><td>{{ m.lot or '—' }}</td><td>{{ m.storekeeper or '—' }}</td></tr>{% endfor %}</table>{% endif %}
+{% if d.shipments %}<h2>٩ — الشحن (العملاء)</h2><table><tr><th>السند</th><th>التاريخ</th><th>العميل</th><th>الكمية</th><th>الشهادة</th><th>الحالة</th></tr>
 {% for r in d.shipments %}<tr><td>{{ r.doc_no }}</td><td>{{ r.sdate }}</td><td>{{ r.customer }}</td>
-<td>{{ r.qty }}</td><td>{{ r.release_no or '—' }}</td></tr>{% endfor %}</table>{% endif %}
+<td>{{ r.qty }}</td><td>{{ r.release_no or '—' }}</td><td>{% if r.voided %}<span class="pill bad">مُبطَل</span>{% else %}<span class="pill ok">صالح</span>{% endif %}</td></tr>{% endfor %}</table>{% endif %}
 {% if d.ncr %}<h2>١١ — عدم المطابقة</h2><table><tr><th>الرقم</th><th>التاريخ</th><th>المرحلة</th><th>الوصف</th><th>التصرّف</th><th>الحالة</th></tr>
 {% for n in d.ncr %}<tr><td><a href="{{ url_for('ncr_view', dev_no=n.dev_no) }}">{{ n.dev_no }}</a></td><td>{{ n.ddate }}</td><td>{{ n.stage or '—' }}</td><td class="r">{{ (n.description or '')[:80] }}</td><td>{{ n.disposition or '—' }}</td>
 <td><span class="pill {{ 'ok' if n.status=='مغلق' else 'bad' }}">{{ n.status }}</span></td></tr>{% endfor %}</table>{% endif %}

@@ -367,6 +367,7 @@ class Flow(unittest.TestCase):
         self.assertIn('عدم مطابقة مفتوحة', body(self._qpost(self.qa, 'QA-PKN-REL', qa)))
         self.assertEqual(self._close_ncrs(nb), 1)
         self._qpost(self.qa, 'QA-PKN-REL', qa)
+        type(self).nb = nb
         self.assertEqual(db.one('SELECT status s FROM work_orders WHERE batch_no=?', (nb,))['s'], 'مكتملة')
         tp = body(self.mgr.get(f'/trace?b={nb}'))
         self.assertIn('مفرج عنها', tp)
@@ -434,6 +435,47 @@ class Flow(unittest.TestCase):
             c = db.use_number(con, None, 'T-260101', 'T-260101-{n3}')
             d = db.use_number(con, 'FREE-TEXT', 'T-260101', 'T-260101-{n3}')
         self.assertEqual((a, b, c, d), ('T-260101-001', 'T-260101-007', 'T-260101-008', 'FREE-TEXT'))
+
+    # ------------------------------------------------------------ 7. الشحن وصرف المواد
+    def test_7_shipping_materials(self):
+        nb = getattr(type(self), 'nb', None)
+        if not nb:
+            self.skipTest('يتطلب test_4')
+        pb = type(self).pb
+        # تشغيلة غير مفرجة (معقمة قبل الشهادة) لا تُشحن
+        r = self.op.post('/shipping', {'batch_no': pb, 'customer': 'ع', 'sdate': TODAY, 'shipper': 'ش', 'qty': '1'})
+        self.assertIn('غير مفرج', body(r))
+        db.run("INSERT INTO packaging(doc_no,batch_no,boxes,env_good,doc_status) VALUES('PKG-T-1',?,20,20,'مكتمل')", (nb,))
+        base = {'batch_no': nb, 'customer': 'مستشفى الأحساء', 'sdate': TODAY, 'shipper': 'مخزن'}
+        self.assertIn('إلزامية', body(self.op.post('/shipping', dict(base, qty='5', shipper=''))))
+        self.assertIn('الكمية غير صحيحة', body(self.op.post('/shipping', dict(base, qty='21'))))
+        self.op.post('/shipping', dict(base, qty='15'))
+        sh = db.one('SELECT * FROM shipments')
+        self.assertEqual((sh['qty'], sh['customer']), (15, 'مستشفى الأحساء'))
+        self.assertTrue(sh['doc_no'].startswith('SHP-'))
+        self.assertIn('الكمية غير صحيحة', body(self.op.post('/shipping', dict(base, qty='6'))))   # المتاح 5
+        # عدم مطابقة مفتوحة تمنع الشحن
+        self.op.post('/ncr/new', {'batch_no': nb, 'stage': 'المنتج النهائي', 'description': 'شكوى'})
+        self.assertIn('عدم مطابقة مفتوحة', body(self.op.post('/shipping', dict(base, qty='1'))))
+        self._close_ncrs(nb)
+        # الإبطال: المشغّل لا يبطل، والمدير بسبب وتوقيع
+        self.assertEqual(self.op.post(f"/shipping/{sh['id']}/void", {'reason': 'x'}, follow=False).status_code, 403)
+        self.assertIn('التوقيع', body(self.mgr.post(f"/shipping/{sh['id']}/void", {'reason': 'خطأ عميل', 'esign_pw': 'bad'})))
+        self.mgr.post(f"/shipping/{sh['id']}/void", {'reason': 'خطأ عميل', 'esign_pw': 'pass123'})
+        self.assertEqual(db.one('SELECT voided v FROM shipments')['v'], 1)
+        self.op.post('/shipping', dict(base, qty='20'))                                            # عاد المتاح كاملًا
+        self.assertIn('مستشفى الأحساء', body(self.mgr.get(f'/trace?b={nb}')))
+        self.assertIn(nb, body(self.mgr.get(f'/reports/ship?dfrom={TODAY}&dto={TODAY}')))
+        # صرف المواد
+        mat = db.one("SELECT item_code FROM items WHERE prefix='PK' AND status='نشط' LIMIT 1")['item_code']
+        m = {'batch_no': nb, 'item_code': mat, 'qty_issued': '500', 'lot': 'FILM-9', 'issue_date': TODAY, 'storekeeper': 'أمين'}
+        self.assertIn('إلزامية', body(self.op.post('/materials', dict(m, lot=''))))
+        self.op.post('/materials', m)
+        self.assertEqual(db.one('SELECT lot FROM bom WHERE batch_no=?', (nb,))['lot'], 'FILM-9')
+        self.assertIn('FILM-9', body(self.mgr.get(f'/trace?b={nb}')))
+        self.assertEqual(self.qc.post('/materials', m, follow=False).status_code, 403)
+        for url in ('/shipping', f'/shipping?b={nb}', f'/materials?b={nb}'):
+            self.assertEqual(self.mgr.get(url).status_code, 200, url)
 
 
 if __name__ == '__main__':

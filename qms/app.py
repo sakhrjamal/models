@@ -1671,7 +1671,8 @@ def backup_admin():
 
 
 # ---------------------------------------------------------------- الجودة ولوحة المدير والتقارير
-import quality, manager, ncr
+import quality, manager, ncr, logistics
+logistics.register(app)
 ncr.register(app)
 quality.register(app)
 manager.register(app)

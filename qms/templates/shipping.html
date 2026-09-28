@@ -1,0 +1,29 @@
+{% extends "base.html" %}{% block title %}الشحن{% endblock %}{% block body %}
+<h1>الشحن</h1>
+<div class="sub">WH-FRM-007 · لا يُشحن إلا ما أُفرج عنه، ولا مع عدم مطابقة مفتوحة — وكل سند يربط التشغيلة بالعميل (أساس الاسترجاع)</div>
+<div class="card noprint"><form class="searchbar" method="get">
+<select name="b" onchange="this.form.submit()" style="flex:1;min-width:260px;font-size:16px;padding:10px">
+<option value="">— اختر تشغيلة مفرج عنها —</option>
+{% for x in batches %}<option value="{{ x.batch_no }}" {{ 'selected' if x.batch_no==b }}>{{ x.batch_no }} · {{ x.item_code }} · متاح {{ '{:,.0f}'.format(x.available) }} {{ x.unit }}</option>{% endfor %}
+</select></form></div>
+{% if cur %}<div class="kpis"><div class="kpi ok"><b>{{ '{:,.0f}'.format(cur.released) }}</b><span>المفرج ({{ cur.ref }})</span></div>
+<div class="kpi"><b>{{ '{:,.0f}'.format(cur.shipped) }}</b><span>المشحون</span></div>
+<div class="kpi {{ 'warn' if cur.available else 'bad' }}"><b>{{ '{:,.0f}'.format(cur.available) }}</b><span>المتاح للشحن ({{ cur.unit }})</span></div></div>
+{% if can('enter') and cur.available %}<div class="card noprint"><form class="grid" method="post">
+<input type="hidden" name="batch_no" value="{{ b }}">
+<div><label>رقم السند</label><input name="doc_no" placeholder="تلقائي"></div>
+<div><label>التاريخ *</label><input type="date" name="sdate" value="{{ today() }}" required></div>
+<div><label>العميل *</label><input name="customer" required></div>
+<div><label>الكمية ({{ cur.unit }}) *</label><input type="number" step="any" min="0.0001" max="{{ cur.available }}" name="qty" required value="{{ cur.available|int }}"></div>
+<div><label>المسؤول عن الشحن *</label><input name="shipper" required value="{{ me.full_name }}"></div>
+<div class="full"><label>ملاحظات (رقم الشاحنة، الفاتورة…)</label><input name="notes"></div>
+<div class="full"><button class="btn">تسجيل الشحن</button></div></form></div>{% endif %}{% endif %}
+<h2>سجل الشحنات {% if b %}— {{ b }}{% endif %}</h2>
+{% if rows %}<div class="tablewrap"><table><tr><th>السند</th><th>التاريخ</th><th>التشغيلة</th><th>الصنف</th><th>العميل</th><th>الكمية</th><th>الإفراج</th><th>المسؤول</th><th>الحالة</th></tr>
+{% for r in rows %}<tr><td>{{ r.doc_no }}</td><td>{{ r.sdate }}</td><td><a href="{{ url_for('trace_view', b=r.batch_no) }}">{{ r.batch_no }}</a></td><td>{{ r.item_code }}</td>
+<td>{{ r.customer }}</td><td>{{ '{:,.0f}'.format(r.qty) }} {{ r.unit or r.uom or '' }}</td><td>{{ r.release_no or '—' }}</td><td>{{ r.shipper or '—' }}</td>
+<td>{% if r.voided %}<span class="pill bad">مُبطَل</span><div class="mini">{{ r.void_reason }}</div>
+{% elif can('wo_close') %}<form method="post" action="{{ url_for('shipping_void', sid=r.id) }}" class="noprint" style="display:flex;gap:4px">
+<input name="reason" placeholder="سبب الإبطال" required style="width:120px"><input type="password" name="esign_pw" placeholder="كلمة المرور" required style="width:100px"><button class="smallbtn g">إبطال</button></form>
+{% else %}<span class="pill ok">صالح</span>{% endif %}</td></tr>{% endfor %}</table></div>
+{% else %}<div class="empty">لا توجد شحنات.</div>{% endif %}{% endblock %}

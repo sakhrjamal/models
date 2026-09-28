@@ -158,7 +158,8 @@ CREATE TABLE IF NOT EXISTS bom (                -- احتياج المواد
   batch_no TEXT,
   mat_kind TEXT, item_code TEXT, description TEXT,
   qty_required REAL, uom TEXT, qty_issued REAL,
-  saptco_ref TEXT, issue_date TEXT, storekeeper TEXT, notes TEXT
+  saptco_ref TEXT, issue_date TEXT, storekeeper TEXT, notes TEXT,
+  lot TEXT, created_by TEXT, voided INTEGER DEFAULT 0, void_reason TEXT
 );
 
 -- ---------- الأسليتر ----------
@@ -330,7 +331,8 @@ CREATE TABLE IF NOT EXISTS shipments (          -- WH-FRM-007
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   doc_no TEXT, sdate TEXT, batch_no TEXT, item_code TEXT,
   customer TEXT, qty REAL, uom TEXT,
-  release_no TEXT, notes TEXT
+  release_no TEXT, notes TEXT,
+  unit TEXT, shipper TEXT, created_by TEXT, voided INTEGER DEFAULT 0, void_reason TEXT, void_by TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_ship_batch ON shipments(batch_no);
 

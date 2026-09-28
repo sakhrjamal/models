@@ -123,6 +123,24 @@ NCR_COLS = [('source_rec', 'TEXT'), ('severity', 'TEXT'), ('disposition', 'TEXT'
             ('qty_affected', 'REAL'), ('created_by', 'TEXT'), ('closed_by', 'TEXT')]
 
 
+EXTRA_COLS = {
+    'shipments': [('unit', 'TEXT'), ('shipper', 'TEXT'), ('created_by', 'TEXT'), ('voided', 'INTEGER DEFAULT 0'),
+                  ('void_reason', 'TEXT'), ('void_by', 'TEXT')],
+    'bom': [('lot', 'TEXT'), ('created_by', 'TEXT'), ('voided', 'INTEGER DEFAULT 0'), ('void_reason', 'TEXT')],
+}
+
+
+def ensure_extra(con):
+    """أعمدة الشحن وصرف المواد على الجداول القائمة."""
+    for table, cols in EXTRA_COLS.items():
+        have = {r[1] for r in con.execute(f'PRAGMA table_info({table})')}
+        if not have:
+            continue
+        for col, typ in cols:
+            if col not in have:
+                con.execute(f'ALTER TABLE {table} ADD COLUMN {col} {typ}')
+
+
 def ensure_ncr(con):
     """يضيف أعمدة عدم المطابقة الجديدة إلى جدول deviations القائم."""
     have = {r[1] for r in con.execute('PRAGMA table_info(deviations)')}
@@ -147,6 +165,7 @@ def run(verbose=False):
                 print('  + أُعيد بناء جدول المستخدمين (أدوار جديدة).')
         ensure_templates_table(con)
         ensure_ncr(con)
+        ensure_extra(con)
         for stmt in DDL:
             con.execute(stmt)
         for k, v, note in SETTINGS:

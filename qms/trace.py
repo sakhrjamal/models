@@ -67,6 +67,7 @@ def batch_chain(batch_no):
                             AND batch_no=? AND decision='مفرج' ORDER BY id DESC LIMIT 1""", (b,))
     d['shipments']= q('SELECT * FROM shipments WHERE batch_no=? ORDER BY id', (b,))
     d['slit_batches'] = slit_batches
+    d['materials'] = q('SELECT * FROM bom WHERE batch_no=? AND IFNULL(voided,0)=0 ORDER BY id', (b,))
     d['ncr'] = q('SELECT * FROM deviations WHERE batch_no=? ORDER BY id', (b,))
 
     # سجلات الجودة المرتبطة بالتشغيلة وبأوامر التقطيع التي غذّتها
