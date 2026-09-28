@@ -362,7 +362,7 @@ CREATE TABLE IF NOT EXISTS users (
   full_name      TEXT NOT NULL,
   pw_hash        TEXT NOT NULL,
   role           TEXT NOT NULL DEFAULT 'viewer'
-                 CHECK(role IN ('viewer','operator','qc','qa','manager','admin')),
+                 CHECK(role IN ('viewer','operator','store','qc','qa','manager','admin')),
   active         INTEGER NOT NULL DEFAULT 1,
   must_change_pw INTEGER NOT NULL DEFAULT 0,
   created_at     TEXT DEFAULT (datetime('now','localtime')),

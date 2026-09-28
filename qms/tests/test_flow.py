@@ -11,11 +11,11 @@ sys.path.insert(0, os.path.dirname(HERE))
 _tmp = tempfile.mkdtemp(prefix='qms-test-')
 os.environ['QMS_DB'] = os.path.join(_tmp, 'qms.db')
 
-import seed, migrate_v11, migrate_v12, db, auth        # noqa: E402
+import seed, migrate_v11, migrate_v12, migrate_v13, db, auth   # noqa: E402
 seed.main()
-migrate_v11.run(); migrate_v12.run(); db.apply_migrations()
+migrate_v11.run(); migrate_v12.run(); migrate_v13.run(); db.apply_migrations()
 auth.ensure_admin()
-for un, role in (('mgr', 'manager'), ('op', 'operator'), ('qc', 'qc'), ('qa', 'qa'), ('view', 'viewer')):
+for un, role in (('mgr', 'manager'), ('op', 'operator'), ('qc', 'qc'), ('qa', 'qa'), ('view', 'viewer'), ('store', 'store')):
     db.run("INSERT INTO users(username,full_name,pw_hash,role,active,must_change_pw) VALUES(?,?,?,?,1,0)",
            (un, f'مستخدم {un}', auth.hash_pw('pass123'), role))
 from app import app                                     # noqa: E402
@@ -48,6 +48,7 @@ class Flow(unittest.TestCase):
     def setUpClass(cls):
         cls.mgr, cls.op, cls.qc, cls.qa = Client('mgr'), Client('op'), Client('qc'), Client('qa')
         cls.view = Client('view')
+        cls.store = Client('store')
         it = db.one("""SELECT * FROM items WHERE prefix IN ('GS','GB') AND machine_code='FD-05' AND ply=8
                        AND sterile='معقم' AND status='نشط' ORDER BY item_code LIMIT 1""")
         cls.item = it
@@ -253,7 +254,7 @@ class Flow(unittest.TestCase):
             self.skipTest('يتطلب test_2')
         pb = type(self).pb
         n_tpl = db.one('SELECT COUNT(*) n FROM qc_templates')['n']
-        self.assertEqual(n_tpl, 23)
+        self.assertEqual(n_tpl, 29)
         base = {'rec_date': TODAY, 'shift': 'أ', 'line_code': 'FD-05', 'batch_no': pb, 'inspector': 'مراقب'}
         chk = {k: 'مطابق' for k in ('edge_seq', 'impurities', 'hair', 'stains', 'holes', 'xray')}
         dims = {'f_len1': '5.2', 'f_len2': '5.0', 'f_len3': '5.4', 'f_wid1': '5.0', 'f_wid2': '4.7', 'f_wid3': '5.3',
@@ -446,7 +447,16 @@ class Flow(unittest.TestCase):
         r = self.op.post('/shipping', {'batch_no': pb, 'customer': 'ع', 'sdate': TODAY, 'shipper': 'ش', 'qty': '1'})
         self.assertIn('غير مفرج', body(r))
         db.run("INSERT INTO packaging(doc_no,batch_no,boxes,env_good,doc_status) VALUES('PKG-T-1',?,20,20,'مكتمل')", (nb,))
+        # لا شحن قبل الاستلام في المخزن؛ الاستلام لأمين المخزن فقط وبعد الإفراج
         base = {'batch_no': nb, 'customer': 'مستشفى الأحساء', 'sdate': TODAY, 'shipper': 'مخزن'}
+        self.assertIn('لم تُستلم', body(self.op.post('/shipping', dict(base, qty='5'))))
+        wh = {'batch_no': nb, 'rdate': TODAY, 'qty': '20', 'location': 'مستودع A', 'received_by': 'أمين'}
+        self.assertEqual(self.op.post('/warehouse', wh, follow=False).status_code, 403)
+        self.assertIn('لا يمكن إدخال', body(self.store.post('/warehouse', dict(wh, batch_no=pb))))
+        self.assertIn('الكمية غير صحيحة', body(self.store.post('/warehouse', dict(wh, qty='25'))))
+        self.store.post('/warehouse', wh)
+        self.assertEqual(db.one('SELECT SUM(qty) n FROM fg_receipts WHERE batch_no=?', (nb,))['n'], 20)
+        self.assertEqual(db.one("SELECT SUM(qty) n FROM stock_tx WHERE batch_no=? AND stage='FG'", (nb,))['n'], 20)
         self.assertIn('إلزامية', body(self.op.post('/shipping', dict(base, qty='5', shipper=''))))
         self.assertIn('الكمية غير صحيحة', body(self.op.post('/shipping', dict(base, qty='21'))))
         self.op.post('/shipping', dict(base, qty='15'))

@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% block title %}استلام المنتج التام{% endblock %}{% block body %}
+<h1>استلام المنتج التام في المخزن</h1>
+<div class="sub">لا يدخل المخزن إلا ما أُفرج عنه نهائيًا (شهادة إفراج أو إفراج ضمان الجودة)، وبما لا يتجاوز المفرج. يُفرَّغ من WIP ويُقيَّد في المنتج التام.</div>
+{% if pending %}{% for p in pending %}<div class="card"><div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:space-between">
+<div><a href="{{ url_for('genealogy', b=p.batch_no) }}"><b>{{ p.batch_no }}</b></a> · {{ p.item_code }} <span class="pill ok">مفرج — {{ p.ref }}</span></div>
+<div>المفرج {{ '{:,.0f}'.format(p.released) }} · المستلم {{ '{:,.0f}'.format(p.received) }} · <b>المتبقي {{ '{:,.0f}'.format(p.pending) }} {{ p.unit }}</b></div></div>
+{% if can('warehouse') %}<form method="post" class="grid noprint" style="margin-top:10px"><input type="hidden" name="batch_no" value="{{ p.batch_no }}">
+<div><label>التاريخ *</label><input type="date" name="rdate" value="{{ today() }}" required></div>
+<div><label>الكمية ({{ p.unit }}) *</label><input type="number" step="any" min="0.0001" max="{{ p.pending }}" name="qty" value="{{ p.pending|int if p.pending==p.pending|int else p.pending }}" required></div>
+<div><label>موقع المخزن *</label><input name="location" required placeholder="مستودع المنتج التام — رف"></div>
+<div><label>المستلم *</label><input name="received_by" required value="{{ me.full_name }}"></div>
+<div style="align-self:end"><button class="btn">تأكيد النقل للمخزن</button></div></form>{% endif %}</div>
+{% endfor %}{% else %}<div class="empty">لا توجد تشغيلات مفرج عنها بانتظار الاستلام.</div>{% endif %}
+{% if recent %}<h2>آخر الاستلامات</h2><table><tr><th>السند</th><th>التاريخ</th><th>التشغيلة</th><th>الكمية</th><th>الموقع</th><th>المستلم</th><th>الإفراج</th></tr>
+{% for r in recent %}<tr><td>{{ r.doc_no }}</td><td>{{ r.rdate }}</td><td>{{ r.batch_no }}</td><td>{{ '{:,.0f}'.format(r.qty) }} {{ r.unit }}</td><td>{{ r.location }}</td><td>{{ r.received_by }}</td><td>{{ r.release_ref }}</td></tr>{% endfor %}</table>{% endif %}
+{% endblock %}

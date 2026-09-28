@@ -1,0 +1,7 @@
+{# شريط خطوات المسار وتقدّمه الحقيقي — يتطلب المتغير progress (mfg.progress) #}
+{% if progress and progress.steps %}<div class="card" style="padding:12px 16px">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+<b>مسار الأمر: {{ (mfg.route(progress.route) or {}).get('name_ar') if mfg is defined else progress.route }}</b>
+<span class="mini">التقدّم {{ progress.pct }}% · المرحلة الحالية: {{ progress.current }}</span></div>
+<div class="bar" style="margin:8px 0"><i style="width:{{ progress.pct }}%"></i></div>
+<div class="stepbar">{% for st in progress.steps %}<div class="st {{ st.state }}">{{ st.name }}<i>{{ (st.frac*100)|round|int }}%</i></div>{% endfor %}</div></div>{% endif %}

@@ -26,6 +26,13 @@ AREAS = {
     'packaging':     dict(ar='التغليف والمنتج النهائي',  stage='التغليف',        batch='PROD'),
     'sterilization': dict(ar='التعقيم',                  stage='التعقيم',        batch='PROD'),
     'general':       dict(ar='عام (مخبر / بيئة / عينات)', stage=None,             batch='PROD'),
+    'bandage':       dict(ar='خط الرباط الضاغط',         stage='الأربطة',        batch='PROD'),
+}
+# مسارات التصنيع التي ينطبق عليها كل نوع منطقة افتراضيًا (تُعدَّل لكل قالب في قاعدة البيانات)
+AREA_ROUTES = {
+    'slitter': ['FULL_GAUZE'], 'folding': ['FULL_GAUZE'],
+    'packaging': ['FULL_GAUZE', 'SP_GAUZE'], 'sterilization': ['FULL_GAUZE', 'SP_GAUZE'],
+    'general': ['FULL_GAUZE', 'SP_GAUZE', 'BANDAGE'], 'bandage': ['BANDAGE'],
 }
 DEPTS = {'QC': 'مراقبة الجودة', 'QA': 'ضمان الجودة'}
 KINDS = {
@@ -54,8 +61,8 @@ def _t(id_, label, req=False):
     return dict(id=id_, label=label, type='text', required=req)
 
 
-def _dim(id_, label, of, tol=0.4):
-    return dict(id=id_, label=label, type='dim', required=True, nominal_from=of, tol=tol, unit='سم')
+def _dim(id_, label, of, tol=0.4, req=True):
+    return dict(id=id_, label=label, type='dim', required=req, nominal_from=of, tol=tol, unit='سم' if of != 'length_m' else 'م')
 
 
 def _match(id_, label, to):
@@ -101,8 +108,10 @@ PRINT_BLOCK = lambda what: [                                   # noqa: E731
 def templates():
     T = []
 
-    def add(code, title, dept, kind, area, fields, route='all', freq=None, batch=None, requires=None, note=''):
+    def add(code, title, dept, kind, area, fields, route='all', freq=None, batch=None, requires=None, note='',
+            final=False):
         T.append(dict(code=code, title=title, dept=dept, kind=kind, area=area, route=route,
+                      mfg_routes=list(AREA_ROUTES[area]), is_final=int(final),
                       freq_hours=freq,
                       needs_batch=int(batch if batch is not None else kind in ('release', 'inspection')),
                       fields=fields, requires=requires or [],
@@ -188,7 +197,7 @@ def templates():
         _c('records', 'مراجعة سندات الطي والفرز والتغليف للتشغيلة'),
         _c('raw_ok', 'مراجعة فحص الخام المستخدم'),
         _c('nc_closed', 'إغلاق أي عدم مطابقة مرتبطة بالتشغيلة'), NOTES],
-        route='non_sterile', requires=['QC-FLD-PRD', 'QC-PKN-FIN', 'QC-PKN-CTN'],
+        route='non_sterile', requires=['QC-FLD-PRD', 'QC-PKN-FIN', 'QC-PKN-CTN'], final=True,
         note='لا يُقبل «مفرج» قبل وجود سجلات مطابقة لفحص المنتج أثناء الطي والمنتج النهائي والكراتين.')
 
     # ======================= المعقم: المغلفات والبوكسات والكراتين ← التعقيم
@@ -228,6 +237,38 @@ def templates():
         _c('residue', 'تقارير متبقيات EO / ECH محدّثة'),
         _c('validation', 'التأهيل الدوري للماكينة'),
         _c('cycles_review', 'مراجعة عينة من تقارير الدورات'), NOTES], route='sterile', freq=168)
+
+    # ======================= الرباط الضاغط (غير معقم دائمًا)
+    add('QC-BND-REL', 'إفراج بدء تشغيل ماكينة الأربطة — مراقبة الجودة', 'QC', 'release', 'bandage', [
+        _c('clearance', 'تفريغ الماكينة من مواد التشغيلة السابقة (Line Clearance)'),
+        _c('jumbo_ok', 'الجامبو رول المخصص مفرج عنه ومطابق للمنتج (العرض والنوع)'),
+        _c('settings', 'ضبط الماكينة على عرض وطول الرول المطلوب'),
+        _c('first_roll', 'اعتماد أول رول (العرض، الطول، الشد، الحواف)'),
+        _c('cleanliness', 'نظافة الماكينة قبل التشغيل'), NOTES], route='non_sterile')
+    add('QC-BND-PRD', 'فحص أثناء تصنيع الرباط — مراقبة الجودة', 'QC', 'periodic', 'bandage', [
+        _dim('w1', 'عرض الرباط — عينة 1', 'width_cm'), _dim('w2', 'عرض الرباط — عينة 2', 'width_cm'),
+        _dim('w3', 'عرض الرباط — عينة 3', 'width_cm'),
+        _dim('l1', 'طول الرول — عينة 1', 'length_m', tol=0.1, req=False), _dim('l2', 'طول الرول — عينة 2', 'length_m', tol=0.1, req=False),
+        _c('tension', 'انتظام الشد واللف'), _c('edges', 'سلامة الحواف وعدم التقطع'),
+        _c('impurities', 'خلو من الشوائب والشعر'), _c('stains', 'خلو من البقع'), NOTES],
+        route='non_sterile', freq=4, batch=True,
+        note='سماحيات العرض والطول مبدئية (0.4 سم / 0.1 م) — عدّلوها من القالب حسب مواصفة المنتج.')
+    add('QC-BND-WRP', 'فحص تغليف الرباط (المظهر والطباعة)', 'QC', 'inspection', 'bandage',
+        [_c('wrap_intact', 'سلامة الغلاف وإحكامه'), _c('appearance', 'شكل الرول داخل الغلاف')] +
+        PRINT_BLOCK('غلاف الرول') + [NOTES], route='non_sterile')
+    add('QC-BND-FIN', 'فحص المنتج النهائي: البوكسات والكراتين (العدد والطباعة)', 'QC', 'inspection', 'bandage',
+        [_exp('roll_box', 'عدد الرولات داخل البوكس', 'per_box', 'رول'),
+         _exp('box_carton', 'عدد البوكسات داخل الكرتونة', 'per_carton', 'بوكس'),
+         _c('box_cond', 'سلامة البوكس والكرتونة')] + PRINT_BLOCK('البوكس') +
+        [_match('carton_batch', 'رقم التشغيلة المطبوع على الكرتونة', 'batch_no'),
+         _match('carton_item', 'كود/اسم الصنف المطبوع على الكرتونة', 'item_code'), NOTES], route='non_sterile')
+    add('QA-BND-REL', 'الإفراج النهائي للرباط الضاغط — ضمان الجودة', 'QA', 'release', 'bandage', [
+        _c('records', 'مراجعة سندات الماكينة والتغليف والبوكسات والكراتين'),
+        _c('raw_ok', 'مراجعة فحص الجامبو رول المستخدم'),
+        _c('nc_closed', 'إغلاق أي عدم مطابقة مرتبطة'), NOTES],
+        route='non_sterile', requires=['QC-BND-PRD', 'QC-BND-WRP', 'QC-BND-FIN'], final=True,
+        note='لا يُقبل «مفرج» قبل فحص التصنيع والتغليف والمنتج النهائي مطابقة. ينقل الدفعة إلى «جاهزة للمخزن».')
+    add('QA-BND-DLY', 'سجل يومي — ضمان الجودة — خط الأربطة', 'QA', 'daily', 'bandage', GMP_DAILY, freq=24)
 
     # ======================= مقترحات إضافية (عامة)
     add('QC-LAB-INS', 'اختبارات مخبرية على عينة التشغيلة (مقترح)', 'QC', 'inspection', 'general', [

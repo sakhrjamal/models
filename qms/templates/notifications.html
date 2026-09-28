@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block title %}الإشعارات{% endblock %}{% block body %}
+<h1>الإشعارات</h1>
+<div class="sub">تصلك الإشعارات حسب صلاحيتك وخطوط الإنتاج المسموحة لك</div>
+<form method="post" class="actions noprint" style="margin-bottom:10px"><button class="btn g">تعليم الكل كمقروء</button></form>
+<div class="card" style="padding:0;overflow:hidden">
+{% for n in rows %}<a class="nrow {{ '' if n.read else 'unread' }}" href="{{ url_for('notification_go', nid=n.id) }}" style="color:inherit;text-decoration:none">
+<div><div class="t">{{ n.title }}</div><div class="m">{{ n.body or '' }}</div></div><div class="m">{{ n.ts }}</div></a>
+{% else %}<div class="empty" style="padding:16px">لا توجد إشعارات.</div>{% endfor %}</div>
+{% endblock %}

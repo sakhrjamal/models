@@ -71,6 +71,25 @@ def need(perm):
         abort(403)
 
 
+def user_lines(u=None):
+    """خطوط الإنتاج (مسارات) المسموحة للمستخدم؛ فارغ = كل الخطوط (المدير والمسؤول دائمًا كلها)."""
+    u = u or getattr(g, 'user', None)
+    if not u or u['role'] in ('manager', 'admin'):
+        return []
+    return [x for x in (u.get('lines') or '').split(',') if x]
+
+
+def line_ok(route_code):
+    """هل يستطيع المستخدم العمل على خط الإنتاج route_code؟"""
+    lines = user_lines()
+    return not lines or not route_code or route_code in lines
+
+
+def need_line(route_code):
+    if not line_ok(route_code):
+        abort(403)
+
+
 def require(perm='view'):
     """مُزخرِف للمسارات: يطلب تسجيل الدخول والصلاحية."""
     def deco(fn):

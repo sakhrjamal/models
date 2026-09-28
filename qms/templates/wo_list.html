@@ -6,7 +6,7 @@
 <a class="btn g" href="{{ url_for('wo_new', t='تقطيع') }}">أمر تقطيع (أسليتر)</a></div>{% endif %}
 {% if rows %}<div class="tablewrap"><table><tr><th>أمر التشغيل</th><th>رقم التشغيلة</th><th>النوع</th>
 <th>الصنف</th><th>المقاس / الطبقات</th><th>المسار</th><th>الماكينة</th><th>الكمية المطلوبة</th>
-<th>المرحلة / التقدّم</th><th>تاريخ البدء</th><th>الحالة</th><th>الإفراج</th>{% if can('wo_close') %}<th></th>{% endif %}</tr>
+<th>مسار التصنيع</th><th>المرحلة / التقدّم</th><th>تاريخ البدء</th><th>الحالة</th><th>الإفراج</th>{% if can('wo_close') %}<th></th>{% endif %}</tr>
 {% for r in rows %}{% set p = r.prog %}<tr><td>{{ r.wo_no }}</td>
 <td><a href="{{ url_for('trace_view', b=r.batch_no) }}"><b>{{ r.batch_no }}</b></a></td>
 <td>{{ r.order_type or 'إنتاج' }}</td>
@@ -14,11 +14,10 @@
 <td>{% if r.size %}{{ r.size }} · {{ r.ply }}ط{% else %}—{% endif %}</td><td>{{ r.route if r.route != '—' else '—' }}</td>
 <td>{{ r.fold_machine or '—' }}</td>
 <td>{% if r.qty_required %}{{ '{:,.0f}'.format(r.qty_required) }} {{ r.uom or '' }}{% else %}—{% endif %}</td>
-<td style="min-width:190px">{% if p %}<div style="font-size:12px;margin-bottom:3px">{{ p.stage }}</div>
-{% if p.pct_fold is not none %}<div class="bar" title="طي {{ '{:,.0f}'.format(p.fold_good) }}"><i style="width:{{ p.pct_fold }}%"></i></div>
-<div class="mini">طي {{ p.pct_fold }}% · تغليف {{ p.pct_pack }}%</div>
-{% elif p.fold_good %}<div class="mini">طي {{ '{:,.0f}'.format(p.fold_good) }}</div>{% endif %}
-{% else %}<span class="mini">أسليتر</span>{% endif %}</td>
+<td>{% if r.order_type=='تقطيع' %}<span class="mini">أسليتر</span>{% else %}<span class="mini">{{ (mfg.route(r.route_code) or {}).get('name_ar') or 'الشاش — تصنيع كامل' }}</span>{% if r.route_override %} <span class="pill warn">استثنائي</span>{% endif %}{% endif %}</td>
+<td style="min-width:200px">{% if p and p.route_progress %}<div style="font-size:12px;margin-bottom:3px">{{ p.route_progress.current }}</div>
+<div class="bar"><i style="width:{{ p.route_progress.pct }}%"></i></div><div class="mini">{{ p.route_progress.pct }}%</div>
+{% elif r.order_type=='تقطيع' %}<span class="mini">أسليتر</span>{% endif %}</td>
 <td>{{ r.batch_start_date or '—' }}</td>
 <td><span class="pill {{ cls_for(r.status) }}">{{ r.status }}</span></td>
 <td>{% set dec = r.decision or (p.decision if p else None) %}{% if dec %}<span class="pill {{ cls_for(dec) }}">{{ dec }}</span>{% else %}<span class="pill warn">—</span>{% endif %}</td>

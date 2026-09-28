@@ -8,7 +8,7 @@
 import csv, io, datetime
 from flask import render_template, request, Response, abort
 
-import db, auth, forms, quality
+import db, auth, forms, quality, mfg
 from util import s
 
 
@@ -126,6 +126,7 @@ def register(app):
                               batch_start_date""")
         for w in open_orders:
             w['prog'] = forms.batch_progress(w['batch_no'])
+            w['rp'] = mfg.progress(w['batch_no'])
             w['late'] = bool(w.get('due_date') and w['due_date'] < today)
         open_sl = db.q("""SELECT w.*, (SELECT COUNT(*) FROM subrolls x WHERE x.slit_batch=w.batch_no OR x.batch_no=w.batch_no) subs
                           FROM work_orders w WHERE COALESCE(order_type,'إنتاج')='تقطيع'
@@ -144,8 +145,10 @@ def register(app):
             rolls_hold=db.one("SELECT COUNT(*) n FROM rolls WHERE stock_status='حجر'")['n'],
             qc_due=len(due), qc_bad=len(bad),
             ncr_open=db.one("SELECT COUNT(*) n FROM deviations WHERE status<>'مغلق'")['n'])
+        import lines
+        cards = [lines.line_stats(r['code']) for r in lines.visible_routes()]
         return render_template('manager_home.html', nav='mgr', k=k, open_orders=open_orders,
-                               open_sl=open_sl, due=due[:8], bad=bad)
+                               open_sl=open_sl, due=due[:8], bad=bad, cards=cards)
 
     @route('/reports', 'reports')
     @auth.require('reports')

@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% block title %}بيانات المنتجات{% endblock %}{% block body %}
+<h1>بيانات المنتجات (Product Master)</h1>
+<div class="sub">مسار التصنيع يُربط بالصنف هنا، فيتحدد تلقائيًا عند إصدار أمر الإنتاج. تغيير المسار لا يمس الأوامر القائمة.</div>
+<div class="card noprint"><form class="searchbar" method="get">
+<input type="text" name="q" value="{{ a.get('q','') }}" placeholder="بحث بالكود أو الوصف" style="flex:1;min-width:200px;font-size:14px;padding:8px">
+<select name="route" style="width:auto"><option value="">كل المسارات</option><option value="none" {{ 'selected' if a.get('route')=='none' }}>بلا مسار</option>{% for r in routes %}<option value="{{ r.code }}" {{ 'selected' if a.get('route')==r.code }}>{{ r.name_ar }}</option>{% endfor %}</select>
+<select name="cat" style="width:auto"><option value="">كل الفئات</option>{% for c in cats %}<option {{ 'selected' if a.get('cat')==c }}>{{ c }}</option>{% endfor %}</select>
+<button class="btn">تصفية</button><a class="btn g" href="{{ url_for('master_product_new') }}">+ صنف جديد</a><a class="btn g" href="{{ url_for('master_routes') }}">المسارات</a></form></div>
+<form method="post"><input type="hidden" name="act" value="bulk">
+<div class="card noprint actions">تعيين مسار للأصناف المحدّدة:
+<select name="route_code" style="width:auto"><option value="">— بلا مسار —</option>{% for r in routes %}<option value="{{ r.code }}">{{ r.name_ar }}</option>{% endfor %}</select><button class="btn g">تطبيق</button></div>
+<div class="tablewrap"><table><tr><th><input type="checkbox" onclick="document.querySelectorAll('.cb').forEach(c=>c.checked=this.checked)"></th><th>الكود</th><th>الوصف</th><th>الفئة</th><th>معقم</th><th>الوحدة</th><th>المسار</th><th>تكوين التعبئة</th><th></th></tr>
+{% for r in rows %}<tr><td><input type="checkbox" class="cb" name="code" value="{{ r.item_code }}"></td><td><b>{{ r.item_code }}</b></td><td class="r">{{ (r.description or '')[:70] }}</td>
+<td>{{ r.product_category or '—' }}</td><td>{{ r.sterile or '—' }}</td><td>{{ r.uom or '—' }}</td>
+<td>{% if r.route_name %}<span class="pill ok">{{ r.route_name }}</span>{% else %}<span class="pill warn">بلا مسار</span>{% endif %}</td>
+<td>{{ (r.npack ~ ' مستويات') if r.npack else '—' }}</td><td><a href="{{ url_for('master_product', code=r.item_code) }}">تعديل</a></td></tr>{% endfor %}</table></div></form>
+{% endblock %}

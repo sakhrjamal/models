@@ -9,7 +9,7 @@
 import datetime
 from flask import render_template, request, redirect, url_for, flash, abort, g
 
-import db, auth
+import db, auth, notify
 from util import s, num, doc_scope
 
 ST_OPEN, ST_WORK, ST_CLOSED = 'مفتوح', 'قيد المعالجة', 'مغلق'
@@ -33,6 +33,10 @@ def create(con, batch_no, stage, description, source_rec=None, severity='ثان�
                    VALUES(?,?,?,?,?,?,?,?,?)""",
                 (no, datetime.date.today().isoformat(), batch_no, stage, description, ST_OPEN,
                  source_rec, severity, actor or (g.user['username'] if getattr(g, 'user', None) else 'system')))
+    rc = (db.one('SELECT route_code FROM work_orders WHERE batch_no=?', (batch_no,)) or {}).get('route_code') if batch_no else None
+    from flask import url_for
+    notify.push(con, 'ncr', f'فُتحت عدم مطابقة {no}' + (f' على التشغيلة {batch_no}' if batch_no else ''),
+                (description or '')[:120], url_for('ncr_view', dev_no=no), batch_no, rc, ('qc_sign', 'wo_issue'))
     return no
 
 

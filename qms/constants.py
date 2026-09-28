@@ -10,10 +10,11 @@ import re
 # ----------------------------------------------------------- أدوار المستخدمين
 # v12: الصلاحيات صريحة لكل دور (لا ترتيب هرمي) حتى لا يرث مدير المصنع
 # صلاحية اعتماد الجودة، ولا يرث مراقب الجودة صلاحية إصدار أوامر الإنتاج.
-ROLES = {'viewer': 0, 'operator': 1, 'qc': 2, 'qa': 3, 'manager': 4, 'admin': 5}
+ROLES = {'viewer': 0, 'operator': 1, 'store': 2, 'qc': 3, 'qa': 4, 'manager': 5, 'admin': 6}
 ROLE_AR = {
     'viewer':   'عرض فقط',
     'operator': 'إدخال إنتاج',
+    'store':    'أمين مخزن',
     'qc':       'مراقب جودة (QC)',
     'qa':       'ضمان جودة (QA)',
     'manager':  'مدير المصنع (كل الصلاحيات)',
@@ -31,14 +32,15 @@ PERMS = {
     # qc_template تعديل قوالب الجودة
     # admin      المستخدمون والنسخ الاحتياطي
     'viewer':   {'view'},
-    'operator': {'view', 'enter'},                       # الإنتاج: إدخال بيانات التشغيل فقط
+    'operator': {'view', 'enter', 'receive'},            # الإنتاج: إدخال بيانات التشغيل واستلام الخام
+    'store':    {'view', 'receive', 'warehouse'},        # أمين المخزن: استلام الخام + مخزن المنتج التام
     'qc':       {'view', 'qc_record'},                   # مراقب الجودة: الفحوص والسجلات وفحص الخام
     'qa':       {'view', 'qc_record', 'qc_sign', 'qc_template', 'audit', 'wo_close'},   # ضمان الجودة
     'manager':  None,                                    # المستخدم الرئيسي: كل الصلاحيات (تُملأ أدناه)
     'admin':    None,
 }
 ALL_PERMS = {'view', 'enter', 'wo_issue', 'wo_close', 'reports', 'audit',
-             'qc_record', 'qc_sign', 'qc_template', 'admin'}
+             'qc_record', 'qc_sign', 'qc_template', 'admin', 'receive', 'warehouse', 'route_override'}
 PERMS['manager'] = set(ALL_PERMS)
 PERMS['admin'] = set(ALL_PERMS)
 

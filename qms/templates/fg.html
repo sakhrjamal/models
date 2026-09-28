@@ -1,0 +1,7 @@
+{% extends "base.html" %}{% block title %}المنتجات النهائية{% endblock %}{% block body %}
+<h1>المنتجات النهائية (مخزن المنتج التام)</h1>
+<div class="sub">الرصيد = المستلم في المخزن − المشحون. يُغذَّى من استلام المخزن بعد الإفراج النهائي.</div>
+{% if rows %}<div class="tablewrap"><table><tr><th>التشغيلة</th><th>الصنف</th><th>المسار</th><th>المستلم</th><th>المشحون</th><th>الرصيد</th><th>الموقع</th><th>آخر استلام</th></tr>
+{% for r in rows %}<tr><td><a href="{{ url_for('genealogy', b=r.batch_no) }}"><b>{{ r.batch_no }}</b></a></td><td>{{ r.item_code }}</td><td>{{ (mfg.route(r.route_code) or {}).get('name_ar') }}</td>
+<td>{{ '{:,.0f}'.format(r.received) }} {{ r.unit }}</td><td>{{ '{:,.0f}'.format(r.shipped) }}</td><td><b>{{ '{:,.0f}'.format(r.on_hand) }}</b></td><td>{{ r.location or '—' }}</td><td>{{ r.last_date }}</td></tr>{% endfor %}</table></div>
+{% else %}<div class="empty">لا توجد منتجات مستلمة في المخزن بعد.</div>{% endif %}{% endblock %}

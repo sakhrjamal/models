@@ -1,21 +1,26 @@
 {% extends "base.html" %}{% block title %}استلام وفحص المواد الخام{% endblock %}{% block body %}
 <div class="pagehead">
   <div><h1>استلام وفحص المواد الخام</h1><div class="sub">سندات الاستلام، الحجر، قرارات الجودة، وحالة الرولات قبل دخول الإنتاج</div></div>
-  {% if can('enter') %}<a class="btn" href="{{ url_for('receipt_new') }}">+ سند استلام جديد</a>{% endif %}
+  <div class="actions">{% if can('receive') %}<a class="btn" href="{{ url_for('receipt_new', cls='ROLL') }}">+ رولات شاش</a>
+  <a class="btn g" href="{{ url_for('sp_receive') }}">+ خام SP</a>
+  <a class="btn g" href="{{ url_for('receipt_new', cls='JUMBO') }}">+ جامبو أربطة</a>{% endif %}</div>
 </div>
+<div class="tabs"><a class="{{ 'on' if not cls }}" href="{{ url_for('receipts') }}">الكل</a>
+{% for k,v in class_ar.items() %}<a class="{{ 'on' if cls==k }}" href="{{ url_for('receipts', cls=k) }}">{{ v }}</a>{% endfor %}</div>
 
 {% if rows %}
 <div class="card tablewrap">
 <table>
-<tr><th>GRN</th><th>التاريخ</th><th>المورد</th><th>الصنف</th><th>Supplier Lot</th><th>الرولات</th><th>قرار QC</th><th>حالة المخزون</th><th></th></tr>
+<tr><th>GRN</th><th>التاريخ</th><th>الفئة</th><th>المورد</th><th>الصنف</th><th>Supplier Lot</th><th>الرولات</th><th>قرار QC</th><th>حالة المخزون</th><th></th></tr>
 {% for r in rows %}
 <tr>
   <td><a href="{{ url_for('receipt_view', grn_no=r.grn_no) }}"><b>{{ r.grn_no }}</b></a></td>
   <td>{{ r.receipt_date }}</td>
+  <td>{{ class_ar.get(r.mclass, '—') }}</td>
   <td class="r">{{ r.supplier_name or '—' }}</td>
   <td>{{ r.item_code }}</td>
   <td>{{ r.supplier_lot }}</td>
-  <td>{{ r.roll_count or 0 }}{% if r.released_rolls %}<div class="mini oktext">{{ r.released_rolls }} مفرج</div>{% endif %}{% if r.rejected_rolls %}<div class="mini badtext">{{ r.rejected_rolls }} مرفوض</div>{% endif %}</td>
+  <td>{% if r.mclass=='SP' %}{{ '{:,.0f}'.format(r.qty) }} {{ r.uom }}{% else %}{{ r.roll_count or 0 }}{% endif %}{% if r.released_rolls %}<div class="mini oktext">{{ r.released_rolls }} مفرج</div>{% endif %}{% if r.rejected_rolls %}<div class="mini badtext">{{ r.rejected_rolls }} مرفوض</div>{% endif %}</td>
   <td>{% if r.decision %}<span class="pill {{ cls_for(r.decision) }}">{{ r.decision }}</span>{% else %}<span class="pill warn">بانتظار الفحص</span>{% endif %}</td>
   <td><span class="pill {{ cls_for(r.stock_status) }}">{{ r.stock_status }}</span></td>
   <td><a href="{{ url_for('receipt_view', grn_no=r.grn_no) }}">فتح</a></td>

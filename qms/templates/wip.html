@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% block title %}المنتجات تحت التشغيل{% endblock %}{% block body %}
+<h1>المنتجات تحت التشغيل (WIP)</h1>
+<div class="sub">كل كمية لها مرحلة حالية ووحدة ودفعة وأمر إنتاج وموقع وحالة. مسارا SP والرباط من دفتر المخزون مباشرة؛ الشاش الكامل مشتق من سندات الطي والفرز والتغليف.</div>
+<div class="tabs"><a class="{{ 'on' if not sel }}" href="{{ url_for('wip') }}">كل الخطوط</a>
+{% for r in routes %}<a class="{{ 'on' if sel==r.code }}" href="{{ url_for('wip', route=r.code) }}">{{ r.name_ar }}</a>{% endfor %}</div>
+{% if rows %}<div class="tablewrap"><table><tr><th>المرحلة الحالية</th><th>الكمية</th><th>الوحدة</th><th>التشغيلة</th><th>أمر الإنتاج</th><th>الصنف</th><th>الموقع</th><th>الحالة</th><th>المصدر</th></tr>
+{% for r in rows %}<tr><td class="r">{{ r.label }}</td><td><b>{{ '{:,.0f}'.format(r.qty) }}</b></td><td>{{ r.unit }}</td>
+<td><a href="{{ url_for('genealogy', b=r.batch_no) }}">{{ r.batch_no }}</a></td><td>{{ r.wo_no or '—' }}</td><td>{{ r.item_code or '—' }}</td><td>{{ r.location }}</td>
+<td>{{ r.status or '—' }}</td><td><span class="mini">{{ 'مشتق' if r.derived else 'دفتر المخزون' }}</span></td></tr>{% endfor %}</table></div>
+{% else %}<div class="empty">لا توجد كميات تحت التشغيل.</div>{% endif %}
+{% if losses %}<h2>المرفوض والهالك (مستبعد من المتاح)</h2><table><tr><th>النوع</th><th>الكمية</th><th>الوحدة</th><th>التشغيلة</th><th>السند</th></tr>
+{% for r in losses %}<tr><td>{{ r.label }}</td><td>{{ '{:,.1f}'.format(r.qty) }}</td><td>{{ r.unit }}</td><td>{{ r.batch_no }}</td><td>{{ r.owner }}</td></tr>{% endfor %}</table>{% endif %}
+{% endblock %}

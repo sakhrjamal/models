@@ -7,8 +7,8 @@
 import json, re, datetime
 from flask import render_template, request, redirect, url_for, flash, abort, g
 
-import db, auth, constants, ncr
-from util import s, num, doc_scope
+import db, auth, constants, ncr, mfg, notify
+from util import s, num, num_unit, doc_scope
 import qc_seed
 
 KIND_AR = {k: v['ar'] for k, v in qc_seed.KINDS.items()}
@@ -18,9 +18,12 @@ ROUTE_AR = qc_seed.ROUTES
 FIELD_TYPES = {'check': 'مطابق / غير مطابق', 'number': 'رقم', 'dim': 'بُعد بسماحية عن المقاس',
                'expect': 'رقم = قيمة التشغيلة', 'match': 'نص مطبوع يُطابَق آليًا',
                'text': 'نص قصير', 'textarea': 'نص طويل', 'select': 'قائمة اختيار'}
-NOMINALS = {'size_l': 'طول مقاس الأمر', 'size_w': 'عرض مقاس الأمر'}
+NOMINALS = {'size_l': 'طول مقاس الأمر', 'size_w': 'عرض مقاس الأمر',
+            'width_cm': 'عرض المنتج (بيانات المنتج)', 'length_m': 'طول الرول (بيانات المنتج)'}
 EXPECTS = {'per_envelope': 'مسحات في المغلف', 'env_per_box': 'مغلفات في البوكس',
-           'boxes_per_carton': 'بوكسات في الكرتونة'}
+           'boxes_per_carton': 'بوكسات في الكرتونة',
+           'per_pack': 'قطع في الباك (تكوين التعبئة)', 'per_box': 'وحدات في البوكس (تكوين التعبئة)',
+           'per_carton': 'بوكسات في الكرتونة (تكوين التعبئة)'}
 MATCHES = {'batch_no': 'رقم التشغيلة', 'item_code': 'كود الصنف', 'batch_date': 'تاريخ التشغيلة',
            'cycle_no': 'رقم دورة التعقيم'}
 SIG_QC_RECORD = 'اعتماد سجل جودة'
@@ -32,7 +35,16 @@ def get_template(code):
     if t:
         t['fields'] = json.loads(t['fields_json'] or '[]')
         t['req_list'] = json.loads(t.get('requires') or '[]')
+        t['mfg_list'] = json.loads(t.get('mfg_routes') or 'null') or [mfg.FULL]
     return t
+
+
+def applies(t, w):
+    """هل القالب ينطبق على أمر الإنتاج w؟ (نوع المنتج + مسار التصنيع)"""
+    if t['route'] != 'all' and route_of(w) != t['route']:
+        return False
+    mr = json.loads(t.get('mfg_routes') or 'null') or [mfg.FULL]
+    return mfg.route_of_wo(w) in mr
 
 
 def has_lines(area):
@@ -60,6 +72,15 @@ def build_ctx(bn):
                    WHERE batch_no=? ORDER BY doc_no DESC LIMIT 1""", (bn,))
     if pk:
         ctx.update({k: v for k, v in pk.items() if v})
+    it = db.one('SELECT width_cm, length_m FROM items WHERE item_code=?', (w.get('item_code'),)) or {}
+    if num_unit(it.get('width_cm')) is not None:
+        ctx['width_cm'] = num_unit(it['width_cm'])
+    if num_unit(it.get('length_m')) is not None:
+        ctx['length_m'] = num_unit(it['length_m'])
+    pm = mfg.pack_map(w.get('item_code'))
+    for unit, key in (('pack', 'per_pack'), ('box', 'per_box'), ('carton', 'per_carton')):
+        if unit in pm:
+            ctx[key] = pm[unit]['per_parent']
     ctx['cycle_nos'] = [r['cycle_no'] for r in db.q(
         'SELECT DISTINCT cycle_no FROM cycle_loads WHERE batch_no=?', (bn,))]
     return ctx
@@ -176,14 +197,16 @@ def lines_for(area):
                 (stage,))
 
 
-def batches_for(area, route='all'):
+def batches_for(area, route='all', mfg_routes=None):
     kind = 'تقطيع' if area == 'slitter' else 'إنتاج'
-    rows = db.q("""SELECT batch_no, item_code, size, ply, fold_machine, route, batch_start_date, status
+    rows = db.q("""SELECT batch_no, item_code, size, ply, fold_machine, route, route_code, batch_start_date, status
                    FROM work_orders WHERE COALESCE(order_type,'إنتاج')=?
                      AND status IN ('صادر','قيد التنفيذ')
                    ORDER BY batch_start_date DESC, batch_no DESC LIMIT 60""", (kind,))
     if route != 'all':
         rows = [r for r in rows if route_of(r) == route]
+    if mfg_routes and kind == 'إنتاج':
+        rows = [r for r in rows if mfg.route_of_wo(r) in mfg_routes]
     return rows
 
 
@@ -233,10 +256,9 @@ def batch_checks(w):
         tpls = db.q("""SELECT * FROM qc_templates WHERE active=1 AND area='slitter'
                        AND kind IN ('release','inspection') ORDER BY dept DESC, code""")
     else:
-        r = route_of(w) or 'all'
         tpls = [t for t in db.q("""SELECT * FROM qc_templates WHERE active=1 AND area<>'slitter'
                                    AND kind IN ('release','inspection') ORDER BY area, dept DESC, code""")
-                if t['route'] in ('all', r)]
+                if applies(t, w)]
     return [dict(tpl=t, rec=latest_record(t['code'], w['batch_no'])) for t in tpls]
 
 
@@ -247,10 +269,8 @@ def pack_release_ok(bn):
 
 
 def final_release(bn):
-    """إفراج المنتج غير المعقم (QA-PKN-REL) إن وُجد."""
-    return db.one("""SELECT rec_no, rec_date, decision, inspector FROM qc_records
-                     WHERE template_code='QA-PKN-REL' AND batch_no=? AND decision='مفرج'
-                     ORDER BY id DESC LIMIT 1""", (bn,))
+    """الإفراج النهائي للتشغيلة (شهادة أو سجل QA نهائي) — انظر mfg.final_release."""
+    return mfg.final_release(bn)
 
 
 # ------------------------------------------------------------------ المسارات
@@ -315,6 +335,9 @@ def register(app):
                 if area == 'slitter' and not is_sl or (area != 'slitter' and is_sl):
                     flash('رقم التشغيلة لا يناسب هذا النموذج: الأسليتر برقم SL وباقي المراحل برقم أمر الإنتاج', 'bad')
                     return redirect(back)
+                if not is_sl and mfg.route_of_wo(w) not in t['mfg_list']:
+                    flash(f'هذا النموذج لا ينطبق على مسار التصنيع «{(mfg.route(mfg.route_of_wo(w)) or {}).get("name_ar")}»', 'bad')
+                    return redirect(back)
                 if t['route'] != 'all' and route_of(w) != t['route']:
                     flash(f'هذا النموذج خاص بالمنتج {ROUTE_AR[t["route"]]} والتشغيلة {batch} مسارها {w.get("route")}', 'bad')
                     return redirect(back)
@@ -344,6 +367,9 @@ def register(app):
                 if decision == 'مفرج' and t['req_list']:
                     lacking = []
                     for rc in t['req_list']:
+                        rt_ = db.one('SELECT * FROM qc_templates WHERE code=?', (rc,))
+                        if rt_ and w and not applies(rt_, w):
+                            continue                      # شرط لا ينطبق على مسار هذه التشغيلة
                         last = latest_record(rc, batch)
                         if not last or last['result'] != 'مطابق':
                             rt = db.one('SELECT title FROM qc_templates WHERE code=?', (rc,))
@@ -376,9 +402,12 @@ def register(app):
                         f'{x["label"]} ({x["reason"]})' for x in fails), rec_no,
                         'رئيسية' if is_release else 'ثانوية')
                 # إفراج المنتج غير المعقم هو الإفراج النهائي للتشغيلة
-                if is_release and decision == 'مفرج' and area == 'packaging' and t['route'] == 'non_sterile':
+                if is_release and decision == 'مفرج' and t['is_final']:
                     con.execute("UPDATE work_orders SET status=? WHERE batch_no=? AND status IN (?,?)",
                                 (constants.WO_DONE, batch, constants.WO_ISSUED, constants.WO_RUNNING))
+                    notify.push(con, 'ready_wh', f'تم الإفراج النهائي للتشغيلة {batch} وأصبحت جاهزة للمخزن',
+                                f'{item_code or ""} — {rec_no}', url_for('warehouse'), batch,
+                                mfg.route_of_wo(w), ('warehouse', 'wo_issue'))
             db.log('create', 'qc_records', rec_no, f'{t["code"]}; {batch or "-"}; {line or "-"}; {result}'
                    + (f'; {decision}' if decision else ''))
             if fails:
@@ -397,7 +426,7 @@ def register(app):
         ctx = build_ctx(batch_sel) if batch_sel else {}
         return render_template('quality_form.html', nav='quality', t=t, KIND_AR=KIND_AR, AREA_AR=AREA_AR,
                                DEPT_AR=DEPT_AR, ROUTE_AR=ROUTE_AR, lines=lines,
-                               batches=batches_for(area, t['route']), ctx=ctx, MATCHES_AR=MATCHES,
+                               batches=batches_for(area, t['route'], t['mfg_list']), ctx=ctx, MATCHES_AR=MATCHES,
                                line_sel=line_sel, batch_sel=batch_sel, is_release=is_release,
                                batch_needed=batch_needed, req_titles=[
                                    (db.one('SELECT title FROM qc_templates WHERE code=?', (c,)) or {}).get('title', c)
@@ -534,21 +563,24 @@ def register(app):
                 flash('فاصل الاستحقاق يجب أن يكون أكبر من صفر أو فارغًا', 'bad')
                 return redirect(url_for('quality_template_edit', code=code))
             route_ = f.get('route') if f.get('route') in ROUTE_AR else t['route']
+            valid_r = {r['code'] for r in mfg.routes()}
+            mfg_sel = [c for c in f.getlist('mfg_routes') if c in valid_r] or t['mfg_list']
             allc = {r['code'] for r in db.q('SELECT code FROM qc_templates')} - {code}
             req = [c for c in f.getlist('requires') if c in allc]
             db.run("""UPDATE qc_templates SET title=?, freq_hours=?, needs_batch=?, fields_json=?, active=?,
-                      note=?, route=?, requires=?, version=version+1, updated_by=?,
+                      note=?, route=?, requires=?, mfg_routes=?, is_final=?, version=version+1, updated_by=?,
                       updated_at=datetime('now','localtime') WHERE code=?""",
                    (title, freq, 1 if f.get('needs_batch') else 0,
                     json.dumps(fields, ensure_ascii=False), 1 if f.get('active') else 0,
-                    s(f.get('note')), route_, json.dumps(req), g.user['username'], code))
+                    s(f.get('note')), route_, json.dumps(req), json.dumps(mfg_sel),
+                    1 if (f.get('is_final') and t['kind'] == 'release') else 0, g.user['username'], code))
             db.log('update', 'qc_templates', code, f'v{t["version"] + 1}; {len(fields)} fields')
             flash(f'حُفظ القالب {code} (الإصدار {t["version"] + 1}) — السجلات السابقة تحتفظ بنسختها', 'ok')
             return redirect(url_for('quality_templates'))
         others = db.q("SELECT code, title FROM qc_templates WHERE code<>? ORDER BY code", (code,))
         return render_template('quality_template_edit.html', nav='quality', t=t, KIND_AR=KIND_AR,
                                AREA_AR=AREA_AR, DEPT_AR=DEPT_AR, ROUTE_AR=ROUTE_AR, FIELD_TYPES=FIELD_TYPES,
-                               NOMINALS=NOMINALS, EXPECTS=EXPECTS, MATCHES=MATCHES, others=others,
+                               NOMINALS=NOMINALS, EXPECTS=EXPECTS, MATCHES=MATCHES, others=others, all_routes=mfg.routes(),
                                used=db.one('SELECT COUNT(*) n FROM qc_records WHERE template_code=?', (code,))['n'])
 
     @route('/quality/templates/new', 'quality_template_new', methods=['GET', 'POST'])
@@ -567,11 +599,12 @@ def register(app):
                 flash('رمز النموذج مستخدم مسبقًا', 'bad')
                 return redirect(url_for('quality_template_new'))
             db.run("""INSERT INTO qc_templates(code,title,dept,kind,area,route,freq_hours,needs_batch,fields_json,
-                      requires,note,updated_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+                      requires,note,updated_by,mfg_routes) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                    (code, title, dept, kind, area, rt, num(f.get('freq_hours')),
                     1 if kind in ('release', 'inspection') else 0,
                     json.dumps([qc_seed.NOTES], ensure_ascii=False), '[]',
-                    'نموذج جديد — أضف بنوده من المحرّر', g.user['username']))
+                    'نموذج جديد — أضف بنوده من المحرّر', g.user['username'],
+                    json.dumps(qc_seed.AREA_ROUTES.get(area, [mfg.FULL]))))
             db.log('create', 'qc_templates', code)
             flash('أُنشئ النموذج — أضف بنوده الآن', 'ok')
             return redirect(url_for('quality_template_edit', code=code))

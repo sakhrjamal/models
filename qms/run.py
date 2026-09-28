@@ -18,6 +18,7 @@ if getattr(sys, 'frozen', False):
 import db
 import migrate_v11
 import migrate_v12
+import migrate_v13
 import backup
 import auth
 from app import app
@@ -75,6 +76,7 @@ def main():
 
     migrate_v11.run(verbose=True)
     migrate_v12.run(verbose=True)
+    migrate_v13.run(verbose=True)
     db.apply_migrations()
     creds = auth.ensure_admin()
     backup.schedule()

@@ -8,23 +8,18 @@
 import datetime
 from flask import render_template, request, redirect, url_for, flash, abort, g
 
-import db, auth, ncr
+import db, auth, ncr, mfg
 from util import s, num, doc_scope
 
 MAT_KINDS = ('فيلم / مغلف', 'بوكس', 'كرتون خارجي', 'أخرى')
 
 
 def released_qty(bn):
-    """(كمية مفرجة, وحدة, رقم الإفراج) لتشغيلة، أو (0, None, None)."""
-    r = db.one("SELECT release_no, qty_boxes FROM releases WHERE batch_no=? AND decision='مفرج عنها'", (bn,))
-    if r:
-        return float(r['qty_boxes'] or 0), 'بوكس', r['release_no']
-    q = db.one("""SELECT rec_no FROM qc_records WHERE template_code='QA-PKN-REL' AND batch_no=?
-                  AND decision='مفرج' ORDER BY id DESC LIMIT 1""", (bn,))
-    if q:
-        p = db.one("SELECT SUM(boxes) b, SUM(env_good) e FROM packaging WHERE batch_no=?", (bn,))
-        return float((p and (p['b'] or p['e'])) or 0), 'بوكس', q['rec_no']
-    return 0.0, None, None
+    """(كمية مستلمة بالمخزن, وحدة, مرجع الإفراج): لا يُشحن إلا ما أُفرج عنه واستُلم في مخزن المنتج التام."""
+    rel, unit, ref = mfg.released_qty(bn)
+    if not rel:
+        return 0.0, None, None
+    return mfg.fg_received(bn), unit, ref
 
 
 def shipped_qty(bn):
@@ -64,7 +59,7 @@ def register(app):
                 return redirect(back)
             av, rel, unit, ref = available(bn)
             if rel <= 0:
-                flash('التشغيلة غير مفرج عنها — لا يجوز شحنها', 'bad')
+                flash('التشغيلة غير مفرج عنها أو لم تُستلم في مخزن المنتج التام — لا يجوز شحنها', 'bad')
                 return redirect(back)
             opened = ncr.open_for_batch(bn)
             if opened:

@@ -1,0 +1,23 @@
+{% extends "base.html" %}{% block title %}{{ r.name_ar }}{% endblock %}{% block body %}
+<div class="crumb"><a href="{{ url_for('manager_home') if can('reports') else url_for('index') }}">اللوحة</a><span class="sep">›</span><span class="here">{{ r.name_ar }}</span></div>
+<h1>{{ r.name_ar }}</h1><div class="sub">{{ r.name_en }} · خط إنتاج مستقل مرتبط بنفس الجودة والمخزن والتتبع والتدقيق</div>
+<div class="kpis">
+<div class="kpi"><b>{{ st.active }}</b><span>أوامر إنتاج فعّالة</span></div>
+<div class="kpi {{ 'warn' if st.pending_qc }}"><b>{{ st.pending_qc }}</b><span>بانتظار فحص الجودة</span></div>
+<div class="kpi"><b>{{ st.wip_batches }}</b><span>تشغيلة فيها WIP {% for u,q in st.wip_units.items() %}· {{ '{:,.0f}'.format(q) }} {{ u }} {% endfor %}</span></div>
+<div class="kpi ok"><b>{{ st.done_today }}</b><span>سندات منجزة اليوم</span></div>
+<div class="kpi ok"><b>{{ st.released_today }}</b><span>أُفرج عنها اليوم</span></div>
+<div class="kpi {{ 'bad' if st.rejected_hold }}"><b>{{ st.rejected_hold }}</b><span>مرفوض / معلّق / NCR</span></div></div>
+<h2>أوامر الإنتاج الفعّالة</h2>
+{% for o in st.orders %}<div class="card"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><a href="{{ url_for('genealogy', b=o.batch_no) }}"><b>{{ o.batch_no }}</b></a>
+<span>{{ o.item_code }} · {{ '{:,.0f}'.format(o.qty_required or 0) }} {{ o.uom }}</span></div>{% set progress = o.prog %}{% include "_stepbar.html" %}</div>
+{% else %}<div class="empty">لا توجد أوامر فعّالة على هذا الخط.</div>{% endfor %}
+<h2>تحت التشغيل (WIP)</h2>
+{% if wip %}<table><tr><th>المرحلة</th><th>الكمية</th><th>التشغيلة</th><th>الصنف</th><th>الموقع</th></tr>
+{% for x in wip %}<tr><td class="r">{{ x.label }}</td><td><b>{{ '{:,.0f}'.format(x.qty) }} {{ x.unit }}</b></td><td>{{ x.batch_no }}</td><td>{{ x.item_code }}</td><td>{{ x.location }}</td></tr>{% endfor %}</table>{% else %}<div class="empty">لا يوجد WIP.</div>{% endif %}
+<h2>بانتظار الجودة</h2>
+{% if pending_raw %}<table><tr><th>استلام خام بلا فحص</th><th>الصنف</th><th>الكمية</th><th>التاريخ</th></tr>{% for x in pending_raw %}<tr><td><a href="{{ url_for('receipt_view', grn_no=x.grn_no) }}">{{ x.grn_no }}</a></td><td>{{ x.item_code }}</td><td>{{ '{:,.0f}'.format(x.qty) }} {{ x.uom }}</td><td>{{ x.receipt_date }}</td></tr>{% endfor %}</table>{% endif %}
+{% if final_qc %}<table style="margin-top:8px"><tr><th>منتج نهائي ينتظر الفحص والإفراج</th><th>الصنف</th></tr>{% for x in final_qc %}<tr><td><a href="{{ url_for('quality_final', route=r.code) }}">{{ x.batch_no }}</a></td><td>{{ x.item_code }}</td></tr>{% endfor %}</table>{% endif %}
+{% if not pending_raw and not final_qc %}<div class="empty">لا يوجد ما ينتظر الجودة.</div>{% endif %}
+{% if recent %}<h2>آخر النشاط</h2><table><tr><th>السند</th><th>التاريخ</th><th>المشغّل</th><th>الماكينة</th><th>الناتج</th></tr>{% for x in recent %}<tr><td>{{ x.ref }}</td><td>{{ x.d }}</td><td>{{ x.operator }}</td><td>{{ x.machine or '—' }}</td><td>{{ '{:,.0f}'.format(x.qty_out or 0) }} {{ x.unit }}</td></tr>{% endfor %}</table>{% endif %}
+{% endblock %}

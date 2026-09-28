@@ -1,11 +1,12 @@
 {% extends "base.html" %}{% block title %}سند استلام مادة خام جديد{% endblock %}{% block body %}
-<h1>سند استلام مادة خام جديد</h1>
+<h1>{{ 'استلام جامبو رول الأربطة' if cls_sel=='JUMBO' else 'سند استلام مادة خام جديد' }}</h1>
 <div class="sub">WH-FRM-001 — يتم وضع جميع الرولات تلقائيًا في الحجر حتى اعتماد فحص الجودة</div>
 
 <form method="post" class="card grid" id="receiptForm">
+  <input type="hidden" name="cls" value="{{ cls_sel }}">
   <div><label>رقم سند الاستلام GRN *</label><input name="grn_no" value="{{ grn_no }}" required></div>
   <div><label>تاريخ الاستلام *</label><input type="date" name="receipt_date" value="{{ today_date }}" required></div>
-  <div><label>نوع الوارد</label><input name="kind" value="رولات شاش خام"></div>
+  <div><label>نوع الوارد</label><input name="kind" value="{{ 'جامبو رول أربطة' if cls_sel=='JUMBO' else 'رولات شاش خام' }}"></div>
   <div><label>المستلم *</label><input name="received_by" required value="{{ me.full_name }}" placeholder="الاسم / الرقم الوظيفي"></div>
 
   <div><label>اسم المورد *</label><input name="supplier_name" list="supplierList" required autocomplete="off"></div>

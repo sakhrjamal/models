@@ -67,9 +67,15 @@ nextBatch();
 </div>
 
 <div><label>الكمية المطلوبة *</label><input type="number" step="any" min="1" name="qty_required" id="qty" required oninput="plan()"></div>
-<div><label>الوحدة *</label><select name="uom" required><option>قطعة</option><option>بوكس</option><option>كرتون</option></select></div>
+<div><label>الوحدة *</label><select name="uom" required><option>قطعة</option><option>رول</option><option>بوكس</option><option>كرتون</option></select></div>
 <div><label>تاريخ التسليم</label><input type="date" name="due_date"></div>
 <div><label>التسلسل (تلقائي — يمكن تعديله)</label><input type="number" name="seq" id="seq" min="1" max="999"></div>
+<div class="full" id="routeBox"></div>
+{% if can('route_override') %}<div class="full" id="ovrBox" hidden><details><summary class="mini" style="cursor:pointer">تغيير المسار استثنائيًا (يُسجَّل في سجل التدقيق)</summary>
+<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:13px;margin-top:8px">
+<div><label>المسار البديل</label><select name="route_override" id="route_override" onchange="routePreview();nextBatch()"><option value="">— بلا تغيير —</option>
+{% for r in all_routes %}<option value="{{ r.code }}">{{ r.name_ar }}</option>{% endfor %}</select></div>
+<div><label>سبب التغيير *</label><input name="route_reason" id="route_reason"></div></div></details></div>{% endif %}
 <div class="full"><div class="batchprev" id="batchPrev">اختر الصنف ليظهر رقم التشغيلة</div></div>
 <div class="full" id="planBox"></div>
 <div class="full"><label>ملاحظات</label><textarea name="notes" rows="2"></textarea></div>
@@ -81,7 +87,8 @@ let t=null, stemNow='';
 const $=id=>document.getElementById(id);
 function esc(x){return String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function plan(){clearTimeout(t);t=setTimeout(go,350);}
-function checkItem(){ if(!$('item_code').value){ alert('اختر الصنف النهائي من القائمة أولًا'); $('itemSearch').focus(); return false;} return true; }
+function checkItem(){ if(!$('item_code').value){ alert('اختر الصنف النهائي من القائمة أولًا'); $('itemSearch').focus(); return false;}
+  if($('route_override') && $('route_override').value && !$('route_reason').value.trim()){ alert('اكتب سبب تغيير المسار'); return false;} return true; }
 
 // ---- منتقي الصنف: يُخفي بقية الأصناف فور الاختيار
 let st=null;
@@ -93,7 +100,7 @@ function search(){
     const box=$('itemResults');
     if(!d.items.length){box.innerHTML='<div class="none">لا توجد أصناف مطابقة</div>';return;}
     box.innerHTML=d.items.map(i=>'<a href="#" data-c="'+esc(i.item_code)+'"><b>'+esc(i.item_code)+'</b> · '+
-      esc(i.size||'')+' '+esc(i.ply||'')+'ط · '+esc(i.sterile||'')+'<span>'+esc(i.description||'')+'</span></a>').join('');
+      esc(i.size||i.width_cm||'')+' '+esc(i.ply?i.ply+'ط':'')+' · '+esc(i.sterile||'')+' · <i>'+esc(i.route_name)+'</i><span>'+esc(i.description||'')+'</span></a>').join('');
     box.querySelectorAll('a').forEach((a,k)=>a.addEventListener('click',e=>{e.preventDefault();choose(d.items[k]);}));
   });
 }
@@ -102,10 +109,11 @@ function choose(i){
   $('pickBox').hidden=true; $('itemResults').innerHTML='';
   const c=$('itemChosen'); c.hidden=false;
   c.innerHTML='<div><b>'+esc(i.item_code)+'</b> · '+esc(i.description||'')+'</div>'+
-    '<div class="meta">'+esc(i.size||'—')+' · '+esc(i.ply||'—')+' طبقة · '+esc(i.xray||'')+' · ميش '+esc(i.mesh||'—')+
-    ' · '+esc(i.sterile||'')+' · ماكينة '+esc(i.machine_code)+'</div>'+
+    '<div class="meta">'+esc(i.product_category||'')+' · '+esc(i.size||i.width_cm||'—')+(i.ply?' · '+esc(i.ply)+' طبقة':'')+' · '+esc(i.xray||'')+
+    (i.mesh?' · ميش '+esc(i.mesh):'')+' · '+esc(i.sterile||'')+(i.machine_code?' · ماكينة '+esc(i.machine_code):'')+'</div>'+
+    '<div class="meta"><span class="pill ok">مسار التصنيع: '+esc(i.route_name)+'</span></div>'+
     '<button type="button" class="smallbtn g" onclick="changeItem()">تغيير الصنف</button>';
-  $('seq').dataset.touched=''; plan(); nextBatch();
+  $('seq').dataset.touched=''; if($('ovrBox')) $('ovrBox').hidden=false; routePreview(); nextBatch();
 }
 function changeItem(){
   $('item_code').value=''; $('itemChosen').hidden=true; $('pickBox').hidden=false;
@@ -114,7 +122,8 @@ function changeItem(){
 }
 function nextBatch(){
   const it=$('item_code').value; if(!it) return;
-  fetch('/api/next_batch?t=%D8%A5%D9%86%D8%AA%D8%A7%D8%AC&item='+encodeURIComponent(it)+'&date='+$('batch_date').value)
+  const ov=$('route_override')?$('route_override').value:'';
+  fetch('/api/next_batch?t=%D8%A5%D9%86%D8%AA%D8%A7%D8%AC&item='+encodeURIComponent(it)+'&route='+encodeURIComponent(ov)+'&date='+$('batch_date').value)
    .then(r=>r.json()).then(d=>{ if(!d.ok) return; stemNow=d.stem;
      if(!$('seq').dataset.touched) $('seq').value=d.seq; showBatch(); });
 }
@@ -123,9 +132,25 @@ function showBatch(){ if(!stemNow) return;
 $('batch_date').addEventListener('change',()=>{$('seq').dataset.touched='';nextBatch();});
 $('seq').addEventListener('input',function(){this.dataset.touched='1';nextBatch();});
 
+let routeNow='';
+function routePreview(){
+  const it=$('item_code').value.trim(); if(!it) return;
+  const ov=$('route_override')?$('route_override').value:'';
+  fetch('/api/route_preview?item='+encodeURIComponent(it)+'&route='+encodeURIComponent(ov)).then(r=>r.json()).then(d=>{
+    const b=$('routeBox');
+    if(!d.ok){b.innerHTML='<div class="msg bad">'+esc(d.msg)+'</div>';routeNow='';return;}
+    routeNow=d.route;
+    const u=document.querySelector('select[name=uom]'); if(u&&d.uom) u.value=d.uom;
+    b.innerHTML='<div class="routecard"><div><b>مسار التصنيع (تلقائي من الصنف):</b> '+esc(d.route_name)+
+      ' <span class="mini">'+esc(d.route_en||'')+' · '+(d.variant==='sterile'?'معقم':'غير معقم')+'</span></div>'+
+      '<div class="flow">'+d.steps.map((s,k)=>'<span>'+(k+1)+'. '+esc(s)+'</span>').join('<i>›</i>')+'</div>'+
+      d.warn.map(w=>'<div class="msg warn" style="margin:8px 0 0">'+esc(w)+'</div>').join('')+'</div>';
+    $('planBox').innerHTML=''; plan();
+  });
+}
 function go(){
  const it=$('item_code').value.trim(), q=$('qty').value, box=$('planBox');
- if(!it){box.innerHTML='';return;}
+ if(!it || (routeNow && routeNow!=='FULL_GAUZE')){box.innerHTML='';return;}
  fetch('/api/plan?item='+encodeURIComponent(it)+'&qty='+encodeURIComponent(q||''))
   .then(r=>r.json()).then(d=>{
    if(!d.ok){box.innerHTML='<div class="msg bad">'+esc(d.msg)+'</div>';return;}

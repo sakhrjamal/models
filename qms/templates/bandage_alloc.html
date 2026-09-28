@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% block title %}تخصيص الجامبو{% endblock %}{% block body %}
+<div class="crumb"><a href="{{ url_for('bandage_home') }}">الرباط الضاغط</a><span class="sep">›</span><span class="here">{{ bn }}</span></div>
+<h1>تخصيص الجامبو رول</h1>
+{% include "_batchbar.html" %}{% include "_stepbar.html" %}
+{% if product_width %}<div class="hint">عرض المنتج {{ product_width|round(1) }} سم — لا يُقبل جامبو أضيق منه.</div>{% endif %}
+{% if can('enter') %}<div class="card noprint"><h2 style="margin-top:0">جامبو رول مفرج عنه وغير مخصص</h2>
+{% if free %}<form class="grid" method="post">
+<div><label>التاريخ *</label><input type="date" name="alloc_date" value="{{ today() }}" required></div>
+<div><label>المسؤول *</label><input name="operator" required value="{{ me.full_name }}"></div>
+<div class="full"><label>الجامبو رول *</label><select name="roll_no" required><option value="">— اختر —</option>
+{% for r in free %}<option value="{{ r.roll_no }}">{{ r.roll_no }} · عرض {{ r.width_cm or '؟' }} سم · المتبقي {{ '{:,.0f}'.format(r.remaining) }} م · لوط المورّد {{ r.slot or '—' }}</option>{% endfor %}</select></div>
+<div class="full"><button class="btn">تخصيص الرول بالكامل للأمر</button></div></form>
+{% else %}<div class="empty">لا يوجد جامبو مفرج عنه وغير مخصص. استلم الجامبو من «استلام جامبو رول الأربطة» وانتظر إفراج الجودة.</div>{% endif %}</div>{% endif %}
+{% if mine %}<h2>الجامبو المخصص لهذه التشغيلة</h2><table><tr><th>الرول</th><th>العرض</th><th>الطول الأصلي</th><th>المتبقي</th><th>لوط المورّد</th></tr>
+{% for r in mine %}<tr><td>{{ r.roll_no }}</td><td>{{ r.width_cm or '—' }}</td><td>{{ r.length_m or '—' }}</td><td><b>{{ '{:,.0f}'.format(r.remaining) }} م</b></td><td>{{ r.slot or '—' }}</td></tr>{% endfor %}</table>{% endif %}
+<div class="actions noprint" style="margin-top:14px"><a class="btn g" href="{{ url_for('bandage_home') }}">رجوع</a><a class="btn" href="{{ url_for('bandage_machine', bn=bn) }}">إلى ماكينة الأربطة</a></div>
+{% endblock %}

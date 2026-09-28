@@ -18,11 +18,12 @@ USERS_DDL = """CREATE TABLE users (
     full_name      TEXT NOT NULL,
     pw_hash        TEXT NOT NULL,
     role           TEXT NOT NULL DEFAULT 'viewer'
-                   CHECK(role IN ('viewer','operator','qc','qa','manager','admin')),
+                   CHECK(role IN ('viewer','operator','store','qc','qa','manager','admin')),
     active         INTEGER NOT NULL DEFAULT 1,
     must_change_pw INTEGER NOT NULL DEFAULT 0,
     created_at     TEXT DEFAULT (datetime('now','localtime')),
-    last_login     TEXT
+    last_login     TEXT,
+    lines          TEXT
 )"""
 
 TPL_DDL = """CREATE TABLE qc_templates (
@@ -36,6 +37,8 @@ TPL_DDL = """CREATE TABLE qc_templates (
   needs_batch INTEGER NOT NULL DEFAULT 0,
   fields_json TEXT NOT NULL,
   requires    TEXT,
+  mfg_routes  TEXT,
+  is_final    INTEGER NOT NULL DEFAULT 0,
   active      INTEGER NOT NULL DEFAULT 1,
   version     INTEGER NOT NULL DEFAULT 1,
   note        TEXT,
@@ -67,7 +70,7 @@ SETTINGS = [
 
 def _users_need_rebuild(con):
     row = con.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").fetchone()
-    return bool(row) and "'manager'" not in (row[0] or '')
+    return bool(row) and "'store'" not in (row[0] or '')
 
 
 def rebuild_users(con):
@@ -87,6 +90,11 @@ def ensure_templates_table(con):
         con.execute(TPL_DDL)
         return
     if "'inspection'" in row[0] and 'requires' in row[0]:
+        have = {r[1] for r in con.execute('PRAGMA table_info(qc_templates)')}
+        if 'mfg_routes' not in have:                       # v13: مسارات التصنيع + علم الإفراج النهائي
+            con.execute('ALTER TABLE qc_templates ADD COLUMN mfg_routes TEXT')
+        if 'is_final' not in have:
+            con.execute('ALTER TABLE qc_templates ADD COLUMN is_final INTEGER NOT NULL DEFAULT 0')
         return
     con.execute('ALTER TABLE qc_templates RENAME TO qc_templates_old')
     con.execute(TPL_DDL)
@@ -105,17 +113,20 @@ def seed_templates(con):
     for t in qc_seed.templates():
         row = (t['code'], t['title'], t['dept'], t['kind'], t['area'], t['route'], t['freq_hours'],
                t['needs_batch'], json.dumps(t['fields'], ensure_ascii=False),
-               json.dumps(t['requires']), t['note'])
+               json.dumps(t['requires']), t['note'], json.dumps(t['mfg_routes']), t['is_final'])
         cur = con.execute("""INSERT OR IGNORE INTO qc_templates
-                (code,title,dept,kind,area,route,freq_hours,needs_batch,fields_json,requires,note,updated_by)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,'system')""", row)
+                (code,title,dept,kind,area,route,freq_hours,needs_batch,fields_json,requires,note,mfg_routes,
+                 is_final,updated_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'system')""", row)
         if cur.rowcount:
             n += 1
         else:
             cur = con.execute("""UPDATE qc_templates SET title=?,dept=?,kind=?,area=?,route=?,freq_hours=?,
-                    needs_batch=?,fields_json=?,requires=?,note=? WHERE code=? AND updated_by='system' AND version=1""",
-                    row[1:] + (row[0],))
+                    needs_batch=?,fields_json=?,requires=?,note=?,mfg_routes=?,is_final=?
+                    WHERE code=? AND updated_by='system' AND version=1""", row[1:] + (row[0],))
             n += cur.rowcount
+            # قالب عدّلته الجودة: نضبط فقط حقلَي المسار والإفراج النهائي إن لم يُضبطا بعد
+            con.execute("UPDATE qc_templates SET mfg_routes=?, is_final=? WHERE code=? AND mfg_routes IS NULL",
+                        (row[11], row[12], row[0]))
     return n
 
 

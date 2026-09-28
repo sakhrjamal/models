@@ -1,19 +1,20 @@
 {% extends "base.html" %}{% block title %}المستخدمون{% endblock %}{% block body %}
 <h1>إدارة المستخدمين</h1>
-<div class="sub">الأدوار: عرض فقط → إدخال إنتاج → جودة → مدير النظام</div>
+<div class="sub">الأدوار: المدير الرئيسي (كل الصلاحيات) · إنتاج · أمين مخزن · مراقب جودة QC · ضمان جودة QA · عرض فقط.
+خطوط الإنتاج تقيّد أدوار الإنتاج والاستلام: فارغ = كل الخطوط.</div>
 
-<form method="post" class="card grid" style="max-width:640px">
+<form method="post" class="card grid" style="max-width:760px">
   <input type="hidden" name="act" value="add">
   <div><label>اسم المستخدم *</label><input name="username" required pattern="[A-Za-z0-9._-]+"></div>
   <div><label>الاسم الكامل *</label><input name="full_name" required></div>
   <div><label>الدور *</label>
     <select name="role">
-      <option value="viewer">عرض فقط</option>
-      <option value="operator" selected>إدخال إنتاج</option>
-      <option value="qa">جودة</option>
-      <option value="admin">مدير النظام</option>
+      {% for r in ['operator','store','qc','qa','manager','viewer','admin'] %}
+      <option value="{{ r }}" {{ 'selected' if r=='operator' }}>{{ ROLE_AR[r] }}</option>{% endfor %}
     </select></div>
   <div><label>كلمة المرور الأولية *</label><input name="password" minlength="6" required></div>
+  <div class="full"><label>خطوط الإنتاج المسموحة (اتركها فارغة = الكل)</label>
+    <div class="chk">{% for r in all_routes %}<label><input type="checkbox" name="lines" value="{{ r.code }}"> {{ r.name_ar }}</label>{% endfor %}</div></div>
   <div class="full actions"><button class="btn">إضافة مستخدم</button>
     <span class="mini">يُطلب من المستخدم تغيير كلمة المرور عند أول دخول.</span></div>
 </form>
@@ -21,7 +22,7 @@
 <h2>المستخدمون الحاليون</h2>
 <div class="card tablewrap">
 <table class="roletable">
-<tr><th>المستخدم</th><th>الاسم</th><th>الدور</th><th>آخر دخول</th><th>الحالة</th><th>إجراءات</th></tr>
+<tr><th>المستخدم</th><th>الاسم</th><th>الدور</th><th>خطوط الإنتاج</th><th>آخر دخول</th><th>الحالة</th><th>إجراءات</th></tr>
 {% for u in rows %}
 <tr class="{{ 'inactive' if not u.active }}">
   <td>{{ u.username }}</td>
@@ -30,11 +31,18 @@
     <form method="post" style="display:inline">
       <input type="hidden" name="act" value="role"><input type="hidden" name="id" value="{{ u.id }}">
       <select name="role" onchange="this.form.submit()" {{ 'disabled' if u.id==me.id }}>
-        {% for r in ['viewer','operator','qa','admin'] %}
+        {% for r in ['viewer','operator','store','qc','qa','manager','admin'] %}
         <option value="{{ r }}" {{ 'selected' if u.role==r }}>{{ ROLE_AR[r] }}</option>{% endfor %}
       </select>
     </form>
   </td>
+  <td>{% if u.role in ('manager','admin') %}<span class="mini">كل الخطوط</span>{% else %}
+    <form method="post" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <input type="hidden" name="act" value="lines"><input type="hidden" name="id" value="{{ u.id }}">
+      {% set mine = (u.lines or '').split(',') %}
+      {% for r in all_routes %}<label style="display:inline-flex;gap:3px;margin:0;font-size:12px;color:var(--ink)"><input type="checkbox" name="lines" value="{{ r.code }}" style="width:auto" {{ 'checked' if r.code in mine }}>{{ r.code }}</label>{% endfor %}
+      <button class="smallbtn g">حفظ</button>
+    </form>{% endif %}</td>
   <td class="c">{{ u.last_login or '—' }}</td>
   <td class="c">{% if u.active %}<span class="pill ok">نشط</span>{% else %}<span class="pill bad">معطّل</span>{% endif %}</td>
   <td class="c">

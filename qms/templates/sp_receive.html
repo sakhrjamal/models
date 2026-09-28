@@ -1,0 +1,32 @@
+{% extends "base.html" %}{% block title %}استلام خام SP{% endblock %}{% block body %}
+<div class="crumb"><a href="{{ url_for('receipts', cls='SP') }}">استلام خام SP</a><span class="sep">›</span><span class="here">جديد</span></div>
+<h1>استلام شاش نصف مصنع (SP)</h1>
+<div class="sub">Semi-Finished Material Receipt — يدخل الحجر بحالة «بانتظار الفحص»، ولا يُستخدم في أمر إنتاج قبل إفراج الجودة</div>
+<form method="post" class="card grid">
+  <div><label>رقم الاستلام (الدفعة الداخلية)</label><input name="grn_no" placeholder="تلقائي: {{ grn_no }}"></div>
+  <div><label>تاريخ الاستلام *</label><input type="date" name="receipt_date" value="{{ today_date }}" required></div>
+  <div><label>المستلم *</label><input name="received_by" required value="{{ me.full_name }}"></div>
+  <div><label>موقع المخزن *</label><input name="wh_location" required placeholder="مثال: منطقة الحجر — رف A2"></div>
+  <div><label>المورّد *</label><input name="supplier_name" list="sl" required autocomplete="off"></div>
+  <datalist id="sl">{% for x in suppliers %}<option value="{{ x.name }}">{{ x.country or '' }}</option>{% endfor %}</datalist>
+  <div><label>بلد المنشأ</label><input name="country"></div>
+  <div><label>أمر الشراء PO</label><input name="po_no"></div>
+  <div><label>الفاتورة</label><input name="invoice_no"></div>
+  <div class="full sectionline"><b>المادة</b></div>
+  <div class="full"><label>كود الصنف SP * <span class="mini">(المقاس · الطبقات · الكاشف — من بيانات الأصناف)</span></label>
+    <select name="item_code" required id="itm"><option value="">— اختر —</option>
+    {% for x in items %}<option value="{{ x.item_code }}" data-uom="{{ x.uom or 'قطعة' }}">{{ x.item_code }} · {{ x.size or '' }} · {{ x.ply or '' }}ط · {{ x.xray or '' }} · {{ x.mesh or '' }}</option>{% endfor %}</select></div>
+  <div><label>لوط المورّد (Supplier Batch) *</label><input name="supplier_lot" required></div>
+  <div><label>الكمية *</label><input type="number" step="any" min="0.0001" name="qty" required></div>
+  <div><label>الوحدة</label><input name="uom" id="uom" value="قطعة"></div>
+  <div><label>عدد العبوات / الأكياس *</label><input type="number" step="1" min="1" name="packages" required></div>
+  <div><label>تاريخ التصنيع</label><input type="date" name="mfg_date"></div>
+  <div><label>تاريخ الانتهاء</label><input type="date" name="expiry_date"></div>
+  <div><label>شهادة التحليل COA</label><select name="coa"><option value="yes">متوفرة</option><option value="no">غير متوفرة</option></select></div>
+  <div><label>رقم الشهادة</label><input name="coa_no"></div>
+  <div><label>حالة العبوات</label><input name="pack_cond" placeholder="سليمة / ملاحظات"></div>
+  <div class="full"><label>ملاحظات</label><textarea name="notes" rows="2"></textarea></div>
+  <div class="full wizard-actions"><div class="l"></div><button class="btn big">تسجيل الاستلام وإرساله للجودة</button></div>
+</form>
+<script>document.getElementById('itm').addEventListener('change',function(){var o=this.selectedOptions[0];if(o&&o.dataset.uom)document.getElementById('uom').value=o.dataset.uom;});</script>
+{% endblock %}

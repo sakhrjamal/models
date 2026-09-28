@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """منطق شاشات الإدخال — التحقق والاشتقاق الآلي"""
-import db, datetime, re
+import db, datetime, re, mfg
 
 PROD, SLIT = 'إنتاج', 'تقطيع'      # نوعا أمر التشغيل
 
@@ -493,12 +493,10 @@ def batch_progress(bn):
                    FROM cycle_loads WHERE batch_no=?""", (bn,))
     ps = db.one('SELECT SUM(boxes) b FROM post_ster_receipts WHERE batch_no=?', (bn,))
     rel = db.one('SELECT release_no, decision FROM releases WHERE batch_no=?', (bn,))
-    if not rel:      # المنتج غير المعقم يُفرج بسجل ضمان الجودة QA-PKN-REL
-        qr = db.one("""SELECT rec_no FROM qc_records WHERE template_code='QA-PKN-REL' AND batch_no=?
-                        AND decision='مفرج' ORDER BY id DESC LIMIT 1""", (bn,))
-        if qr:
-            rel = dict(release_no=qr['rec_no'], decision='مفرج عنها')
-
+    if not rel:      # الإفراج النهائي بسجل ضمان جودة (منتج غير معقم / رباط)
+        fr = mfg.final_release(bn)
+        if fr:
+            rel = dict(release_no=fr['ref'], decision='مفرج عنها')
     if rel:
         stage = 'الإفراج — ' + (rel['decision'] or '')
     elif ps and ps['b']:
@@ -532,6 +530,6 @@ def batch_progress(bn):
         ster_in=_n(cy and cy['i']), ster_out=_n(cy and cy['o']), cycles=int((cy and cy['n']) or 0),
         received_boxes=_n(ps and ps['b']),
         release_no=rel['release_no'] if rel else None, decision=rel['decision'] if rel else None,
-        pct_fold=pct(good), pct_pack=pct(packed),
+        pct_fold=pct(good), pct_pack=pct(packed), route_progress=mfg.progress(bn),
         scrap_pct=round(_n(fo and fo['s']) / (good + _n(fo and fo['s'])) * 100, 1)
                   if (good + _n(fo and fo['s'])) else 0)

@@ -1,0 +1,8 @@
+{% extends "base.html" %}{% block title %}مسارات التصنيع{% endblock %}{% block body %}
+<h1>مسارات التصنيع</h1><div class="sub">المنتج ← المسار ← الخطوات ← بوابات الجودة ← حركات المخزون. إضافة مسار = بيانات جديدة لا برمجة شاشات عامة.</div>
+{% for x in data %}{% set r = x.r %}<div class="card"><h2 style="margin-top:0">{{ r.name_ar }} <span class="mini">{{ r.code }} · {{ r.name_en }} · {{ x.n_items }} صنف</span></h2>
+<div class="mini">الخام: {{ r.input_kind }} · حرف رقم التشغيلة: {{ r.batch_letter or 'من ماكينة الطي' }} · وحدة الأساس: {{ r.base_uom }}</div>
+{% for v, st in x.variants %}<div style="margin-top:8px"><b>{{ 'معقم' if v=='sterile' else 'غير معقم' }}</b><div class="flow">{% for s in st %}<span>{{ loop.index }}. {{ s.name_ar }}</span>{% if not loop.last %}<i>›</i>{% endif %}{% endfor %}</div></div>{% endfor %}
+<div style="margin-top:10px"><b>بوابات الجودة (نماذج فحص/إفراج تنطبق على هذا المسار)</b><div class="chips" style="margin-top:6px">{% for gt in x.gates %}<a class="chip {{ 'ok' if gt.is_final else '' }}" href="{{ url_for('quality_templates') }}">{{ gt.code }}{% if gt.is_final %} ⚑ نهائي{% endif %}</a>{% endfor %}</div></div></div>{% endfor %}
+<h2>فئات الخام</h2><table><tr><th>بادئة الكود</th><th>الفئة</th><th>الوصف</th></tr>{% for c in classes %}<tr><td>{{ c.prefix }}</td><td>{{ c.class }}</td><td>{{ c.label_ar }}</td></tr>{% endfor %}</table>
+{% endblock %}

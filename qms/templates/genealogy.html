@@ -1,0 +1,39 @@
+{% extends "base.html" %}{% block title %}تقرير الأصل والفرع{% endblock %}{% block body %}
+{% macro node(n) %}<li><b>{{ n.label }}</b>{% if n.sub %}<div class="mini">{{ n.sub }}</div>{% endif %}{% if n.children %}<ul>{% for c in n.children %}{% if c %}{{ node(c) }}{% endif %}{% endfor %}</ul>{% endif %}</li>{% endmacro %}
+<h1>تقرير الأصل والفرع (Batch Genealogy)</h1>
+<div class="sub">يعمل لكل مسارات التصنيع: من المنتج النهائي إلى المورّد، ومن الخام إلى كل منتج نهائي وعميل</div>
+<div class="card noprint"><form class="searchbar" method="get">
+<input type="text" name="b" value="{{ b }}" placeholder="رقم التشغيلة النهائية — مثال: SEP-2628-B-001" style="flex:1">
+<button class="btn">عرض السلسلة</button>
+{% if d %}<a class="btn g" href="{{ url_for('genealogy', b=b, print=1) }}" target="_blank">نسخة للطباعة</a>{% endif %}</form>
+<form class="searchbar" method="get" style="margin-top:10px"><input type="text" name="ref" value="{{ ref }}" placeholder="أو: رقم استلام / لوط مورّد / رول جامبو — لمعرفة المنتجات المصنَّعة منه" style="flex:1"><button class="btn g">تتبع أمامي</button></form></div>
+{% if ref %}<h2>المنتجات المصنَّعة من «{{ ref }}»</h2>
+{% if fwd %}<table><tr><th>التشغيلة</th><th>الصنف</th><th>المسار</th><th>المصدر</th><th>الإفراج</th><th>المستلم بالمخزن</th><th>العملاء</th></tr>
+{% for x in fwd %}<tr><td><a href="{{ url_for('genealogy', b=x.batch_no) }}"><b>{{ x.batch_no }}</b></a></td><td>{{ x.item_code }}</td><td>{{ x.route }}</td><td>{{ x.source }}</td>
+<td>{% if x.release %}<span class="pill ok">{{ x.release }}</span>{% else %}<span class="pill warn">لم يُفرج</span>{% endif %}</td><td>{{ '{:,.0f}'.format(x.fg) }}</td><td>{{ x.customers }}</td></tr>{% endfor %}</table>
+{% else %}<div class="empty">لم يُستخدم هذا الخام في أي تشغيلة، أو أنه غير مسجّل.</div>{% endif %}{% endif %}
+{% if b and not d %}<div class="msg bad">رقم التشغيلة <b>{{ b }}</b> غير موجود.</div>{% endif %}
+{% if d %}{% set w = d.w %}
+<div class="verdict {{ 'ok' if d.release else 'warn' }}">{{ 'مفرج عنها — ' ~ d.release.ref if d.release else ('المرحلة الحالية: ' ~ d.progress.current) }}</div>
+<div class="card"><div class="kv">
+<div class="row"><div class="k">المنتج</div><div class="v">{{ w.item_code }}</div></div>
+<div class="row"><div class="k">أمر الإنتاج</div><div class="v">{{ w.wo_no }}</div></div>
+<div class="row"><div class="k">مسار التصنيع</div><div class="v">{{ d.route.name_ar if d.route else '—' }}{% if w.route_override %} <span class="pill warn">مسار استثنائي</span>{% endif %}</div></div>
+<div class="row"><div class="k">النوع</div><div class="v">{{ 'معقم' if d.variant=='sterile' else 'غير معقم' }}</div></div>
+<div class="row"><div class="k">المطلوب</div><div class="v">{{ '{:,.0f}'.format(w.qty_required or 0) }} {{ w.uom }}</div></div>
+<div class="row"><div class="k">الناتج السليم</div><div class="v">{{ '{:,.0f}'.format(d.out.good) }} {{ d.out.unit }}</div></div>
+<div class="row"><div class="k">مرفوض</div><div class="v">{{ '{:,.0f}'.format(d.out.reject) }}</div></div>
+<div class="row"><div class="k">هالك</div><div class="v">{{ '{:,.0f}'.format(d.out.scrap) }}</div></div>
+<div class="row"><div class="k">مستلم بالمخزن</div><div class="v">{{ '{:,.0f}'.format(d.fg) }}</div></div></div></div>
+{% set progress = d.progress %}{% include "_stepbar.html" %}
+<h2>الخام والمورّد</h2>
+{% if d.sources %}<table><tr><th>النوع</th><th>المرجع</th><th>الاستلام</th><th>المورّد</th><th>لوط المورّد</th><th>قرار الجودة</th><th>الكمية</th></tr>
+{% for r in d.sources %}<tr><td>{{ r.kind }}</td><td>{{ r.ref }}</td><td>{{ r.grn or '—' }}</td><td>{{ r.supplier or '—' }}</td><td><a href="{{ url_for('genealogy', ref=r.supplier_lot) }}">{{ r.supplier_lot or '—' }}</a></td>
+<td>{% if r.qc %}<span class="pill {{ cls_for(r.qc) }}">{{ r.qc }}</span>{% else %}—{% endif %}</td><td>{{ r.qty }}</td></tr>{% endfor %}</table>
+{% else %}<div class="empty">لم يُخصَّص خام بعد.</div>{% endif %}
+<h2>شجرة الأصل</h2><div class="gtree card"><ul style="border:0;padding-right:0">{{ node(d.tree) }}</ul></div>
+<h2>الخط الزمني</h2><div class="tline">
+{% for e in d.events %}<div class="ev {{ e.kind }}"><div class="h"><b>{{ e.stage }}</b><span class="m">{{ e.date }}</span></div>
+<div>{% if e.link %}<a href="{{ e.link }}">{{ e.title }}</a>{% else %}{{ e.title }}{% endif %}</div><div class="m">{{ e.meta }}</div></div>{% endfor %}</div>
+{% if print_mode %}<script>window.print()</script>{% endif %}{% endif %}
+{% endblock %}

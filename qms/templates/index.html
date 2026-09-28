@@ -10,7 +10,11 @@
     <button class="btn">تتبّع</button>
   </form>
 </div>
+<h2>خطوط الإنتاج</h2>
 <div class="tiles">
+{% for r in routes_ %}<a class="tile" href="{{ url_for('line_view', code=r.code) }}"><b>{{ r.name_ar }}</b><span>{{ r.name_en }} — أوامر وWIP وجودة</span></a>{% endfor %}
+</div>
+<div class="tiles" style="margin-top:14px">
   <a class="tile" href="{{ url_for('trace_view') }}"><b>مستكشف التشغيلة</b><span>السلسلة كاملة من المورّد إلى الإفراج</span></a>
   <a class="tile" href="{{ url_for('items') }}"><b>مستكشف الأصناف</b><span>ابحث بالكود أو بالمواصفات</span></a>
   <a class="tile" href="{{ url_for('receipt_new') }}"><b>استلام مادة خام</b><span>إنشاء GRN والرولات ثم فحص QC والإفراج</span></a>

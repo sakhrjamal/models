@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% block title %}الرباط الضاغط{% endblock %}{% block body %}
+<h1>خط الرباط الضاغط</h1>
+<div class="sub">جامبو رول ← ماكينة الأربطة ← تغليف ← بوكسات ← كراتين ← فحص نهائي ← مخزن. كل مرحلة لا تقبل أكثر مما خرج من سابقتها.</div>
+{% set go = request.args.get('go') %}
+<div class="kpis"><div class="kpi ok"><b>{{ jumbo|length }}</b><span>جامبو مفرج عنه غير مخصص</span></div></div>
+{% for r in rows %}<div class="card"><div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:space-between;align-items:baseline">
+<a href="{{ url_for('genealogy', b=r.batch_no) }}"><b style="font-size:16px">{{ r.batch_no }}</b></a>
+<span>{{ r.item_code }} · {{ '{:,.0f}'.format(r.qty_required or 0) }} {{ r.uom }}</span></div>
+{% set progress = r.prog %}{% include "_stepbar.html" %}
+<div class="actions noprint">
+<a class="btn {{ '' if go in (None,'alloc') else 'g' }}" href="{{ url_for('bandage_alloc', bn=r.batch_no) }}">تخصيص الجامبو</a>
+<a class="btn {{ '' if go=='machine' else 'g' }}" href="{{ url_for('bandage_machine', bn=r.batch_no) }}">ماكينة الأربطة</a>
+<a class="btn {{ '' if go=='wrap' else 'g' }}" href="{{ url_for('bandage_wrap', bn=r.batch_no) }}">التغليف</a>
+<a class="btn {{ '' if go=='box' else 'g' }}" href="{{ url_for('bandage_box', bn=r.batch_no) }}">البوكسات</a>
+<a class="btn {{ '' if go=='carton' else 'g' }}" href="{{ url_for('bandage_carton', bn=r.batch_no) }}">الكراتين</a>
+<a class="btn g" href="{{ url_for('materials', b=r.batch_no) }}">صرف المواد</a></div></div>
+{% else %}<div class="empty">لا توجد أوامر رباط مفتوحة. يصدرها مدير المصنع باختيار صنف مساره «الرباط الضاغط».</div>{% endfor %}{% endblock %}

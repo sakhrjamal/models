@@ -55,15 +55,8 @@
     <div class="row"><span class="k">المبرر/الشرط</span><span class="v">{{ inspection.justification or '—' }}</span></div>
   </div>
   <table class="qctable"><tr><th>الاختبار</th><th>النتيجة المسجلة</th></tr>
-    <tr><td>Acidity / Alkalinity — الحموضة والقلوية</td><td>{{ inspection.c1 or '—' }}</td></tr>
-    <tr><td>Dehydration</td><td>{{ inspection.c2 or '—' }}</td></tr>
-    <tr><td>Impurities — الشوائب</td><td>{{ inspection.c3 or '—' }}</td></tr>
-    <tr><td>Distillation</td><td>{{ inspection.c4 or '—' }}</td></tr>
-    <tr><td>Mesh — عدد الخيوط</td><td>{{ inspection.c5 or '—' }}</td></tr>
-    <tr><td>Absorbency — الامتصاص</td><td>{{ inspection.c6 or '—' }}</td></tr>
-    <tr><td>المظهر والنظافة</td><td>{{ inspection.c7 or '—' }}</td></tr>
-    <tr><td>الأبعاد / الوزن</td><td>{{ inspection.c8 or '—' }}</td></tr>
-    <tr><td>مراجعة COA</td><td>{{ inspection.c9 or '—' }}</td></tr>
+    {% for i in range(1,10) %}<tr><td>{{ labels.get(i, 'بند ' ~ i) }}</td><td>{{ inspection['c%d' % i] or '—' }}</td></tr>
+    {% endfor %}
   </table>
   {% if inspection.notes %}<div class="hint"><b>ملاحظات QC:</b> {{ inspection.notes }}</div>{% endif %}
 </div>
@@ -80,15 +73,8 @@
   <div><label>مسؤول الجودة QA</label><input name="qa_officer"></div>
 
   <div class="full sectionline"><b>نتائج الاختبارات</b><span class="mini">أدخل القيمة والنتيجة/الحكم حسب طريقة الاختبار المعتمدة لديكم</span></div>
-  <div><label>Acidity / Alkalinity — الحموضة والقلوية</label><input name="c1" placeholder="النتيجة / مطابق"></div>
-  <div><label>Dehydration</label><input name="c2" placeholder="النتيجة / مطابق"></div>
-  <div><label>Impurities — الشوائب</label><input name="c3" placeholder="النتيجة / مطابق"></div>
-  <div><label>Distillation</label><input name="c4" placeholder="النتيجة / مطابق"></div>
-  <div><label>Mesh — عدد الخيوط</label><input name="c5" placeholder="مثال: 19x15 / مطابق"></div>
-  <div><label>Absorbency — الامتصاص</label><input name="c6" placeholder="النتيجة / مطابق"></div>
-  <div><label>المظهر والنظافة</label><input name="c7" placeholder="مطابق / ملاحظة"></div>
-  <div><label>الأبعاد / الوزن</label><input name="c8" placeholder="مطابق / ملاحظة"></div>
-  <div><label>مراجعة COA</label><input name="c9" value="{{ 'مطابق' if rec.coa == 'متوفر' else 'غير متوفر' }}"></div>
+  {% for i in range(1,10) %}<div><label>{{ labels.get(i, 'بند ' ~ i) }}</label>{% if i==9 %}<input name="c9" value="{{ 'مطابق' if rec.coa == 'متوفر' else 'غير متوفر' }}">{% else %}<input name="c{{ i }}" placeholder="النتيجة / مطابق"{{ '' }}>{% endif %}</div>
+  {% endfor %}
 
   <div><label>قرار الجودة *</label>
     <select name="decision" required><option value="">— اختر —</option><option>قبول</option><option>قبول مشروط</option><option>رفض</option><option>معلّق</option></select>

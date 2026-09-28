@@ -19,7 +19,7 @@ echo [2/4] تجهيز قاعدة البيانات...
 if not exist "data\qms.db" ( python seed.py )
 
 echo [3/4] بناء الملف التنفيذي - قد يستغرق عدة دقائق...
-python -m PyInstaller --noconfirm --onefile --name QMS_System --add-data "templates;templates" --add-data "static;static" --add-data "schema.sql;." --hidden-import waitress --hidden-import jinja2 --console run.py > build_log.txt 2>&1
+python -m PyInstaller --noconfirm --onefile --name QMS_System --add-data "templates;templates" --add-data "static;static" --add-data "schema.sql;." --add-data "schema_v13.sql;." --hidden-import waitress --hidden-import jinja2 --console run.py > build_log.txt 2>&1
 
 if not exist "dist\QMS_System.exe" (
   echo.

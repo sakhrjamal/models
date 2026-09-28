@@ -63,8 +63,9 @@ def batch_chain(batch_no):
     d['loads']    = q('SELECT * FROM cycle_loads WHERE batch_no=? ORDER BY id', (b,))
     d['psr']      = q('SELECT * FROM post_ster_receipts WHERE batch_no=? ORDER BY doc_no', (b,))
     d['release']  = one('SELECT * FROM releases WHERE batch_no=?', (b,))
-    d['qc_release'] = one("""SELECT rec_no, rec_date, inspector FROM qc_records WHERE template_code='QA-PKN-REL'
-                            AND batch_no=? AND decision='مفرج' ORDER BY id DESC LIMIT 1""", (b,))
+    d['qc_release'] = one("""SELECT r.rec_no, r.rec_date, r.inspector FROM qc_records r
+                            JOIN qc_templates t ON t.code=r.template_code
+                            WHERE t.is_final=1 AND r.batch_no=? AND r.decision='مفرج' ORDER BY r.id DESC LIMIT 1""", (b,))
     d['shipments']= q('SELECT * FROM shipments WHERE batch_no=? ORDER BY id', (b,))
     d['slit_batches'] = slit_batches
     d['materials'] = q('SELECT * FROM bom WHERE batch_no=? AND IFNULL(voided,0)=0 ORDER BY id', (b,))

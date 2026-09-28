@@ -8,6 +8,9 @@
 <div class="full"><label>العنوان *</label><input name="title" required value="{{ t.title }}"></div>
 <div><label>فاصل الاستحقاق (ساعات) — للسجل اليومي/الدوري</label><input type="number" step="any" min="0.5" name="freq_hours" value="{{ t.freq_hours if t.freq_hours else '' }}"></div>
 <div><label>المنتج</label><select name="route">{% for k,v in ROUTE_AR.items() %}<option value="{{ k }}" {{ 'selected' if t.route==k }}>{{ v }}</option>{% endfor %}</select></div>
+<div class="full"><label>مسارات التصنيع التي ينطبق عليها</label><div class="chk">
+{% for r in all_routes %}<label><input type="checkbox" name="mfg_routes" value="{{ r.code }}" {{ 'checked' if r.code in t.mfg_list }}> {{ r.name_ar }}</label>{% endfor %}</div></div>
+{% if t.kind=='release' %}<div><label><input type="checkbox" name="is_final" style="width:auto" {{ 'checked' if t.is_final }}> إفراج نهائي للتشغيلة (يُغلق الأمر ويفتح المخزن)</label></div>{% endif %}
 <div><label><input type="checkbox" name="needs_batch" style="width:auto" {{ 'checked' if t.needs_batch }}> رقم التشغيلة إلزامي</label></div>
 <div><label><input type="checkbox" name="active" style="width:auto" {{ 'checked' if t.active }}> نموذج فعّال</label></div>
 <div class="full"><label>ملاحظة</label><input name="note" value="{{ t.note or '' }}"></div>
