@@ -1,0 +1,53 @@
+{% extends "base.html" %}{% block title %}الجودة{% endblock %}{% block body %}
+<h1>قسم الجودة — خطوط الشاش</h1>
+<div class="sub">إفراج الخط والتشغيلة، والسجلات اليومية والدورية — مراقبة الجودة (QC) وضمان الجودة (QA) · الأسليتر (الرولات) ومكائن الطي</div>
+<div class="actions noprint" style="margin-bottom:14px">
+<a class="btn g" href="{{ url_for('quality_records') }}">سجل كل السجلات</a>
+<a class="btn g" href="{{ url_for('quality_templates') }}">قوالب الجودة</a>
+<span class="mini">ربط الإنتاج بالإفراج: <b>{{ {'off':'متوقف','warn':'تنبيه فقط','block':'منع التسجيل بدون إفراج'}.get(gate, gate) }}</b></span></div>
+
+{% set ndue = due|selectattr('due')|list|length %}
+<div class="kpis">
+<div class="kpi {{ 'warn' if ndue else 'ok' }}"><b>{{ ndue }}</b><span>سجل يومي/دوري مستحق</span></div>
+<div class="kpi {{ 'bad' if bad else 'ok' }}"><b>{{ bad|length }}</b><span>غير مطابق آخر 7 أيام</span></div>
+<div class="kpi"><b>{{ running|length }}</b><span>تشغيلة مفتوحة</span></div>
+<div class="kpi"><b>{{ tpls|length }}</b><span>نموذج فعّال</span></div>
+</div>
+
+<h2>إفراج الخط والتشغيلة</h2>
+{% if running %}<div class="tablewrap"><table>
+<tr><th>رقم التشغيلة</th><th>النوع</th><th>الصنف</th><th>الخط</th><th>إفراج QC</th><th>إفراج QA</th></tr>
+{% for x in running %}{% set w = x.w %}{% set ac = 'FLD' if x.area=='folding' else 'SLT' %}
+<tr><td><a href="{{ url_for('trace_view', b=w.batch_no) }}"><b>{{ w.batch_no }}</b></a></td>
+<td>{{ 'طي' if x.area=='folding' else 'أسليتر' }}</td><td>{{ w.item_code or '—' }}</td><td>{{ w.fold_machine or 'SL-01' }}</td>
+{% for dept in ['QC','QA'] %}{% set r = x.rs.get((dept, x.area)) %}<td>
+{% if r %}<a href="{{ url_for('quality_records', batch=w.batch_no, tpl=dept~'-'~ac~'-REL') }}"><span class="pill {{ 'ok' if r.decision=='مفرج' else 'bad' }}">{{ r.decision }}</span></a>
+{% elif (can('qc_sign') if dept=='QA' else can('qc_record')) %}<a class="smallbtn" href="{{ url_for('quality_new', code=dept~'-'~ac~'-REL', b=w.batch_no) }}">تسجيل إفراج</a>
+{% else %}<span class="pill warn">بانتظار</span>{% endif %}</td>{% endfor %}</tr>{% endfor %}</table></div>
+{% else %}<div class="empty">لا توجد تشغيلات مفتوحة.</div>{% endif %}
+
+<h2>السجلات اليومية والدورية — الاستحقاق</h2>
+<div class="tablewrap"><table>
+<tr><th>النموذج</th><th>الخط</th><th>الفاصل</th><th>آخر تسجيل</th><th>الحالة</th><th></th></tr>
+{% for x in due %}<tr><td class="r">{{ x.tpl.title }}</td><td>{{ x.line.machine_code }}</td>
+<td>{{ ('كل %g ساعة'|format(x.tpl.freq_hours)) if x.tpl.freq_hours else '—' }}</td>
+<td>{% if x.last %}<a href="{{ url_for('quality_record', rid=x.last.id) }}">{{ x.last.rec_date }} {{ x.last.rec_time or '' }}</a>
+ <span class="pill {{ cls_for(x.last.result) }}">{{ x.last.result }}</span>{% else %}—{% endif %}</td>
+<td><span class="pill {{ 'warn' if x.due else 'ok' }}">{{ x.state }}</span></td>
+<td class="noprint">{% if (can('qc_sign') if x.tpl.dept=='QA' else can('qc_record')) %}
+<a class="smallbtn" href="{{ url_for('quality_new', code=x.tpl.code, line=x.line.machine_code) }}">سجل جديد</a>{% endif %}</td></tr>{% endfor %}
+</table></div>
+
+{% if bad %}<h2>سجلات غير مطابقة (آخر 7 أيام)</h2>
+<table><tr><th>السجل</th><th>النموذج</th><th>التاريخ</th><th>التشغيلة</th><th>الخط</th><th>عدد البنود</th></tr>
+{% for r in bad %}<tr><td><a href="{{ url_for('quality_record', rid=r.id) }}">{{ r.rec_no }}</a></td><td class="r">{{ r.title }}</td>
+<td>{{ r.rec_date }}</td><td>{{ r.batch_no or '—' }}</td><td>{{ r.line_code or '—' }}</td><td>{{ r.fail_count }}</td></tr>{% endfor %}</table>{% endif %}
+
+<h2>آخر السجلات</h2>
+{% if recent %}<table><tr><th>السجل</th><th>النموذج</th><th>التاريخ</th><th>الوردية</th><th>التشغيلة</th><th>الخط</th><th>النتيجة</th><th>القرار</th></tr>
+{% for r in recent %}<tr><td><a href="{{ url_for('quality_record', rid=r.id) }}">{{ r.rec_no }}</a></td><td class="r">{{ r.title }}</td>
+<td>{{ r.rec_date }}</td><td>{{ r.shift or '—' }}</td><td>{{ r.batch_no or '—' }}</td><td>{{ r.line_code or '—' }}</td>
+<td><span class="pill {{ cls_for(r.result) }}">{{ r.result }}</span></td>
+<td>{% if r.decision %}<span class="pill {{ 'ok' if r.decision=='مفرج' else 'bad' }}">{{ r.decision }}</span>{% else %}—{% endif %}</td></tr>{% endfor %}</table>
+{% else %}<div class="empty">لا توجد سجلات بعد.</div>{% endif %}
+{% endblock %}

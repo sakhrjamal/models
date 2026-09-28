@@ -1,0 +1,29 @@
+{% extends "base.html" %}{% block title %}سجل التدقيق{% endblock %}{% block body %}
+<h1>سجل التدقيق</h1>
+<div class="sub">كل إضافة أو تعديل أو حذف منسوب لمستخدم ووقت — لا يمكن تحريره من الواجهة</div>
+<div class="card noprint"><form class="searchbar">
+  <input type="text" name="k" value="{{ key }}" placeholder="بحث برقم مستند أو تفصيل… مثال: GRN-260910-001">
+  <button class="btn">بحث</button>
+  {% if key %}<a class="btn g" href="{{ url_for('audit_view') }}">الكل</a>{% endif %}
+</form></div>
+
+<h2>التواقيع الإلكترونية</h2>
+{% if sigs %}<div class="card tablewrap"><table class="audit-t">
+<tr><th>الوقت</th><th>المستخدم</th><th>الدور</th><th>المعنى</th><th>السجل</th></tr>
+{% for x in sigs %}<tr>
+<td class="c">{{ x.signed_at or x.ts }}</td><td>{{ x.full_name }} ({{ x.username }})</td>
+<td>{{ ROLE_AR.get(x.role, x.role) }}</td><td>{{ x.meaning }}</td>
+<td class="c">{{ x.table_name }} / {{ x.record_key }}</td></tr>{% endfor %}
+</table></div>{% else %}<div class="empty">لا توجد تواقيع بعد.</div>{% endif %}
+
+<h2>الأحداث</h2>
+{% if rows %}<div class="card tablewrap"><table class="audit-t">
+<tr><th>الوقت</th><th>المستخدم</th><th>الإجراء</th><th>الجدول</th><th>المفتاح</th><th>تفاصيل</th></tr>
+{% for r in rows %}<tr>
+<td class="c">{{ r.ts }}</td><td>{{ r.username }}</td><td>{{ r.action }}</td>
+<td>{{ r.table_name }}</td><td class="c">{{ r.record_key }}</td>
+<td style="text-align:right">{{ r.details or '—' }}</td></tr>{% endfor %}
+</table></div>
+<div class="mini">تُعرض آخر 300 حدث (أو 500 عند البحث). السجل الكامل في قاعدة البيانات.</div>
+{% else %}<div class="empty">لا توجد أحداث مطابقة.</div>{% endif %}
+{% endblock %}

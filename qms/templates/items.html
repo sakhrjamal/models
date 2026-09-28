@@ -1,0 +1,49 @@
+{% extends "base.html" %}{% block title %}مستكشف الأصناف{% endblock %}
+{% macro kv(k,v) %}<div class="row"><div class="k">{{ k }}</div><div class="v">{{ v if v not in (None,'') else '—' }}</div></div>{% endmacro %}
+{% block body %}
+<h1>مستكشف الأصناف</h1>
+<div class="sub">ابحث بالكود فتظهر المواصفات، أو اختر المواصفات فيظهر الكود</div>
+<div class="card"><form class="searchbar">
+  <input type="text" name="code" value="{{ code }}" placeholder="اكتب كود الصنف… مثال: GS013" autofocus>
+  <button class="btn">بحث</button></form>
+</div>
+{% if code and not item %}<div class="msg bad">الكود <b>{{ code }}</b> غير موجود في الفهرس.</div>{% endif %}
+{% if item %}<div class="card"><div class="kv">
+{{ kv('كود الصنف', item.item_code) }}{{ kv('التصنيف', item.category_ar) }}
+{{ kv('العائلة', item.family) }}{{ kv('المقاس', item.size) }}
+{{ kv('عدد الطبقات', item.ply) }}{{ kv('الخط الكاشف', item.xray) }}
+{{ kv('نوع الميش', item.mesh) }}{{ kv('حالة التعقيم', item.sterile) }}
+{{ kv('الحافة', item.edge) }}{{ kv('ماكينة الطي', item.machine_code) }}
+{{ kv('عرض القص المعياري (سم)', mtx.std_width_cm if mtx else None) }}
+{{ kv('وحدة القياس', item.uom) }}
+{{ kv('العرض (سم)', item.width_cm) }}{{ kv('الطول (م)', item.length_m) }}
+{{ kv('درجة الكشف (خام)', item.xray_grade) }}
+{{ kv('كود العبوة (PK/BX)', item.pack_code) }}{{ kv('كود الكرتون (MB)', item.master_box) }}
+</div><div class="row" style="margin-top:10px"><div class="k">الوصف الكامل</div><div class="v">{{ item.description }}</div></div>
+{% if item.prefix in ('GS','SP') and not item.pack_code %}
+<div class="hint">لا توجد عبوة مسجّلة لهذا الصنف في الفهرس — راجع أكواد PK و BX.</div>{% endif %}
+</div>{% endif %}
+<h2>البحث بالمواصفات</h2>
+<div class="card"><form class="grid">
+<div><label>المقاس</label><select name="size">{% for o in ['','5x5 cm','7.5x7.5 cm','10x10 cm'] %}<option {{ 'selected' if sel.size==o }}>{{ o }}</option>{% endfor %}</select></div>
+<div><label>عدد الطبقات</label><select name="ply">{% for o in ['','8','12','16'] %}<option {{ 'selected' if sel.ply==o }}>{{ o }}</option>{% endfor %}</select></div>
+<div><label>الخط الكاشف</label><select name="xray">{% for o in ['','WITH X-RAY','WITHOUT X-RAY'] %}<option {{ 'selected' if sel.xray==o }}>{{ o }}</option>{% endfor %}</select></div>
+<div><label>نوع الميش</label><select name="mesh">{% for o in ['','18x11','19x15'] %}<option {{ 'selected' if sel.mesh==o }}>{{ o }}</option>{% endfor %}</select></div>
+<div><label>حالة التعقيم</label><select name="sterile">{% for o in ['','معقم','غير معقم'] %}<option {{ 'selected' if sel.sterile==o }}>{{ o }}</option>{% endfor %}</select></div>
+<div style="align-self:end"><button class="btn">ابحث</button></div>
+</form>
+{% if found %}<table style="margin-top:14px"><tr><th>الكود</th><th>التصنيف</th><th>ماكينة الطي</th><th>العبوة</th><th>الكرتون</th><th>الوصف</th></tr>
+{% for f in found %}<tr><td><a href="{{ url_for('items', code=f.item_code) }}">{{ f.item_code }}</a></td>
+<td>{{ f.category_ar }}</td><td>{{ f.machine_code or '—' }}</td>
+<td>{{ f.pack_code or '—' }}</td><td>{{ f.master_box or '—' }}</td><td class="r">{{ f.description }}</td></tr>{% endfor %}</table>
+{% elif sel.size and sel.ply %}<div class="empty">لا يوجد كود بهذه المواصفة في الفهرس.</div>{% endif %}
+</div>
+<h2>بحث حر</h2>
+<div class="card"><form class="searchbar"><input type="text" name="q" value="{{ q }}" placeholder="جزء من الكود أو الوصف">
+<button class="btn">ابحث</button></form>
+{% if hits %}<table style="margin-top:14px"><tr><th>الكود</th><th>التصنيف</th><th>المقاس</th><th>الطبقات</th><th>الكاشف</th><th>الميش</th><th>التعقيم</th><th>الوصف</th></tr>
+{% for h in hits %}<tr><td><a href="{{ url_for('items', code=h.item_code) }}">{{ h.item_code }}</a></td>
+<td>{{ h.category_ar }}</td><td>{{ h.size or '—' }}</td><td>{{ h.ply or '—' }}</td>
+<td>{{ h.xray or '—' }}</td><td>{{ h.mesh or '—' }}</td><td>{{ h.sterile or '—' }}</td>
+<td class="r">{{ h.description }}</td></tr>{% endfor %}</table>{% endif %}
+</div>{% endblock %}

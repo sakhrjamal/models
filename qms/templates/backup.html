@@ -1,0 +1,23 @@
+{% extends "base.html" %}{% block title %}النسخ الاحتياطي{% endblock %}{% block body %}
+<h1>النسخ الاحتياطي</h1>
+<div class="sub">نسخة تلقائية متسقة كل بضع ساعات + نسخة عند بدء التشغيل. تُحفظ في:</div>
+<div class="hint" style="direction:ltr;text-align:left">{{ folder }}</div>
+
+<form method="post" class="card">
+  <p>ينشئ هذا الزر نسخة فورية الآن (بطريقة <code>VACUUM INTO</code> فتكون سليمة حتى أثناء العمل).</p>
+  <button class="btn">إنشاء نسخة احتياطية الآن</button>
+</form>
+
+<div class="hint">
+  <b>استرجاع نسخة:</b> أغلق النظام، انسخ ملف النسخة إلى <code>data\qms.db</code> (استبدل الحالي)،
+  ثم احذف أي ملفات <code>qms.db-wal</code> و <code>qms.db-shm</code> بجانبه، وشغّل النظام.
+  خذ نسخة خارج المصنع أسبوعيًا أيضًا.
+</div>
+
+<h2>آخر النسخ</h2>
+{% if backups %}<div class="card tablewrap"><table>
+<tr><th>الملف</th><th>التاريخ والوقت</th><th>الحجم</th></tr>
+{% for b in backups %}<tr><td style="direction:ltr">{{ b.name }}</td><td>{{ b.when }}</td>
+<td>{{ '{:,}'.format(b.size_kb) }} ك.ب</td></tr>{% endfor %}
+</table></div>{% else %}<div class="empty">لا توجد نسخ بعد — ستُنشأ أول نسخة بعد دقيقة من تشغيل النظام.</div>{% endif %}
+{% endblock %}

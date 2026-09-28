@@ -1,0 +1,40 @@
+{% extends "base.html" %}{% block body %}
+<h1>الرئيسية</h1>
+<div class="sub">نظرة سريعة على حالة الإنتاج والتتبع</div>
+<div class="stat">
+{% for k,v in st.items() %}<div><b>{{ v }}</b><span>{{ k }}</span></div>{% endfor %}
+</div>
+<div class="card">
+  <form class="searchbar" action="{{ url_for('trace_view') }}">
+    <input type="text" name="b" placeholder="اكتب رقم التشغيلة المطبوع على المنتج… مثال: SEP-2610-F-001" autofocus>
+    <button class="btn">تتبّع</button>
+  </form>
+</div>
+<div class="tiles">
+  <a class="tile" href="{{ url_for('trace_view') }}"><b>مستكشف التشغيلة</b><span>السلسلة كاملة من المورّد إلى الإفراج</span></a>
+  <a class="tile" href="{{ url_for('items') }}"><b>مستكشف الأصناف</b><span>ابحث بالكود أو بالمواصفات</span></a>
+  <a class="tile" href="{{ url_for('receipt_new') }}"><b>استلام مادة خام</b><span>إنشاء GRN والرولات ثم فحص QC والإفراج</span></a>
+  {% if can('wo_issue') %}<a class="tile" href="{{ url_for('wo_new') }}"><b>أمر تشغيل جديد</b><span>يُصدر رقم التشغيلة</span></a>{% endif %}
+  <a class="tile" href="{{ url_for('quality_home') }}"><b>الجودة</b><span>إفراج الخطوط والسجلات اليومية والدورية</span></a>
+  <a class="tile" href="{{ url_for('sorting') }}"><b>الفرز</b><span>استهلاك كراتين الطي وتجهيز مجموعات التغليف</span></a>
+  <a class="tile" href="{{ url_for('packaging') }}"><b>التغليف والتعبئة</b><span>المغلفات والبوكسات والكراتين ومطابقة المواد</span></a>
+  <a class="tile" href="{{ url_for('cycle_new') }}"><b>دورة تعقيم جديدة</b><span>تحميل سندات التغليف وتسجيل EO وCI وBI والتهوية</span></a>
+  <a class="tile" href="{{ url_for('forward') }}"><b>التتبع الأمامي</b><span>من لوط المورّد إلى التشغيلات</span></a>
+</div>
+<h2>آخر التشغيلات</h2>
+{% if recent %}<table><tr><th>رقم التشغيلة</th><th>الصنف</th><th>تاريخ البدء</th><th>حالة الأمر</th><th>الإفراج</th><th></th></tr>
+{% for r in recent %}<tr>
+<td><a href="{{ url_for('trace_view', b=r.batch_no) }}">{{ r.batch_no }}</a></td>
+<td>{{ r.item_code or '—' }}</td><td>{{ r.batch_start_date or '—' }}</td>
+<td>{{ r.status or '—' }}</td>
+<td>{% if r.decision %}<span class="pill {{ cls_for(r.decision) }}">{{ r.decision }}</span>{% else %}<span class="pill warn">لم تُفرج</span>{% endif %}</td>
+<td><a href="{{ url_for('trace_view', b=r.batch_no) }}">تتبّع</a></td>
+</tr>{% endfor %}</table>
+{% else %}<div class="empty">لا توجد تشغيلات بعد. ابدأ بإصدار أمر تشغيل.</div>{% endif %}
+{% if pend %}<h2>دورات تعقيم بانتظار النتيجة</h2>
+<table><tr><th>رقم الدورة</th><th>التاريخ</th><th>المؤشر البيولوجي</th><th>الحالة</th></tr>
+{% for c in pend %}<tr><td><a href="{{ url_for('cycle_view', cycle_no=c.cycle_no) }}">{{ c.cycle_no }}</a></td>
+<td>{{ c.cycle_date or '—' }}</td>
+<td><span class="pill {{ cls_for(c.bi_result or 'بانتظار') }}">{{ c.bi_result or 'بانتظار' }}</span></td>
+<td>{{ c.status or '—' }}</td></tr>{% endfor %}</table>{% endif %}
+{% endblock %}

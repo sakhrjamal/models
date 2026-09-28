@@ -1,0 +1,65 @@
+{% extends "base.html" %}{% block title %}المستخدمون{% endblock %}{% block body %}
+<h1>إدارة المستخدمين</h1>
+<div class="sub">الأدوار: عرض فقط → إدخال إنتاج → جودة → مدير النظام</div>
+
+<form method="post" class="card grid" style="max-width:640px">
+  <input type="hidden" name="act" value="add">
+  <div><label>اسم المستخدم *</label><input name="username" required pattern="[A-Za-z0-9._-]+"></div>
+  <div><label>الاسم الكامل *</label><input name="full_name" required></div>
+  <div><label>الدور *</label>
+    <select name="role">
+      <option value="viewer">عرض فقط</option>
+      <option value="operator" selected>إدخال إنتاج</option>
+      <option value="qa">جودة</option>
+      <option value="admin">مدير النظام</option>
+    </select></div>
+  <div><label>كلمة المرور الأولية *</label><input name="password" minlength="6" required></div>
+  <div class="full actions"><button class="btn">إضافة مستخدم</button>
+    <span class="mini">يُطلب من المستخدم تغيير كلمة المرور عند أول دخول.</span></div>
+</form>
+
+<h2>المستخدمون الحاليون</h2>
+<div class="card tablewrap">
+<table class="roletable">
+<tr><th>المستخدم</th><th>الاسم</th><th>الدور</th><th>آخر دخول</th><th>الحالة</th><th>إجراءات</th></tr>
+{% for u in rows %}
+<tr class="{{ 'inactive' if not u.active }}">
+  <td>{{ u.username }}</td>
+  <td>{{ u.full_name }}</td>
+  <td class="c">
+    <form method="post" style="display:inline">
+      <input type="hidden" name="act" value="role"><input type="hidden" name="id" value="{{ u.id }}">
+      <select name="role" onchange="this.form.submit()" {{ 'disabled' if u.id==me.id }}>
+        {% for r in ['viewer','operator','qa','admin'] %}
+        <option value="{{ r }}" {{ 'selected' if u.role==r }}>{{ ROLE_AR[r] }}</option>{% endfor %}
+      </select>
+    </form>
+  </td>
+  <td class="c">{{ u.last_login or '—' }}</td>
+  <td class="c">{% if u.active %}<span class="pill ok">نشط</span>{% else %}<span class="pill bad">معطّل</span>{% endif %}</td>
+  <td class="c">
+    {% if u.id != me.id %}
+    <form method="post" style="display:inline" onsubmit="return confirm('تأكيد؟')">
+      <input type="hidden" name="act" value="toggle"><input type="hidden" name="id" value="{{ u.id }}">
+      <button class="smallbtn g">{{ 'تعطيل' if u.active else 'تفعيل' }}</button>
+    </form>
+    {% endif %}
+    <form method="post" style="display:inline" onsubmit="return promptReset(this)">
+      <input type="hidden" name="act" value="reset"><input type="hidden" name="id" value="{{ u.id }}">
+      <input type="hidden" name="password" value="">
+      <button class="smallbtn">تعيين كلمة مرور</button>
+    </form>
+  </td>
+</tr>
+{% endfor %}
+</table>
+</div>
+<script>
+function promptReset(fm){
+  var p = prompt('كلمة المرور الجديدة (6 خانات على الأقل):');
+  if(!p || p.length < 6){ return false; }
+  fm.querySelector('input[name=password]').value = p;
+  return true;
+}
+</script>
+{% endblock %}

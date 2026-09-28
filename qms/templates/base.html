@@ -1,0 +1,80 @@
+<!doctype html><html lang="ar" dir="rtl"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="csrf" content="{{ csrf_token() }}">
+<title>{% block title %}نظام إدارة الإنتاج والتتبع{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head><body>
+{% if me %}
+<header class="noprint">
+  <div class="logo">نظام إدارة الإنتاج والتتبع</div>
+  <nav>
+    <a href="{{ url_for('index') }}"      class="{{ 'on' if nav=='home' }}">الرئيسية</a>
+    {% if can('reports') %}<a href="{{ url_for('manager_home') }}" class="{{ 'on' if nav=='mgr' }}">لوحة المدير</a>
+    <a href="{{ url_for('reports') }}" class="{{ 'on' if nav=='reports' }}">التقارير</a>{% endif %}
+    <a href="{{ url_for('trace_view') }}" class="{{ 'on' if nav=='trace' }}">مستكشف التشغيلة</a>
+    <a href="{{ url_for('items') }}"      class="{{ 'on' if nav=='items' }}">مستكشف الأصناف</a>
+    <a href="{{ url_for('receipts') }}"   class="{{ 'on' if nav=='receipts' }}">استلام وفحص الخام</a>
+    <a href="{{ url_for('wo_list') }}"    class="{{ 'on' if nav=='wo' }}">أوامر التشغيل</a>
+    <a href="{{ url_for('slit') }}"       class="{{ 'on' if nav=='slit' }}">الأسليتر</a>
+    <a href="{{ url_for('fold') }}"       class="{{ 'on' if nav=='fold' }}">مكائن الطي</a>
+    <a href="{{ url_for('sorting') }}"    class="{{ 'on' if nav=='sorting' }}">الفرز</a>
+    <a href="{{ url_for('packaging') }}"  class="{{ 'on' if nav=='packaging' }}">التغليف</a>
+    <a href="{{ url_for('cycles') }}"     class="{{ 'on' if nav=='cycles' }}">دورات التعقيم</a>
+    <a href="{{ url_for('releases') }}"   class="{{ 'on' if nav=='rel' }}">شهادات الإفراج</a>
+    <a href="{{ url_for('quality_home') }}" class="{{ 'on' if nav=='quality' }}">الجودة</a>
+    {% if can('audit') %}<a href="{{ url_for('audit_view') }}" class="{{ 'on' if nav=='admin' }}">سجل التدقيق</a>{% endif %}
+    {% if can('admin') %}<a href="{{ url_for('users_admin') }}">المستخدمون</a>
+    <a href="{{ url_for('backup_admin') }}">النسخ الاحتياطي</a>{% endif %}
+  </nav>
+  <div class="usermenu">
+    <a href="{{ url_for('account') }}" title="الحساب">{{ me.full_name }}
+      <span class="rolechip">{{ ROLE_AR.get(me.role, me.role) }}</span></a>
+    <a class="logout" href="{{ url_for('logout') }}">خروج</a>
+  </div>
+</header>
+{% endif %}
+<div class="wrap">
+{% with m = get_flashed_messages(with_categories=true) %}{% for c,t in m %}
+  <div class="msg {{ c }}">{{ t }}</div>{% endfor %}{% endwith %}
+{% block body %}{% endblock %}
+</div>
+<script>
+// إضافة رمز التحقق CSRF تلقائيًا لكل نموذج POST — دون تعديل كل قالب
+(function () {
+  var tok = (document.querySelector('meta[name=csrf]') || {}).content || '';
+  document.querySelectorAll('form').forEach(function (fm) {
+    var m = (fm.getAttribute('method') || '').toLowerCase();
+    if (m !== 'post') return;
+    if (fm.querySelector('input[name=_csrf]')) return;
+    var i = document.createElement('input');
+    i.type = 'hidden'; i.name = '_csrf'; i.value = tok;
+    fm.appendChild(i);
+  });
+})();
+// علامة النجمة الحمراء على كل حقل إلزامي (required) — تضاف تلقائيًا وتُلوَّن النجمة الموجودة في النص
+(function () {
+  function label_of(el) {
+    if (el.id) { var l = document.querySelector('label[for="' + el.id + '"]'); if (l) return l; }
+    var p = el.parentElement;
+    while (p && p.tagName !== 'FORM') {
+      var lb = p.querySelector(':scope > label'); if (lb) return lb; p = p.parentElement;
+      if (p && p.classList && p.classList.contains('grid')) break;
+    }
+    return null;
+  }
+  function star(lb) {
+    if (!lb || lb.querySelector('.req')) return;
+    var t = lb.innerHTML;
+    if (/\*/.test(t)) { lb.innerHTML = t.replace(/\s*\*/, '<span class="req">*</span>'); }
+    else { lb.insertAdjacentHTML('beforeend', '<span class="req">*</span>'); }
+  }
+  document.querySelectorAll('input[required],select[required],textarea[required]').forEach(function (el) {
+    if (el.type === 'hidden' || el.type === 'checkbox' || el.type === 'radio') return;
+    star(label_of(el));
+  });
+  document.querySelectorAll('label').forEach(function (lb) {          // نجمة مكتوبة يدويًا: تلوين فقط
+    if (!lb.querySelector('.req') && /\*\s*(<span|$)/.test(lb.innerHTML)) star(lb);
+  });
+})();
+</script>
+</body></html>

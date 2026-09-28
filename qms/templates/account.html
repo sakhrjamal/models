@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% block title %}حسابي{% endblock %}{% block body %}
+<h1>حسابي</h1>
+<div class="sub">{{ me.full_name }} — {{ ROLE_AR.get(me.role, me.role) }} — {{ me.username }}</div>
+{% if me.must_change_pw %}
+<div class="msg warn">يجب تعيين كلمة مرور جديدة قبل متابعة العمل.</div>
+{% endif %}
+<form method="post" class="card grid" style="max-width:520px">
+  <div class="full"><label>كلمة المرور الحالية</label>
+    <input type="password" name="current_pw" autocomplete="current-password" required></div>
+  <div class="full"><label>كلمة المرور الجديدة (6 خانات على الأقل)</label>
+    <input type="password" name="new_pw" autocomplete="new-password" required></div>
+  <div class="full"><label>تأكيد كلمة المرور الجديدة</label>
+    <input type="password" name="repeat_pw" autocomplete="new-password" required></div>
+  <div class="full actions"><button class="btn">تحديث كلمة المرور</button></div>
+</form>
+{% endblock %}

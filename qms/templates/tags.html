@@ -1,0 +1,42 @@
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>بطاقات السب رول — {{ bn }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<style>
+body{background:#fff}
+.sheet{display:grid;grid-template-columns:1fr 1fr;gap:8mm;padding:8mm}
+.tag{border:2px solid #1f4e79;border-radius:6px;padding:0;page-break-inside:avoid}
+.tag h3{background:#1f4e79;color:#fff;margin:0;padding:7px;font-size:14px;text-align:center}
+.tag table{width:100%;border:0;font-size:12px}
+.tag td{border:1px solid #dde4ec;padding:5px 7px}
+.tag td.k{background:#eef3f9;font-weight:700;width:38%;font-size:11px;color:#33475e}
+.tag td.v{font-weight:700;font-size:13px}
+.tag .big{font-size:16px;color:#1f4e79}
+.tag .sig{padding:6px;font-size:10px;text-align:center;border-top:1px solid #dde4ec;color:#555}
+.bar{padding:10mm 8mm 0}
+@media print{.bar{display:none}@page{size:A4;margin:6mm}}
+</style></head><body onload="window.print()">
+<div class="bar noprint">
+<h1 style="margin:0">بطاقات السب رول — {{ bn }}</h1>
+<div class="sub">تُقص وتُلصق على كل رول قبل مغادرته الأسليتر · {{ subs|length }} بطاقة</div>
+<button class="btn" onclick="window.print()">طباعة</button></div>
+<div class="sheet">
+{% for r in subs %}<div class="tag">
+<h3>بطاقة سب رول — الأسليتر SL-01</h3>
+<table>
+<tr><td class="k">رقم البطاقة</td><td class="v big">{{ r.tag_no }}</td></tr>
+<tr><td class="k">رقم الرول</td><td class="v">{{ r.roll_no }}</td></tr>
+<tr><td class="k">ماكينة الوجهة</td><td class="v big">{{ r.dest_machine }}</td></tr>
+<tr><td class="k">عدد الطبقات</td><td class="v big">{{ r.ply }}</td></tr>
+<tr><td class="k">المقاس المستهدف</td><td class="v">{{ r.target_size or '—' }}</td></tr>
+<tr><td class="k">كود SR</td><td class="v">{{ r.sr_code or '—' }}</td></tr>
+<tr><td class="k">العرض / الطول</td><td class="v">{{ r.width_cm }} سم × {{ r.length_m }} م</td></tr>
+<tr><td class="k">الخط الكاشف</td><td class="v">{{ r.xray or '—' }}</td></tr>
+<tr><td class="k">نوع الميش</td><td class="v">{{ r.mesh or '—' }}</td></tr>
+<tr><td class="k">رقم التشغيلة</td><td class="v big">{{ r.batch_no }}</td></tr>
+<tr><td class="k">التاريخ</td><td class="v">{{ r.sdate or '—' }}</td></tr>
+</table>
+<div class="sig">توقيع الفني: ____________ &nbsp;&nbsp; تحقق: ____________</div>
+</div>{% endfor %}
+</div>
+{% if not subs %}<div class="wrap"><div class="empty">لا توجد بطاقات لهذه التشغيلة.</div></div>{% endif %}
+</body></html>

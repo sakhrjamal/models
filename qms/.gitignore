@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+data/qms.db
+data/*.db-wal
+data/*.db-shm
+data/*.bak-*
+data/secret.key
+data/backups/
+data/logs/
+build/
+dist/
+*.spec

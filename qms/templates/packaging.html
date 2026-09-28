@@ -1,0 +1,81 @@
+{% extends "base.html" %}{% block title %}التغليف{% endblock %}{% block body %}
+<h1>سند التغليف والتعبئة</h1>
+<div class="sub">PRD-FRM-004 · مجموعات الفرز ← مغلفات ← بوكسات ← كراتين</div>
+<div class="card noprint"><form class="searchbar">
+<select name="b" onchange="this.form.submit()" style="flex:1;min-width:260px;font-size:16px;padding:10px">
+<option value="">— اختر رقم التشغيلة —</option>
+{% for x in batches %}<option value="{{ x.batch_no }}" {{ 'selected' if x.batch_no==bn }}>{{ x.batch_no }} · {{ x.item_code }} · {{ x.size or '' }} {{ x.ply or '' }}ط · {{ x.route or '' }}</option>{% endfor %}
+</select><noscript><button class="btn">اختر</button></noscript></form></div>
+
+{% if not bn %}<div class="hint">اختر رقم التشغيلة أولًا.</div>
+{% else %}
+{% include "_batchbar.html" %}
+
+<h2>١ — تسجيل سند التغليف</h2>
+<div class="card noprint">
+{% if sorts %}
+<form class="grid" method="post" id="packForm">
+<input type="hidden" name="batch_no" value="{{ bn }}">
+<div><label>رقم سند التغليف</label><input name="doc_no" value="{{ next_doc }}"></div>
+<div><label>التاريخ *</label><input type="date" name="pdate" value="{{ today() }}" required></div>
+<div><label>الوردية *</label><select name="shift" required><option>أ</option><option>ب</option><option>ج</option></select></div>
+<div><label>سند الفرز المصدر *</label><select name="sort_doc_no" id="sort_doc" required onchange="fillSort()">
+{% for r in sorts %}<option value="{{ r.doc_no }}" data-rem="{{ r.remaining_groups }}" data-per="{{ r.per_group }}">{{ r.doc_no }} · متاح {{ '{:,.0f}'.format(r.remaining_groups) }} مجموعة · {{ r.per_group }} قطعة/مجموعة</option>{% endfor %}
+</select></div>
+<div><label>المجموعات الداخلة *</label><input type="number" step="any" min="0.0001" name="groups_in" id="groups_in" required></div>
+<div><label>مسحات في المغلف *</label><input type="number" step="1" min="1" name="per_envelope" id="per_env" required></div>
+<div><label>مغلفات سليمة *</label><input type="number" step="any" min="0" name="env_good" id="env_good" required></div>
+<div><label>مغلفات تالفة</label><input type="number" step="any" min="0" name="env_scrap" id="env_scrap" value="0"></div>
+<div><label>فحص اللحام *</label><select name="seal_check" required><option>مطابق</option><option>غير مطابق</option><option>معلّق</option></select></div>
+<div><label>التحقق من الطباعة/الكود *</label><select name="code_verify" required><option>مطابق</option><option>غير مطابق</option><option>معلّق</option></select></div>
+<div><label>المشغّل *</label><input name="operator" required value="{{ me.full_name }}"></div>
+<div><label>الرقم الوظيفي</label><input name="emp_id"></div>
+
+<div class="full sectionline"><b>مواد التغليف</b></div>
+<div><label>كود الغلاف / الفيلم</label><input name="film_code" list="pkitems" placeholder="PK..."></div>
+<div><label>لوط الغلاف / الفيلم</label><input name="film_lot"></div>
+<div><label>كود البوكس</label><input name="box_code" list="bxitems" placeholder="BX..."></div>
+<div><label>لوط البوكس</label><input name="box_lot"></div>
+<div><label>كود الكرتون الخارجي</label><input name="mb_code" list="mbitems" placeholder="MB..."></div>
+<div><label>لوط الكرتون الخارجي</label><input name="mb_lot"></div>
+<datalist id="pkitems">{% for m in mats if m.prefix=='PK' %}<option value="{{ m.item_code }}">{{ m.description }}</option>{% endfor %}</datalist>
+<datalist id="bxitems">{% for m in mats if m.prefix=='BX' %}<option value="{{ m.item_code }}">{{ m.description }}</option>{% endfor %}</datalist>
+<datalist id="mbitems">{% for m in mats if m.prefix=='MB' %}<option value="{{ m.item_code }}">{{ m.description }}</option>{% endfor %}</datalist>
+
+<div class="full sectionline"><b>مطابقة مادة الغلاف / الفيلم</b><span class="mini">اترك القيم فارغة إذا كانت غير مطلوبة لهذا المنتج</span></div>
+<div><label>الكمية المصروفة</label><input type="number" step="any" min="0" name="film_issued"></div>
+<div><label>المستخدمة</label><input type="number" step="any" min="0" name="film_used"></div>
+<div><label>الهالك</label><input type="number" step="any" min="0" name="film_waste"></div>
+<div><label>المرتجع</label><input type="number" step="any" min="0" name="film_returned"></div>
+
+<div class="full sectionline"><b>التعبئة النهائية</b></div>
+<div><label>تاريخ التعبئة</label><input type="date" name="filled_date" value="{{ today() }}"></div>
+<div><label>المغلفات المعبأة</label><input type="number" step="any" min="0" name="env_packed" id="env_packed"></div>
+<div><label>مغلف / بوكس *</label><input type="number" step="1" min="1" name="env_per_box" id="env_per_box" required></div>
+<div><label>بوكس / كرتون *</label><input type="number" step="1" min="1" name="boxes_per_carton" id="boxes_per_carton" required></div>
+<div><label>البوكسات المصروفة</label><input type="number" step="any" min="0" name="boxes_issued" id="boxes_issued"></div>
+<div><label>البوكسات التالفة</label><input type="number" step="any" min="0" name="boxes_scrap" value="0"></div>
+<div><label>الكراتين المصروفة</label><input type="number" step="any" min="0" name="cartons_issued" id="cartons_issued"></div>
+<div><label>الكراتين التالفة</label><input type="number" step="any" min="0" name="cartons_scrap" value="0"></div>
+<div class="full"><label>ملاحظات</label><textarea name="notes" rows="2"></textarea></div>
+<div class="full"><div id="packPreview" class="hint"></div><button class="btn">حفظ سند التغليف</button></div>
+</form>
+{% else %}<div class="empty">لا توجد مجموعات فرز متاحة للتغليف. سجّل الفرز أولًا أو تأكد من وجود مجموعات متبقية.</div>{% endif %}
+</div>
+
+{% if rows %}
+<h2>٢ — سندات التغليف المسجلة</h2>
+<div class="tablewrap"><table><tr><th>السند</th><th>التاريخ</th><th>سند الفرز</th><th>المجموعات</th><th>مغلف سليم</th><th>بوكس</th><th>كرتون</th><th>مطابقة المغلفات</th><th>مطابقة الفيلم</th><th>مطابقة التعبئة</th><th>اللحام</th><th>الطباعة</th><th>الحالة</th></tr>
+{% for p in rows %}<tr><td>{{ p.doc_no }}</td><td>{{ p.pdate }}</td><td>{{ p.sort_doc_no }}</td><td>{{ '{:,.0f}'.format(p.groups_in) if p.groups_in is not none else '—' }}</td>
+<td>{{ '{:,.0f}'.format(p.env_good) if p.env_good is not none else '—' }}</td><td>{{ p.boxes or 0 }}</td><td>{{ p.cartons or 0 }}</td>
+<td><span class="pill {{ cls_for(p.env_recon) }}">{{ p.env_recon or '—' }}</span></td><td><span class="pill {{ cls_for(p.film_recon) }}">{{ p.film_recon or '—' }}</span></td>
+<td><span class="pill {{ cls_for(p.box_recon) }}">{{ p.box_recon or '—' }}</span></td><td><span class="pill {{ cls_for(p.seal_check) }}">{{ p.seal_check or '—' }}</span></td>
+<td><span class="pill {{ cls_for(p.code_verify) }}">{{ p.code_verify or '—' }}</span></td><td><span class="pill {{ cls_for(p.doc_status) }}">{{ p.doc_status }}</span></td></tr>{% endfor %}</table></div>
+{% endif %}
+<div class="actions noprint" style="margin-top:16px"><a class="btn g" href="{{ url_for('sorting', b=bn) }}">العودة إلى الفرز</a><a class="btn g" href="{{ url_for('trace_view', b=bn) }}">عرض التتبع</a>{% if b.route=='معقم' %}<a class="btn" href="{{ url_for('cycles') }}">الانتقال إلى التعقيم</a>{% endif %}</div>
+<script>
+function fillSort(){const s=document.getElementById('sort_doc');if(!s)return;const o=s.options[s.selectedIndex],g=document.getElementById('groups_in'),p=document.getElementById('per_env'),e=document.getElementById('env_good'),ep=document.getElementById('env_packed');g.value=o.dataset.rem||'';p.value=o.dataset.per||'';e.value=o.dataset.rem||'';ep.value=o.dataset.rem||'';previewPack();}
+function previewPack(){const e=parseFloat(document.getElementById('env_packed')?.value||document.getElementById('env_good')?.value||0),pb=parseInt(document.getElementById('env_per_box')?.value||0),bc=parseInt(document.getElementById('boxes_per_carton')?.value||0),d=document.getElementById('packPreview');if(!d)return;if(e>0&&pb>0&&bc>0){const boxes=Math.ceil(e/pb),cartons=Math.ceil(boxes/bc);d.innerHTML='الناتج المتوقع: <b>'+boxes.toLocaleString('ar-SA')+'</b> بوكس · <b>'+cartons.toLocaleString('ar-SA')+'</b> كرتون. يمكن إدخال المصروف لمطابقة مواد التعبئة.';if(!document.getElementById('boxes_issued').value)document.getElementById('boxes_issued').value=boxes;if(!document.getElementById('cartons_issued').value)document.getElementById('cartons_issued').value=cartons;}else d.innerHTML='أدخل عدد المغلفات لكل بوكس وعدد البوكسات لكل كرتون لاحتساب الناتج.';}
+['env_packed','env_good','env_per_box','boxes_per_carton'].forEach(id=>document.getElementById(id)?.addEventListener('input',previewPack)); fillSort();
+</script>
+{% endif %}{% endblock %}

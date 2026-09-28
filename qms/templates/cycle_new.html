@@ -1,0 +1,42 @@
+{% extends "base.html" %}{% block title %}دورة تعقيم جديدة{% endblock %}{% block body %}
+<div class="pagehead"><div><h1>إنشاء دورة تعقيم جديدة</h1><div class="sub">ST-FRM-001 · تحميل سندات التغليف المكتملة على جهاز EO مع تتبع كل حمولة</div></div>
+<div class="actions noprint"><a class="btn g" href="{{ url_for('cycles') }}">دورات التعقيم</a></div></div>
+
+{% if packs %}
+<form method="post" class="card noprint" id="cycleForm">
+<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:13px">
+<div><label>رقم الدورة *</label><input name="cycle_no" value="{{ next_cycle }}" required></div>
+<div><label>تاريخ الدورة *</label><input type="date" name="cycle_date" value="{{ today() }}" required></div>
+<div><label>جهاز التعقيم *</label><select name="machine_code" required>{% for m in machines %}<option value="{{ m.machine_code }}">{{ m.machine_code }} · {{ m.name }}</option>{% else %}<option value="EO-01">EO-01</option>{% endfor %}</select></div>
+<div><label>وقت بدء الدورة</label><input type="time" name="start_time"></div>
+<div><label>المشغّل *</label><input name="operator" required value="{{ me.full_name }}"></div>
+<div><label>الرقم الوظيفي</label><input name="emp_id"></div>
+<div><label>رقم تقرير الماكينة</label><input name="machine_report_no"></div>
+<div><label>لوط غاز EO</label><input name="gas_lot"></div>
+<div><label>نمط التحميل</label><input name="load_pattern" placeholder="مثال: Pattern A"></div>
+<div><label>عدد BI المخطط</label><input type="number" min="0" step="1" name="bi_count" value="0"></div>
+<div style="grid-column:1/-1"><label>ملاحظات</label><textarea name="notes" rows="2"></textarea></div>
+</div>
+
+<h2>اختيار الحمولة</h2>
+<div class="hint">يظهر فقط سند التغليف <b>المكتمل</b> لمنتج مساره <b>معقم</b>. يمكن تحميل جزء من سند التغليف وترك الباقي لدورة لاحقة.</div>
+<div class="tablewrap"><table><tr><th>تحميل</th><th>سند التغليف</th><th>التشغيلة</th><th>الصنف</th><th>المقاس</th><th>الطبقات</th><th>إجمالي البوكس</th><th>سبق تحميله</th><th>المتبقي</th><th>بوكس لهذه الدورة</th><th>كرتون</th><th>الموضع</th></tr>
+{% for p in packs %}<tr>
+<td><input type="checkbox" name="pack_doc_no" value="{{ p.doc_no }}" class="loadcheck" style="width:auto"></td>
+<td><b>{{ p.doc_no }}</b></td><td><a href="{{ url_for('trace_view', b=p.batch_no) }}">{{ p.batch_no }}</a></td><td>{{ p.item_code }}</td><td>{{ p.size or '—' }}</td><td>{{ p.ply or '—' }}</td>
+<td>{{ '{:,.0f}'.format(p.boxes or 0) }}</td><td>{{ '{:,.0f}'.format(p.loaded_boxes or 0) }}</td><td><span class="pill ok">{{ '{:,.0f}'.format(p.remaining_boxes or 0) }}</span></td>
+<td><input class="cellinput" type="number" min="0" step="any" name="boxes_{{ p.doc_no }}" value="{{ p.remaining_boxes or 0 }}"></td>
+<td><input class="cellinput" type="number" min="0" step="any" name="cartons_{{ p.doc_no }}" value="{{ p.cartons or 0 }}"></td>
+<td><input class="cellinput" name="position_{{ p.doc_no }}" placeholder="علوي / أوسط / سفلي"></td>
+</tr>{% endfor %}</table></div>
+<div class="actions" style="margin-top:16px"><button class="btn">إنشاء الدورة وتحميل المنتجات</button><span class="mini" id="selectedCount">لم يتم اختيار حمولة بعد</span></div>
+</form>
+<script>
+function countLoads(){const n=[...document.querySelectorAll('.loadcheck')].filter(x=>x.checked).length;document.getElementById('selectedCount').textContent=n?'تم اختيار '+n+' حمولة':'لم يتم اختيار حمولة بعد';}
+document.querySelectorAll('.loadcheck').forEach(x=>x.addEventListener('change',countLoads));
+</script>
+{% else %}
+<div class="empty">لا توجد سندات تغليف مكتملة ومتاحة للتعقيم حاليًا. أكمل سند التغليف لمنتج معقم أولًا.</div>
+<div class="actions noprint"><a class="btn" href="{{ url_for('packaging') }}">الانتقال إلى التغليف</a></div>
+{% endif %}
+{% endblock %}

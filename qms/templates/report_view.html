@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% block title %}{{ title }}{% endblock %}{% block body %}
+<div class="crumb noprint"><a href="{{ url_for('reports') }}">التقارير</a><span class="sep">›</span><span class="here">{{ title }}</span></div>
+<h1>{{ title }}</h1>
+<div class="sub">من {{ d1 }} إلى {{ d2 }} · {{ rows|length }} صف</div>
+<div class="card noprint"><form class="searchbar" method="get">
+<label style="margin:0">من</label><input type="date" name="dfrom" value="{{ d1 }}" style="width:auto">
+<label style="margin:0">إلى</label><input type="date" name="dto" value="{{ d2 }}" style="width:auto">
+<button class="btn">عرض</button>
+<a class="btn g" href="{{ url_for('report_view', name=name, dfrom=d1, dto=d2, fmt='csv') }}">تصدير Excel (CSV)</a>
+<button type="button" class="btn g" onclick="window.print()">طباعة</button></form></div>
+{% if rows %}<div class="tablewrap"><table><tr>{% for c in cols %}<th>{{ c }}</th>{% endfor %}</tr>
+{% for r in rows %}<tr>{% for v in r %}<td>{% if loop.index0==0 and name in ('batches','slit') %}<a href="{{ url_for('trace_view', b=v) }}">{{ v }}</a>{% elif v is none %}—{% elif v is number %}{{ '{:,.0f}'.format(v) if v==v|int else v }}{% else %}{{ v }}{% endif %}</td>{% endfor %}</tr>{% endfor %}</table></div>
+{% else %}<div class="empty">لا توجد بيانات في هذا المدى.</div>{% endif %}{% endblock %}

@@ -1,0 +1,6 @@
+{% extends "base.html" %}{% block title %}التقارير{% endblock %}{% block body %}
+<h1>التقارير</h1>
+<div class="sub">كل تقرير بمدى تاريخ اختياري، مع تصدير إلى Excel (CSV)</div>
+<div class="tiles">
+{% for k,(t,d,f) in reports.items() %}<a class="tile" href="{{ url_for('report_view', name=k) }}"><b>{{ t }}</b><span>{{ d }}</span></a>{% endfor %}
+</div>{% endblock %}

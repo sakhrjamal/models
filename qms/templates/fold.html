@@ -1,0 +1,100 @@
+{% extends "base.html" %}{% block title %}مكائن الطي{% endblock %}{% block body %}
+<h1>سند تشغيل مكائن الطي</h1>
+<div class="sub">PRD-FRM-002 · السب رول ← مسحات مطوية · يُسجَّل برقم التشغيلة والتاريخ</div>
+<div class="card noprint"><form class="searchbar">
+<select name="b" onchange="this.form.submit()" style="flex:1;min-width:260px;font-size:16px;padding:10px">
+<option value="">— اختر رقم التشغيلة —</option>
+{% for x in batches %}<option value="{{ x.batch_no }}" {{ 'selected' if x.batch_no==bn }}>
+{{ x.batch_no }} · {{ x.item_code }} · {{ x.size or '' }} {{ x.ply or '' }}ط</option>{% endfor %}
+</select><noscript><button class="btn">اختر</button></noscript></form></div>
+{% if not bn %}<div class="hint">اختر رقم التشغيلة أولًا — يصدرها مدير المصنع في أمر الإنتاج.</div>
+{% else %}
+{% include "_batchbar.html" %}
+
+<h2>١ — استهلاك السب رول</h2>
+<div class="card noprint">
+{% if avail %}<form method="post">
+<input type="hidden" name="act" value="in"><input type="hidden" name="batch_no" value="{{ bn }}">
+<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:13px">
+<div><label>رقم السند</label><input name="doc_no" value="{{ default_doc }}"></div>
+<div><label>التاريخ *</label><input type="date" name="fdate" value="{{ today() }}" required></div>
+<div><label>الوردية *</label><select name="shift" required><option>أ</option><option>ب</option><option>ج</option></select></div>
+<div><label>المشغّل *</label><input name="operator" required value="{{ me.full_name }}"></div>
+<div><label>الرقم الوظيفي</label><input name="emp_id"></div>
+</div>
+<div style="margin-top:14px"><label>السب رول المتاح من المخزون — {{ avail|length }} بطاقة (مطابقة للصنف والماكينة والطبقات) *</label>
+<div class="tablewrap" style="max-height:300px;overflow:auto"><table>
+<tr><th style="width:38px"><input type="checkbox" id="all" onclick="document.querySelectorAll('.tg').forEach(c=>c.checked=this.checked);cnt()"></th>
+<th>البطاقة</th><th>أمر التقطيع</th><th>الرول</th><th>الطول</th><th>العرض</th><th>الخط الكاشف / الميش</th></tr>
+{% for t in avail %}<tr><td><input type="checkbox" class="tg" name="tag_no" value="{{ t.tag_no }}" onchange="cnt()"></td>
+<td><b>{{ t.tag_no }}</b></td><td>{{ t.slit_batch or t.batch_no }}</td><td>{{ t.roll_no }}</td>
+<td>{{ t.length_m }} م</td><td>{{ t.width_cm }} سم</td><td>{{ t.xray or '—' }} · {{ t.mesh or '—' }}</td></tr>{% endfor %}</table></div>
+<div class="mini" id="cntbox" style="margin-top:6px">لم يُحدَّد شيء</div></div>
+<div id="partial" class="grid" style="display:none;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:13px;margin-top:10px">
+<div><label>الطول المستهلك (م) — سب رول واحد فقط</label><input type="number" step="any" name="length_used_m" placeholder="فارغ = الرول كاملًا"></div>
+<div><label>استُهلك كليًا؟</label><select name="fully_used"><option>نعم</option><option>لا</option></select></div>
+<div><label>الرصيد المرتجع (م)</label><input type="number" step="any" name="returned_m" value="0"></div>
+</div>
+<div style="margin-top:14px"><button class="btn">تسجيل الاستهلاك</button></div></form>
+<div class="hint">الماكينة والمقاس والصنف يأتون من أمر الإنتاج تلقائيًا. يُقبل فقط سب رول مطابق للصنف
+(ماكينة، طبقات، خط كاشف، ميش) مهما كان أمر التقطيع الذي أنتجه — والربط محفوظ في التتبع.</div>
+<script>function cnt(){const n=document.querySelectorAll('.tg:checked').length;
+document.getElementById('cntbox').textContent=n?('محدد: '+n+' سب رول'):'لم يُحدَّد شيء';
+document.getElementById('partial').style.display=(n===1)?'grid':'none';}</script>
+{% else %}<div class="empty">لا توجد بطاقات سب رول متاحة مطابقة لهذه التشغيلة
+({{ b.fold_machine }} · {{ b.ply }} طبقة{% if b.xray %} · {{ b.xray }}{% endif %}{% if b.mesh %} · ميش {{ b.mesh }}{% endif %}).
+{% if not fin %} يجب أن يسجّل الأسليتر القص أولًا ويدخل السب رول المخزون — أصدر <a href="{{ url_for('wo_new', t='تقطيع') }}">أمر تقطيع</a> عند الحاجة.{% else %} كل البطاقات استُهلكت.{% endif %}</div>{% endif %}
+</div>
+{% if fin %}<div class="tablewrap"><table><tr><th>السند</th><th>التاريخ</th><th>الوردية</th><th>البطاقة</th><th>أمر التقطيع</th><th>الرول</th>
+<th>الماكينة</th><th>الطول</th><th>العرض</th><th>المساحة المستهلكة</th><th>المشغّل</th></tr>
+{% for r in fin %}<tr><td>{{ r.doc_no }}</td><td>{{ r.fdate }}</td><td>{{ r.shift }}</td>
+<td>{{ r.tag_no }}</td><td>{{ r.sr_source_batch or '—' }}</td><td>{{ r.roll_no }}</td><td>{{ r.machine_code }}</td>
+<td>{{ r.length_used_m }}</td><td>{{ r.width_cm }}</td>
+<td>{{ '{:,.0f}'.format(r.area_used_cm2) if r.area_used_cm2 else '—' }}</td>
+<td>{{ r.operator }} {% if r.emp_id %}({{ r.emp_id }}){% endif %}</td></tr>{% endfor %}</table></div>{% endif %}
+
+<h2>٢ — الناتج</h2>
+<div class="card noprint"><form class="grid" method="post">
+<input type="hidden" name="act" value="out"><input type="hidden" name="batch_no" value="{{ bn }}">
+<div><label>رقم السند</label><input name="doc_no" value="{{ default_doc }}"></div>
+<div><label>التاريخ *</label><input type="date" name="fdate" value="{{ today() }}" required></div>
+<div><label>الوردية *</label><select name="shift" required><option>أ</option><option>ب</option><option>ج</option></select></div>
+<div><label>الماكينة</label><div class="lockedfield">{{ b.fold_machine }}</div></div>
+<div><label>الصنف الخارج</label><div class="lockedfield">{{ b.item_code }} · {{ b.size }} · {{ b.ply }}ط</div></div>
+<div><label>مساحة القطعة (سم²)</label><div class="lockedfield">{{ piece_area if piece_area else '—' }}</div></div>
+<div><label>كود الكرتونة</label><input name="carton_code" placeholder="تلقائي — أو اكتب كود كرتونة قائمة للإضافة عليها"></div>
+<div><label>الكمية السليمة *</label><input type="number" step="any" min="0" name="qty_good" required></div>
+<div><label>الكمية في الكرتونة</label><input type="number" step="any" min="1" name="qty_per_carton"></div>
+<div><label>التالف (قطعة)</label><input type="number" step="any" min="0" name="scrap" value="0"></div>
+<div><label>وزن التالف (كجم)</label><input type="number" step="any" min="0" name="scrap_weight"></div>
+<div><label>قراءة العداد قبل</label><input type="number" step="any" name="counter_before"></div>
+<div><label>قراءة العداد بعد</label><input type="number" step="any" name="counter_after"></div>
+<div><label>المشغّل *</label><input name="operator" required value="{{ me.full_name }}"></div>
+<div class="full"><button class="btn">تسجيل الناتج</button></div></form></div>
+{% if fout %}<div class="tablewrap"><table><tr><th>السند</th><th>التاريخ</th><th>الوردية</th><th>الماكينة</th><th>الصنف</th>
+<th>الكرتونة</th><th>السليم</th><th>التالف</th><th>الكراتين</th><th>المشغّل</th><th>التحقق</th></tr>
+{% for r in fout %}<tr><td>{{ r.doc_no }}</td><td>{{ r.fdate }}</td><td>{{ r.shift or '—' }}</td><td>{{ r.machine_code }}</td>
+<td>{{ r.item_code }}</td><td>{{ r.carton_code or '—' }}</td>
+<td>{{ '{:,.0f}'.format(r.qty_good) if r.qty_good else '—' }}</td>
+<td>{{ '{:,.0f}'.format(r.scrap) if r.scrap else 0 }}</td><td>{{ r.cartons or '—' }}</td><td>—</td>
+<td><span class="pill {{ cls_for(r.machine_size_check) }}">{{ r.machine_size_check or '—' }}</span></td></tr>{% endfor %}</table></div>{% endif %}
+
+<h2>٣ — المطابقة</h2>
+{% if recon and recon.theo %}
+<div class="card"><div class="kv">
+<div class="row"><div class="k">السب رول المستهلك</div><div class="v">{{ recon.subrolls }}</div></div>
+<div class="row"><div class="k">المساحة المستهلكة</div><div class="v">{{ '{:,.0f}'.format(recon.area) }} سم²</div></div>
+<div class="row"><div class="k">مساحة القطعة</div><div class="v">{{ recon.piece_area }} سم²</div></div>
+<div class="row"><div class="k">العدد المعياري</div><div class="v">{{ '{:,}'.format(recon.theo) }} قطعة</div></div>
+<div class="row"><div class="k">الإنتاج السليم</div><div class="v">{{ '{:,.0f}'.format(recon.good) }}</div></div>
+<div class="row"><div class="k">التالف</div><div class="v">{{ '{:,.0f}'.format(recon.scrap) }}</div></div>
+<div class="row"><div class="k">الفاقد</div><div class="v">{{ '{:,.0f}'.format(recon.loss) }}</div></div>
+<div class="row"><div class="k">نسبة الفاقد</div><div class="v">{{ '%.1f'|format(recon.pct*100) }}% (الحد {{ '%.0f'|format(recon.limit*100) }}%)</div></div>
+</div>
+<div class="verdict {{ cls_for(recon.result) }}" style="margin-top:14px">{{ recon.result }}</div>
+{% if recon.loss < 0 %}<div class="hint">فاقد سالب يعني إنتاجًا يفوق المعياري — انحراف يوقف التشغيلة للتحقيق، لا يُمرَّر.</div>{% endif %}
+</div>
+{% else %}<div class="empty">تحتاج مساحة القطعة وناتج الطي لحساب المطابقة.</div>{% endif %}
+<div class="actions noprint" style="margin-top:16px"><a class="btn" href="{{ url_for('sorting', b=bn) }}">الانتقال إلى الفرز</a>
+<a class="btn g" href="{{ url_for('trace_view', b=bn) }}">عرض التتبع</a></div>
+{% endif %}{% endblock %}

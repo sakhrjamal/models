@@ -1,0 +1,26 @@
+{# مكوّن التنقّل المشترك لخطوات الأسليتر — يُستدعى بـ step (1..3) #}
+<div class="crumb">
+<a href="{{ url_for('index') }}">الرئيسية</a><span class="sep">›</span>
+<a href="{{ url_for('slit') }}">الأسليتر</a><span class="sep">›</span>
+<span class="here">{{ bn }}</span>
+</div>
+<div class="steps">
+<a class="s {{ 'done' if step>1 else ('on' if step==1) }}" href="{{ url_for('slit_roll', bn=bn) }}">
+<span class="n">{{ '✓' if step>1 else '1' }}</span> الرول الداخل</a>
+<a class="s {{ 'done' if step>2 else ('on' if step==2) }}" href="{{ url_for('slit_plan', bn=bn) }}">
+<span class="n">{{ '✓' if step>2 else '2' }}</span> خطة القص</a>
+<a class="s {{ 'on' if step==3 }}" href="{{ url_for('slit_review', bn=bn) }}">
+<span class="n">3</span> المطابقة والبطاقات</a>
+</div>
+{% if b and not b.item_code %}<div class="summary-bar">
+<div class="it"><b>{{ b.batch_no }}</b><span>رقم تشغيلة الأسليتر</span></div>
+<div class="it"><b>{{ b.batch_start_date or '—' }}</b><span>تاريخ البدء</span></div>
+<div class="it"><b>{{ b.wo_no or '—' }}</b><span>أمر التقطيع</span></div>
+{% if b.qty_required %}<div class="it"><b>{{ '{:,.0f}'.format(b.qty_required) }}</b><span>المستهدف (سب رول)</span></div>{% endif %}
+</div>{% elif b %}<div class="summary-bar">
+<div class="it"><b>{{ b.item_code }}</b><span>المنتج</span></div>
+<div class="it"><b>{{ b.size or '—' }} · {{ b.ply or '—' }}ط</b><span>المقاس والطبقات</span></div>
+<div class="it"><b>{{ b.fold_machine or '—' }}</b><span>ماكينة الطي</span></div>
+<div class="it"><b>{{ b.std_width_cm or '—' }} سم</b><span>عرض القص المعياري</span></div>
+<div class="it"><b>{{ b.route }}</b><span>المسار</span></div>
+</div>{% endif %}

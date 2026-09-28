@@ -1,0 +1,53 @@
+{% extends "base.html" %}{% block title %}الفرز{% endblock %}{% block body %}
+<h1>سند الفرز</h1>
+<div class="sub">PRD-FRM-003 · كرتون ناتج الطي ← مجموعات جاهزة للتغليف</div>
+<div class="card noprint"><form class="searchbar">
+<select name="b" onchange="this.form.submit()" style="flex:1;min-width:260px;font-size:16px;padding:10px">
+<option value="">— اختر رقم التشغيلة —</option>
+{% for x in batches %}<option value="{{ x.batch_no }}" {{ 'selected' if x.batch_no==bn }}>{{ x.batch_no }} · {{ x.item_code }} · {{ x.size or '' }} {{ x.ply or '' }}ط</option>{% endfor %}
+</select><noscript><button class="btn">اختر</button></noscript></form></div>
+
+{% if not bn %}<div class="hint">اختر رقم التشغيلة أولًا.</div>
+{% else %}
+{% include "_batchbar.html" %}
+
+<h2>١ — تسجيل عملية الفرز</h2>
+<div class="card noprint">
+{% if cartons %}
+<form class="grid" method="post" id="sortForm">
+<input type="hidden" name="batch_no" value="{{ bn }}">
+<div><label>رقم سند الفرز</label><input name="doc_no" value="{{ next_doc }}"></div>
+<div><label>التاريخ *</label><input type="date" name="sdate" value="{{ today() }}" required></div>
+<div><label>الوردية *</label><select name="shift" required><option>أ</option><option>ب</option><option>ج</option></select></div>
+<div><label>كرتونة المصدر *</label><select name="carton_code" id="carton" required onchange="fillCarton()">
+{% for c in cartons %}<option value="{{ c.carton_code }}" data-rem="{{ c.remaining_qty }}" data-item="{{ c.item_code or '' }}">{{ c.carton_code }} · متبقي {{ '{:,.0f}'.format(c.remaining_qty) }} قطعة</option>{% endfor %}
+</select></div>
+<div><label>الكمية الداخلة *</label><input type="number" step="any" min="0.0001" name="qty_in" id="qty_in" required></div>
+<div><label>عدد القطع في المجموعة *</label><input type="number" step="1" min="1" name="per_group" id="per_group" required placeholder="مثال: 5 أو 10 أو 100"></div>
+<div><label>التالف أثناء الفرز</label><input type="number" step="any" min="0" name="scrap" id="scrap" value="0"></div>
+<div><label>مراجعة العد</label><select name="count_review"><option>مطابق</option><option>غير مطابق</option><option>معلّق</option></select></div>
+<div><label>المشغّل *</label><input name="operator" required value="{{ me.full_name }}"></div>
+<div><label>الرقم الوظيفي</label><input name="emp_id"></div>
+<div class="full"><label>ملاحظات</label><textarea name="notes" rows="2"></textarea></div>
+<div class="full"><div id="preview" class="hint"></div><button class="btn">تسجيل سند الفرز</button></div>
+</form>
+{% else %}<div class="empty">لا توجد كراتين طي متبقية لهذه التشغيلة. سجّل ناتج الطي أولًا أو تأكد أن هناك كمية غير مستهلكة.</div>{% endif %}
+</div>
+
+{% if rows %}
+<h2>٢ — سندات الفرز المسجلة</h2>
+<div class="tablewrap"><table><tr><th>السند</th><th>التاريخ</th><th>الوردية</th><th>كرتونة المصدر</th><th>الداخل</th><th>قطعة/مجموعة</th><th>المجموعات</th><th>القطع المستخدمة</th><th>التالف</th><th>المتبقي</th><th>مراجعة العد</th><th>المشغّل</th></tr>
+{% for r in rows %}<tr><td>{{ r.doc_no }}</td><td>{{ r.sdate }}</td><td>{{ r.shift or '—' }}</td><td>{{ r.carton_code }}</td>
+<td>{{ '{:,.0f}'.format(r.qty_in) if r.qty_in is not none else '—' }}</td><td>{{ r.per_group }}</td><td>{{ '{:,.0f}'.format(r.groups) if r.groups is not none else '—' }}</td>
+<td>{{ '{:,.0f}'.format(r.pieces_used) if r.pieces_used is not none else '—' }}</td><td>{{ '{:,.0f}'.format(r.scrap) if r.scrap else 0 }}</td>
+<td><span class="pill {{ 'ok' if not r.variance else 'warn' }}">{{ '{:,.0f}'.format(r.variance) if r.variance else 0 }}</span></td>
+<td><span class="pill {{ cls_for(r.count_review) }}">{{ r.count_review or '—' }}</span></td><td>{{ r.operator or '—' }}</td></tr>{% endfor %}</table></div>
+{% endif %}
+
+<div class="actions noprint" style="margin-top:16px"><a class="btn g" href="{{ url_for('fold', b=bn) }}">العودة إلى الطي</a><a class="btn" href="{{ url_for('packaging', b=bn) }}">الانتقال إلى التغليف</a><a class="btn g" href="{{ url_for('trace_view', b=bn) }}">عرض التتبع</a></div>
+<script>
+function fillCarton(){const c=document.getElementById('carton'),q=document.getElementById('qty_in'); if(!c||!q)return; q.value=c.options[c.selectedIndex].dataset.rem||''; preview();}
+function preview(){const q=parseFloat(document.getElementById('qty_in')?.value||0),p=parseInt(document.getElementById('per_group')?.value||0),s=parseFloat(document.getElementById('scrap')?.value||0),d=document.getElementById('preview'); if(!d)return; if(q>0&&p>0){const u=Math.max(q-s,0),g=Math.floor(u/p),r=q-(g*p)-s; d.innerHTML='الناتج المتوقع: <b>'+g.toLocaleString('ar-SA')+'</b> مجموعة · القطع المستخدمة '+(g*p).toLocaleString('ar-SA')+' · المتبقي '+r.toLocaleString('ar-SA');}else d.innerHTML='أدخل الكمية وحجم المجموعة ليظهر الناتج المتوقع.';}
+document.getElementById('qty_in')?.addEventListener('input',preview); document.getElementById('per_group')?.addEventListener('input',preview); document.getElementById('scrap')?.addEventListener('input',preview); fillCarton();
+</script>
+{% endif %}{% endblock %}

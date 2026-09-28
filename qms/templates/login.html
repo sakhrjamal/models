@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% block title %}تسجيل الدخول{% endblock %}{% block body %}
+<div class="login-page">
+  <div class="card">
+    <h1>نظام إدارة الإنتاج والتتبع</h1>
+    <div class="sub">مصنع الشاش والأربطة الطبية</div>
+    <form method="post">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <label>اسم المستخدم</label>
+      <input name="username" autofocus autocomplete="username" required>
+      <label>كلمة المرور</label>
+      <input type="password" name="password" autocomplete="current-password" required>
+      <button class="btn">دخول</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

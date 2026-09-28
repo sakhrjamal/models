@@ -1,0 +1,55 @@
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<title>سجل تتبع التشغيلة {{ b }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
+<body onload="window.print()"><div class="wrap">
+<h1 style="text-align:center">سجل تتبع التشغيلة</h1>
+<div style="text-align:center;font-size:19px;font-weight:700;margin-bottom:6px">{{ b }}</div>
+<div style="text-align:center;color:#6b7a8f;font-size:12px;margin-bottom:16px">
+QMS-RPT-001 · طُبع في {{ today() }}</div>
+{% if not d.found %}<div class="msg bad">رقم التشغيلة غير موجود.</div>{% else %}
+{% set w=d.wo %}
+<div class="verdict {{ cls_for(d.verdict) }}">{{ d.verdict }}</div>
+<table><tr><th colspan="4">المنتج وأمر التشغيل</th></tr>
+<tr><td>أمر التشغيل</td><td>{{ w.wo_no }}</td><td>كود المنتج</td><td>{{ w.item_code }}</td></tr>
+<tr><td>المقاس / الطبقات</td><td>{{ w.size }} / {{ w.ply }}</td><td>الكاشف / الميش</td><td>{{ w.xray }} / {{ w.mesh }}</td></tr>
+<tr><td>المسار</td><td>{{ w.route }}</td><td>تاريخ بدء التشغيلة</td><td>{{ w.batch_start_date }}</td></tr>
+<tr><td>ماكينة الطي</td><td>{{ w.fold_machine or '—' }}</td><td>رقم تشغيل الماكينة</td><td>{{ w.machine_batch_no or '—' }}</td></tr></table>
+{% if d.supply %}<table style="margin-top:10px"><tr><th colspan="4">المورّد والخام</th></tr>
+{% for r in d.supply %}<tr><td>رقم الرول</td><td>{{ r.roll_no }}</td><td>المورّد</td><td>{{ r.supplier or '—' }}</td></tr>
+<tr><td>لوط المورّد</td><td>{{ r.supplier_lot or '—' }}</td><td>شهادة التحليل</td><td>{{ r.coa_no or '—' }}</td></tr>
+<tr><td>سند الاستلام</td><td>{{ r.grn_no or '—' }}</td><td>قرار الفحص</td><td>{{ r.qc_decision or '—' }}</td></tr>{% endfor %}</table>{% endif %}
+{% if d.slit_orders %}<table style="margin-top:10px"><tr><th colspan="4">أوامر التقطيع التي غذّت هذه التشغيلة</th></tr>
+{% for o in d.slit_orders %}<tr><td>رقم تشغيلة الأسليتر</td><td>{{ o.batch_no }}</td><td>تاريخ البدء</td><td>{{ o.batch_start_date or '—' }}</td></tr>{% endfor %}</table>{% endif %}
+{% if d.rolls %}<table style="margin-top:10px"><tr><th colspan="6">الأسليتر — الرولات الداخلة</th></tr>
+<tr><th>أمر التقطيع</th><th>الرول</th><th>التاريخ</th><th>الطول</th><th>العرض</th><th>الفني</th></tr>
+{% for r in d.rolls %}<tr><td>{{ r.batch_no }}</td><td>{{ r.roll_no }}</td><td>{{ r.sdate }}</td><td>{{ r.length_m }}</td><td>{{ r.width_cm }}</td><td>{{ r.operator or '—' }}</td></tr>{% endfor %}</table>{% endif %}
+{% if d.subrolls %}<table style="margin-top:10px"><tr><th colspan="6">السب رول</th></tr>
+<tr><th>البطاقة</th><th>الرول</th><th>الوجهة</th><th>الطبقات</th><th>العرض</th><th>التحقق</th></tr>
+{% for r in d.subrolls %}<tr><td>{{ r.tag_no }}</td><td>{{ r.roll_no }}</td><td>{{ r.dest_machine }}</td>
+<td>{{ r.ply }}</td><td>{{ r.width_cm }}</td><td>{{ r.width_check or '—' }}</td></tr>{% endfor %}</table>{% endif %}
+{% if d.fold_out %}<table style="margin-top:10px"><tr><th colspan="6">الطي</th></tr>
+<tr><th>السند</th><th>التاريخ</th><th>الماكينة</th><th>المنتج</th><th>السليم</th><th>التالف</th></tr>
+{% for r in d.fold_out %}<tr><td>{{ r.doc_no }}</td><td>{{ r.fdate }}</td><td>{{ r.machine_code }}</td>
+<td>{{ r.item_code }}</td><td>{{ r.qty_good }}</td><td>{{ r.scrap }}</td></tr>{% endfor %}</table>{% endif %}
+{% if d.packaging %}<table style="margin-top:10px"><tr><th colspan="4">التغليف</th></tr>
+{% for p in d.packaging %}<tr><td>سند التغليف</td><td>{{ p.doc_no }}</td><td>لوط الفيلم</td><td>{{ p.film_lot or '—' }}</td></tr>
+<tr><td>لوط البوكس</td><td>{{ p.box_lot or '—' }}</td><td>لوط الكرتون</td><td>{{ p.mb_lot or '—' }}</td></tr>
+<tr><td>المغلفات / البوكسات</td><td>{{ p.env_good or '—' }} / {{ p.boxes or '—' }}</td>
+<td>حالة السند</td><td>{{ p.doc_status }}</td></tr>{% endfor %}</table>{% endif %}
+{% if d.cycles %}<table style="margin-top:10px"><tr><th colspan="4">التعقيم والتهوية</th></tr>
+{% for c in d.cycles %}<tr><td>رقم الدورة</td><td>{{ c.cycle_no }}</td><td>تاريخ الدورة</td><td>{{ c.cycle_date }}</td></tr>
+<tr><td>تقرير الماكينة</td><td>{{ c.machine_report_no or '—' }}</td><td>لوط الغاز</td><td>{{ c.gas_lot or '—' }}</td></tr>
+<tr><td>المؤشر البيولوجي</td><td>{{ c.bi_result or '—' }}</td><td>المؤشر الكيميائي</td><td>{{ c.ci_internal or '—' }}</td></tr>
+{% if c.aeration %}<tr><td>مدة التهوية</td><td>{{ c.aeration.duration_h }} ساعة</td>
+<td>تقييم التهوية</td><td>{{ c.aeration.duration_eval or '—' }}</td></tr>{% endif %}{% endfor %}</table>{% endif %}
+{% if d.qc %}<table style="margin-top:10px"><tr><th colspan="6">سجلات الجودة أثناء التشغيل</th></tr>
+<tr><th>السجل</th><th>النموذج</th><th>التاريخ</th><th>الخط</th><th>النتيجة</th><th>القرار</th></tr>
+{% for r in d.qc %}<tr><td>{{ r.rec_no }}</td><td>{{ r.title }}</td><td>{{ r.rec_date }}</td><td>{{ r.line_code or '—' }}</td><td>{{ r.result or '—' }}</td><td>{{ r.decision or '—' }}</td></tr>{% endfor %}</table>{% endif %}
+{% if d.release %}{% set r=d.release %}<table style="margin-top:10px"><tr><th colspan="4">شهادة الإفراج</th></tr>
+<tr><td>رقم الشهادة</td><td>{{ r.release_no }}</td><td>تاريخ الإصدار</td><td>{{ r.issue_date }}</td></tr>
+<tr><td>تاريخ انتهاء الصلاحية</td><td>{{ r.expiry_date or '—' }}</td><td>الكمية</td><td>{{ r.qty_boxes or '—' }}</td></tr>
+<tr><td>القرار</td><td colspan="3"><b>{{ r.decision }}</b> — {{ r.qa_officer or '' }}</td></tr></table>{% endif %}
+<div style="margin-top:26px;display:flex;gap:40px">
+<div style="flex:1;border-top:1px solid #999;padding-top:6px;text-align:center">مسؤول الجودة</div>
+<div style="flex:1;border-top:1px solid #999;padding-top:6px;text-align:center">مدير المصنع</div></div>
+{% endif %}</div></body></html>

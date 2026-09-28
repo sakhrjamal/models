@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% block title %}الأسليتر{% endblock %}{% block body %}
+<div class="crumb"><a href="{{ url_for('index') }}">الرئيسية</a><span class="sep">›</span>
+<span class="here">الأسليتر</span></div>
+<h1>سند تقطيع الرولات — الأسليتر</h1>
+<div class="sub">الأسليتر يعمل تحت رقم أمر التقطيع (SL) — والسب رول الناتج يدخل المخزون ويُسحب لاحقًا برقم تشغيلة الإنتاج</div>
+{% if rows %}<div class="pick-list">
+{% for x in rows %}<a class="pick" href="{{ url_for('slit_roll', bn=x.batch_no) }}">
+<div class="info"><b>{{ x.batch_no }}</b>
+<span>{% if x.item_code %}{{ x.item_code }} · {{ x.size or '' }} {{ x.ply or '' }}ط · {{ x.fold_machine or '—' }}{% else %}أمر تقطيع {{ x.wo_no or '' }} · {{ x.batch_start_date or '' }}{% if x.qty_required %} · المستهدف {{ '{:,.0f}'.format(x.qty_required) }} سب رول{% endif %}{% endif %}</span></div>
+<div style="text-align:left">
+<span class="pill {{ 'ok' if x.stage=='اكتمل' else ('warn' if x.stage!='لم يبدأ' else '') }}">{{ x.stage }}</span>
+{% if x.nrolls %}<span class="sub" style="display:block;margin-top:4px">{{ x.nrolls }} رول · {{ x.nsubs }} سب رول</span>{% endif %}
+</div>
+<div class="go">‹</div></a>{% endfor %}
+</div>
+{% else %}<div class="hint">لا توجد أوامر تقطيع مفتوحة. يصدر مدير المصنع أمر تقطيع (SL) من شاشة أوامر التشغيل.</div>{% endif %}
+{% endblock %}

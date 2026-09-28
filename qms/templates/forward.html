@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% block body %}
+<h1>التتبع الأمامي</h1>
+<div class="sub">من لوط المورّد إلى كل التشغيلات التي دخل فيها — أساس الاسترجاع</div>
+<div class="card"><form class="searchbar"><input type="text" name="lot" value="{{ lot }}" placeholder="لوط المورّد… مثال: SUP-2508-77" autofocus>
+<button class="btn">تتبّع</button></form></div>
+{% if lot %}{% if rows %}
+<div class="msg ok">لوط المورّد <b>{{ lot }}</b> دخل في {{ rows|length }} تشغيلة (أسليتر وإنتاج).</div>
+<table><tr><th>رقم التشغيلة</th><th>المرحلة</th><th>الصنف</th><th>تاريخ البدء</th><th>شهادة الإفراج</th><th>القرار</th><th></th></tr>
+{% for r in rows %}<tr><td>{{ r.batch_no }}</td><td>{{ r.stage }}</td><td>{{ r.item_code or '—' }}</td>
+<td>{{ r.batch_start_date or '—' }}</td><td>{{ r.release_no or '—' }}</td>
+<td>{% if r.decision %}<span class="pill {{ cls_for(r.decision) }}">{{ r.decision }}</span>{% else %}<span class="pill warn">لم تُفرج</span>{% endif %}</td>
+<td><a href="{{ url_for('trace_view', b=r.batch_no) }}">تتبّع</a></td></tr>{% endfor %}</table>
+{% else %}<div class="empty">لم يُستخدم هذا اللوط في أي تشغيلة، أو أنه غير مسجّل.</div>{% endif %}{% endif %}
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% block title %}سجلات الجودة{% endblock %}{% block body %}
+<div class="crumb"><a href="{{ url_for('quality_home') }}">الجودة</a><span class="sep">›</span><span class="here">السجلات</span></div>
+<h1>سجلات الجودة</h1>
+<div class="card noprint"><form class="grid" method="get" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">
+<div><label>النموذج</label><select name="tpl"><option value="">الكل</option>{% for t in tpls %}<option value="{{ t.code }}" {{ 'selected' if a.get('tpl')==t.code }}>{{ t.title }}</option>{% endfor %}</select></div>
+<div><label>الخط</label><select name="line"><option value="">الكل</option>{% for l in lines %}<option {{ 'selected' if a.get('line')==l.line_code }}>{{ l.line_code }}</option>{% endfor %}</select></div>
+<div><label>رقم التشغيلة</label><input name="batch" value="{{ a.get('batch','') }}"></div>
+<div><label>النتيجة</label><select name="result"><option value="">الكل</option><option {{ 'selected' if a.get('result')=='مطابق' }}>مطابق</option><option {{ 'selected' if a.get('result')=='غير مطابق' }}>غير مطابق</option></select></div>
+<div><label>من تاريخ</label><input type="date" name="dfrom" value="{{ a.get('dfrom','') }}"></div>
+<div><label>إلى تاريخ</label><input type="date" name="dto" value="{{ a.get('dto','') }}"></div>
+<div style="align-self:end"><button class="btn">تصفية</button></div></form></div>
+{% if rows %}<div class="tablewrap"><table><tr><th>السجل</th><th>النموذج</th><th>التاريخ</th><th>الوردية</th><th>التشغيلة</th><th>الخط</th><th>النتيجة</th><th>القرار</th><th>الفاحص</th></tr>
+{% for r in rows %}<tr><td><a href="{{ url_for('quality_record', rid=r.id) }}">{{ r.rec_no }}</a></td><td class="r">{{ r.title }}</td>
+<td>{{ r.rec_date }}</td><td>{{ r.shift or '—' }}</td><td>{{ r.batch_no or '—' }}</td><td>{{ r.line_code or '—' }}</td>
+<td><span class="pill {{ cls_for(r.result) }}">{{ r.result }}</span></td>
+<td>{% if r.decision %}<span class="pill {{ 'ok' if r.decision=='مفرج' else 'bad' }}">{{ r.decision }}</span>{% else %}—{% endif %}</td>
+<td>{{ r.inspector or '—' }}</td></tr>{% endfor %}</table></div>
+{% else %}<div class="empty">لا توجد سجلات مطابقة.</div>{% endif %}{% endblock %}

@@ -1,0 +1,153 @@
+{% extends "base.html" %}{% block title %}مستكشف التشغيلة{% endblock %}
+{% macro kv(k,v) %}<div class="row"><div class="k">{{ k }}</div><div class="v">{{ v if v not in (None,'') else '—' }}</div></div>{% endmacro %}
+{% macro st(k,v) %}<div class="row"><div class="k">{{ k }}</div><div class="v">{% if v %}<span class="pill {{ cls_for(v) }}">{{ v }}</span>{% else %}—{% endif %}</div></div>{% endmacro %}
+{% block body %}
+<h1>مستكشف التشغيلة</h1>
+<div class="sub">اكتب رقم التشغيلة المطبوع على المنتج النهائي، فتظهر سلسلته كاملة</div>
+<div class="card noprint">
+  <form class="searchbar"><input type="text" name="b" value="{{ b }}" placeholder="SEP-2610-F-001 (إنتاج) أو SEP-2610-SL-001 (أسليتر)" autofocus>
+  <button class="btn">تتبّع</button>
+  {% if d and d.found %}<a class="btn g" href="{{ url_for('trace_print', b=b) }}" target="_blank">نسخة للطباعة</a>{% endif %}
+  </form>
+</div>
+{% if b and d and not d.found %}
+  <div class="msg bad">رقم التشغيلة <b>{{ b }}</b> غير موجود في أوامر التشغيل.</div>
+{% elif d and d.found %}
+{% set w=d.wo %}
+<div class="verdict {{ cls_for(d.verdict) }}">{{ d.verdict }}</div>
+<div class="chain">
+  {% for name,ok in [('أمر التشغيل',true),('الرول',d.rolls|length>0),('السب رول',d.subrolls|length>0),
+                     ('الطي',d.fold_out|length>0),('الكراتين',d.cartons|length>0),('الفرز',d.sorting|length>0),
+                     ('التغليف',d.packaging|length>0),('التعقيم',d.loads|length>0),
+                     ('التهوية',d.cycles|selectattr('aeration')|list|length>0),('استلام بعد التعقيم',d.psr|length>0),
+                     ('الإفراج',d.release is not none)] %}
+  <div class="step {{ 'done' if ok else 'none' }}">{{ name }}<b>{{ '✔' if ok else '—' }}</b></div>{% endfor %}
+</div>
+{% if d.kind == 'تقطيع' %}<div class="hint">هذا <b>أمر تقطيع (أسليتر)</b> — رقم التشغيلة الخاص بمرحلة القص. المراحل اللاحقة (طي، فرز، تغليف، تعقيم، إفراج)
+تُسجَّل برقم أمر الإنتاج الذي يسحب من سب رول هذا الأمر — انظر «أوامر الإنتاج التي سحبت منه» أدناه.</div>{% endif %}
+<h2>١ — المنتج وأمر التشغيل</h2><div class="card"><div class="kv">
+{{ kv('رقم التشغيلة', w.batch_no) }}{{ kv('أمر التشغيل', w.wo_no) }}
+{{ kv('نوع التشغيلة', w.batch_kind) }}{{ kv('كود المنتج', w.item_code) }}
+{{ kv('المقاس', w.size) }}{{ kv('عدد الطبقات', w.ply) }}
+{{ kv('الخط الكاشف', w.xray) }}{{ kv('نوع الميش', w.mesh) }}
+{{ kv('المسار', w.route) }}{{ kv('الكمية المطلوبة', w.qty_required) }}
+{{ kv('تاريخ بدء التشغيلة', w.batch_start_date) }}{{ kv('ماكينة الطي', w.fold_machine) }}
+{{ kv('رقم تشغيل الماكينة', w.machine_batch_no) }}{{ kv('عرض القص المعياري', w.std_width_cm) }}
+{{ kv('مُصدر الأمر', w.issued_by) }}{{ kv('مدير الإنتاج', w.prod_manager) }}
+</div></div>
+<h2>٢ — المورّد والخام</h2>
+{% if d.supply %}<table><tr><th>رقم الرول</th><th>المورّد</th><th>بلد المنشأ</th><th>لوط المورّد</th>
+<th>سند الاستلام</th><th>أمر الشراء</th><th>شهادة التحليل</th><th>تصنيع المادة</th><th>انتهاء المادة</th><th>قرار الفحص</th></tr>
+{% for r in d.supply %}<tr><td>{{ r.roll_no }}</td><td>{{ r.supplier or '—' }}</td><td>{{ r.country or '—' }}</td>
+<td><a href="{{ url_for('forward', lot=r.supplier_lot) }}">{{ r.supplier_lot or '—' }}</a></td>
+<td>{{ r.grn_no or '—' }}</td><td>{{ r.po_no or '—' }}</td><td>{{ r.coa_no or '—' }}</td>
+<td>{{ r.mfg_date or '—' }}</td><td>{{ r.expiry_date or '—' }}</td>
+<td>{% if r.qc_decision %}<span class="pill {{ cls_for(r.qc_decision) }}">{{ r.qc_decision }}</span>{% else %}—{% endif %}</td></tr>{% endfor %}</table>
+{% else %}<div class="empty">لا توجد بيانات مورّد مرتبطة — سجّل الرولات في سند الاستلام.</div>{% endif %}
+<h2>٣ — الأسليتر والسب رول</h2>
+{% if d.slit_orders %}<div class="hint">هذه التشغيلة سحبت سب رول من {{ d.slit_orders|length }} أمر تقطيع:
+{% for o in d.slit_orders %}<a href="{{ url_for('trace_view', b=o.batch_no) }}"><b>{{ o.batch_no }}</b></a> ({{ o.batch_start_date or '—' }}){{ '، ' if not loop.last }}{% endfor %}</div>{% endif %}
+{% if d.consumers %}<table style="margin-bottom:10px"><tr><th>أوامر الإنتاج التي سحبت منه</th><th>الصنف</th><th>تاريخ البدء</th><th>السب رول المسحوب</th><th>الحالة</th></tr>
+{% for c in d.consumers %}<tr><td><a href="{{ url_for('trace_view', b=c.batch_no) }}"><b>{{ c.batch_no }}</b></a></td><td>{{ c.item_code or '—' }}</td>
+<td>{{ c.batch_start_date or '—' }}</td><td>{{ c.subrolls }}</td><td>{{ c.status or '—' }}</td></tr>{% endfor %}</table>{% endif %}
+{% if d.rolls %}<table><tr><th>أمر التقطيع</th><th>السند</th><th>التاريخ</th><th>الوردية</th><th>رقم الرول</th><th>كود RR</th><th>الطول</th><th>العرض</th><th>المساحة</th><th>الفني</th></tr>
+{% for r in d.rolls %}<tr><td>{{ r.batch_no }}</td><td>{{ r.doc_no }}</td><td>{{ r.sdate }}</td><td>{{ r.shift }}</td><td>{{ r.roll_no }}</td>
+<td>{{ r.item_code }}</td><td>{{ r.length_m }}</td><td>{{ r.width_cm }}</td>
+<td>{{ '{:,.0f}'.format(r.area_cm2) if r.area_cm2 else '—' }}</td><td>{{ r.operator or '—' }}</td></tr>{% endfor %}</table>{% endif %}
+{% if d.subrolls %}<table style="margin-top:10px"><tr><th>البطاقة</th><th>الرول</th><th>كود SR</th><th>الحالة</th><th>الوجهة</th><th>الطبقات</th><th>المقاس</th><th>العرض</th><th>المعياري</th><th>التحقق</th><th>المساحة</th></tr>
+{% for r in d.subrolls %}<tr><td>{{ r.tag_no }}</td><td>{{ r.roll_no }}</td><td>{{ r.sr_code }}</td>
+<td>{{ r.stock_status or '—' }}{% if r.consumed_by_batch %} → {{ r.consumed_by_batch }}{% endif %}</td>
+<td>{{ r.dest_machine }}</td><td>{{ r.ply }}</td><td>{{ r.target_size }}</td><td>{{ r.width_cm }}</td><td>{{ r.std_width_cm }}</td>
+<td><span class="pill {{ cls_for(r.width_check) }}">{{ r.width_check or '—' }}</span></td>
+<td>{{ '{:,.0f}'.format(r.area_cm2) if r.area_cm2 else '—' }}</td></tr>{% endfor %}</table>
+{% elif not d.rolls %}<div class="empty">لم تُسجَّل عملية قص بعد.</div>{% endif %}
+{% if d.kind != 'تقطيع' %}
+<h2>٤ — التقطيع والطي</h2>
+{% if d.fold_out %}<table><tr><th>السند</th><th>التاريخ</th><th>الوردية</th><th>الماكينة</th><th>المنتج</th><th>السليم</th><th>التالف</th><th>الكراتين</th><th>التحقق</th></tr>
+{% for r in d.fold_out %}<tr><td>{{ r.doc_no }}</td><td>{{ r.fdate }}</td><td>{{ r.shift }}</td><td>{{ r.machine_code }}</td>
+<td>{{ r.item_code }}</td><td>{{ '{:,.0f}'.format(r.qty_good) if r.qty_good else '—' }}</td>
+<td>{{ '{:,.0f}'.format(r.scrap) if r.scrap else '—' }}</td><td>{{ r.cartons }}</td>
+<td><span class="pill {{ cls_for(r.machine_size_check) }}">{{ r.machine_size_check or '—' }}</span></td></tr>{% endfor %}</table>
+{% if d.fold_in %}<div class="sub" style="margin-top:8px">المشغّلون: {% for f in d.fold_in %}{{ f.operator or '—' }} ({{ f.emp_id or '—' }}){{ ' · ' if not loop.last }}{% endfor %}</div>{% endif %}
+{% else %}<div class="empty">لم تُسجَّل عملية طي بعد.</div>{% endif %}
+<h2>٥ — الكراتين والفرز</h2>
+{% if d.cartons %}<table><tr><th>الكرتونة</th><th>المصدر</th><th>المرجع</th><th>الصنف</th><th>العدد</th><th>الموقع</th><th>الحالة</th></tr>
+{% for r in d.cartons %}<tr><td>{{ r.carton_code }}</td><td>{{ r.source }}</td><td>{{ r.source_ref or '—' }}</td>
+<td>{{ r.item_code }}</td><td>{{ '{:,.0f}'.format(r.qty) if r.qty else '—' }}</td><td>{{ r.location or '—' }}</td>
+<td><span class="pill {{ cls_for(r.status) }}">{{ r.status }}</span></td></tr>{% endfor %}</table>{% endif %}
+{% if d.sorting %}<table style="margin-top:10px"><tr><th>سند الفرز</th><th>التاريخ</th><th>الكرتونة</th><th>الداخل</th><th>في المجموعة</th><th>المجموعات</th><th>التالف</th><th>الفارق</th><th>المشغّل</th></tr>
+{% for r in d.sorting %}<tr><td>{{ r.doc_no }}</td><td>{{ r.sdate }}</td><td>{{ r.carton_code }}</td>
+<td>{{ '{:,.0f}'.format(r.qty_in) if r.qty_in else '—' }}</td><td>{{ r.per_group }}</td>
+<td>{{ '{:,.0f}'.format(r.groups) if r.groups else '—' }}</td><td>{{ r.scrap }}</td><td>{{ r.variance }}</td>
+<td>{{ r.operator or '—' }}</td></tr>{% endfor %}</table>
+{% elif not d.cartons %}<div class="empty">لم تُسجَّل كراتين ولا فرز.</div>{% endif %}
+<h2>٦ — التغليف والتعبئة</h2>
+{% if d.packaging %}{% for p in d.packaging %}
+<div class="card"><div class="kv">
+{{ kv('رقم سند التغليف', p.doc_no) }}{{ kv('التاريخ', p.pdate) }}
+{{ kv('مسحات في المغلف', p.per_envelope) }}{{ kv('المشغّل', p.operator) }}
+{{ kv('كود الفيلم', p.film_code) }}{{ kv('لوط الفيلم', p.film_lot) }}
+{{ kv('كود البوكس', p.box_code) }}{{ kv('لوط البوكس', p.box_lot) }}
+{{ kv('كود الكرتون', p.mb_code) }}{{ kv('لوط الكرتون', p.mb_lot) }}
+{{ kv('المغلفات المنتجة', p.env_good) }}{{ kv('البوكسات', p.boxes) }}
+{{ kv('الكراتين', p.cartons) }}
+{{ st('مطابقة الفيلم', p.film_recon) }}{{ st('فحص اللحام', p.seal_check) }}
+{{ st('مطابقة المغلفات', p.env_recon) }}{{ st('حالة السند', p.doc_status) }}
+</div></div>{% endfor %}
+{% else %}<div class="empty">لم يُسجَّل تغليف بعد.</div>{% endif %}
+<h2>٧ — التعقيم</h2>
+{% if d.loads %}<table><tr><th>رقم الدورة</th><th>سند التغليف</th><th>البوكسات الداخلة</th><th>الخارجة</th><th>الفارق</th><th>الموضع</th><th>المؤشر الكيميائي</th></tr>
+{% for l in d.loads %}<tr><td><a href="{{ url_for('cycle_view', cycle_no=l.cycle_no) }}">{{ l.cycle_no }}</a></td>
+<td>{{ l.pack_doc_no }}</td><td>{{ l.boxes_in }}</td><td>{{ l.boxes_out }}</td>
+<td>{% if l.variance %}<span class="pill bad">{{ l.variance }}</span>{% else %}0{% endif %}</td>
+<td>{{ l.position or '—' }}</td>
+<td><span class="pill {{ cls_for(l.ci_load) }}">{{ l.ci_load or '—' }}</span></td></tr>{% endfor %}</table>
+{% for c in d.cycles %}<div class="card" style="margin-top:12px"><div class="kv">
+{{ kv('رقم الدورة', c.cycle_no) }}{{ kv('تاريخ الدورة', c.cycle_date) }}
+{{ kv('مشغّل التعقيم', c.operator) }}{{ kv('مدة الدورة (ساعة)', c.duration_h) }}
+{{ kv('تقرير الماكينة', c.machine_report_no) }}{{ kv('لوط الغاز', c.gas_lot) }}
+{{ kv('نمط التحميل', c.load_pattern) }}
+{{ st('المؤشر الكيميائي الخارجي', c.ci_external) }}{{ st('المؤشر الكيميائي الداخلي', c.ci_internal) }}
+{{ st('المؤشر البيولوجي', c.bi_result) }}{{ kv('عدد المؤشرات البيولوجية', c.bi_count) }}
+{{ st('حالة الدورة', c.status) }}
+{% if c.aeration %}{{ kv('مدة التهوية (ساعة)', c.aeration.duration_h) }}
+{{ kv('المدة الدنيا المعتمدة', c.aeration.min_required_h) }}
+{{ st('تقييم التهوية', c.aeration.duration_eval) }}{{ st('تقييم الحرارة', c.aeration.temp_eval) }}
+{{ st('حالة التهوية', c.aeration.status) }}{% endif %}
+</div></div>{% endfor %}
+{% else %}<div class="empty">لم تدخل هذه التشغيلة أي دورة تعقيم.</div>{% endif %}
+<h2>٨ — الاستلام والإفراج</h2>
+{% if d.psr %}<table><tr><th>سند الاستلام</th><th>التاريخ</th><th>الدورة</th><th>البوكسات</th><th>موقع الحجر</th><th>بطاقة الحجر</th><th>حالة المخزون</th><th>الحالة النهائية</th></tr>
+{% for r in d.psr %}<tr><td>{{ r.doc_no }}</td><td>{{ r.rdate }}</td><td>{{ r.cycle_no }}</td><td>{{ r.boxes }}</td>
+<td>{{ r.qc_location or '—' }}</td><td>{{ r.quarantine_card or '—' }}</td>
+<td><span class="pill {{ cls_for(r.stock_status) }}">{{ r.stock_status }}</span></td>
+<td><span class="pill {{ cls_for(r.final_status) }}">{{ r.final_status or '—' }}</span></td></tr>{% endfor %}</table>{% endif %}
+{% if d.release %}{% set r=d.release %}
+<div class="card"><div class="kv">
+{{ kv('رقم الشهادة', r.release_no) }}{{ kv('تاريخ الإصدار', r.issue_date) }}
+{{ kv('تاريخ التعقيم', r.ster_date) }}{{ kv('تاريخ انتهاء الصلاحية', r.expiry_date) }}
+{{ kv('الكمية المفرج عنها', r.qty_boxes) }}{{ kv('الكراتين', r.cartons) }}
+{{ kv('تقرير المتبقيات', r.residue_report_no) }}{{ kv('مسؤول الجودة', r.qa_officer) }}
+{{ st('القرار', r.decision) }}
+</div>
+<table style="margin-top:12px"><tr><th>#</th><th>البند</th><th>النتيجة</th></tr>
+{% for i,n in [(1,'فحص المواد الواردة'),(2,'مطابقة كميات الإنتاج'),(3,'الفحص أثناء التشغيل'),
+               (4,'سند التغليف'),(5,'بارامترات دورة التعقيم'),(6,'المؤشر الكيميائي'),
+               (7,'المؤشر البيولوجي'),(8,'التهوية'),(9,'متبقيات EO و ECH')] %}
+{% set val = r['r%d'%i] %}
+<tr><td>{{ i }}</td><td class="r">{{ n }}</td>
+<td><span class="pill {{ cls_for(val) }}">{{ val or 'لم تصدر' }}</span></td></tr>{% endfor %}</table></div>
+{% else %}<div class="hint">لم تصدر شهادة إفراج لهذه التشغيلة — المنتج يبقى بحالة حجر ولا يُشحن.</div>{% endif %}
+{% endif %}
+{% if d.shipments %}<h2>٩ — الشحن</h2><table><tr><th>السند</th><th>التاريخ</th><th>العميل</th><th>الكمية</th><th>الشهادة</th></tr>
+{% for r in d.shipments %}<tr><td>{{ r.doc_no }}</td><td>{{ r.sdate }}</td><td>{{ r.customer }}</td>
+<td>{{ r.qty }}</td><td>{{ r.release_no or '—' }}</td></tr>{% endfor %}</table>{% endif %}
+{% if d.qc %}<h2>١٠ — سجلات الجودة أثناء التشغيل</h2>
+<table><tr><th>السجل</th><th>النموذج</th><th>التاريخ</th><th>الوردية</th><th>التشغيلة</th><th>الخط</th><th>النتيجة</th><th>القرار</th><th>الفاحص</th></tr>
+{% for r in d.qc %}<tr><td><a href="{{ url_for('quality_record', rid=r.id) }}">{{ r.rec_no }}</a></td><td class="r">{{ r.title }}</td>
+<td>{{ r.rec_date }}</td><td>{{ r.shift or '—' }}</td><td>{{ r.batch_no or '—' }}</td><td>{{ r.line_code or '—' }}</td>
+<td><span class="pill {{ cls_for(r.result) }}">{{ r.result or '—' }}</span></td>
+<td>{% if r.decision %}<span class="pill {{ 'ok' if r.decision=='مفرج' else 'bad' }}">{{ r.decision }}</span>{% else %}—{% endif %}</td>
+<td>{{ r.inspector or '—' }}</td></tr>{% endfor %}</table>{% endif %}
+{% endif %}
+{% endblock %}

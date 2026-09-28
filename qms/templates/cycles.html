@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% block title %}دورات التعقيم{% endblock %}{% block body %}
+<div class="pagehead"><div><h1>دورات التعقيم</h1><div class="sub">الدورة الواحدة قد تضم عدة تشغيلات، والتشغيلة قد تتوزع على عدة دورات</div></div>
+<div class="actions noprint">{% if can('enter') %}<a class="btn" href="{{ url_for('cycle_new') }}">+ دورة تعقيم جديدة</a>{% endif %}</div></div>
+{% if rows %}<div class="tablewrap"><table><tr><th>رقم الدورة</th><th>التاريخ</th><th>المدة</th><th>سندات التغليف</th><th>التشغيلات</th>
+<th>البوكسات الداخلة</th><th>الخارجة</th><th>الفارق</th><th>المؤشر البيولوجي</th><th>التهوية</th><th>الحالة</th></tr>
+{% for c in rows %}<tr><td><a href="{{ url_for('cycle_view', cycle_no=c.cycle_no) }}">{{ c.cycle_no }}</a></td>
+<td>{{ c.cycle_date or '—' }}</td><td>{{ c.duration_h if c.duration_h is not none else '—' }}</td><td>{{ c.loads }}</td><td>{{ c.batches }}</td>
+<td>{{ '{:,.0f}'.format(c.bin or 0) }}</td><td>{{ '{:,.0f}'.format(c.bout or 0) }}</td>
+<td>{% set v = (c.bout or 0) - (c.bin or 0) %}{% if v %}<span class="pill bad">{{ '{:+,.0f}'.format(v) }}</span>{% else %}0{% endif %}</td>
+<td><span class="pill {{ cls_for(c.bi_result or 'بانتظار') }}">{{ c.bi_result or 'بانتظار' }}</span></td>
+<td>{% if c.aer %}<span class="pill {{ cls_for(c.aer) }}">{{ c.aer }}</span>{% else %}—{% endif %}</td>
+<td><span class="pill {{ cls_for(c.status) }}">{{ c.status }}</span></td></tr>{% endfor %}</table></div>
+{% else %}<div class="empty">لا توجد دورات تعقيم مسجلة.</div>{% endif %}{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}{% block title %}الأسليتر — المطابقة{% endblock %}{% block body %}
+{% set step=3 %}{% include "_slit_nav.html" %}
+<h1>الخطوة ٣ — المطابقة والبطاقات</h1>
+<div class="sub">راجع مطابقة العرض لكل رول، ثم اطبع بطاقات السب رول</div>
+
+<div class="card">
+<h2 style="margin-top:0">مطابقة عرض كل رول</h2>
+{% if recon %}<table><tr><th>رقم الرول</th><th>العرض الخام</th><th>تنظيف الطرفين</th><th>العرض التشغيلي</th>
+<th>عدد السب رول</th><th>مجموع العروض</th><th>الفرق</th><th>الحد المرجعي</th><th>النتيجة</th></tr>
+{% for r in recon %}<tr><td><b>{{ r.roll_no }}</b></td><td>{{ r.parent_w }} سم</td>
+<td>{{ r.edge_each }} + {{ r.edge_each }} = {{ r.edge_total }} سم</td>
+<td><strong>{{ r.usable_w }} سم</strong></td><td>{{ r.n }}</td><td>{{ r.sum_w }} سم</td>
+<td>{% if r.deviation > 0 %}+{% endif %}{{ r.deviation }} سم</td><td>{{ r.warning_limit }} سم</td>
+<td><span class="pill {{ cls_for(r.result) }}">{{ r.result }}</span></td></tr>{% endfor %}</table>
+<div class="sub" style="margin-top:8px">العرض التشغيلي = العرض الخام − (تنظيف لكل طرف × 2). أي فرق تحذير فقط، لا يمنع.</div>
+{% else %}<div class="empty">لا توجد بيانات مطابقة — أضف خطة قص أولًا.</div>{% endif %}
+</div>
+
+{% if subs %}
+<div class="card">
+<h2 style="margin-top:0">السب رولات — {{ subs|length }} بطاقة</h2>
+<table><tr><th>البطاقة</th><th>الرول</th><th>الوجهة</th><th>الطبقات</th><th>المقاس</th><th>العرض</th><th>التحقق</th></tr>
+{% for r in subs %}<tr><td><b>{{ r.tag_no }}</b></td><td>{{ r.roll_no }}</td><td>{{ r.dest_machine }}</td>
+<td>{{ r.ply }}</td><td>{{ r.target_size or '—' }}</td><td>{{ r.width_cm }}</td>
+<td><span class="pill {{ cls_for(r.width_check) }}">{{ (r.width_check or '—')[:22] }}</span></td></tr>{% endfor %}</table>
+</div>
+{% endif %}
+
+<div class="wizard-actions">
+<div class="l">
+<a class="btn back" href="{{ url_for('slit_plan', bn=bn) }}">رجوع لخطة القص</a>
+<a class="btn" href="{{ url_for('slit') }}">إنهاء — للقائمة</a>
+</div>
+{% if subs %}<a class="btn big" href="{{ url_for('tags', b=bn) }}" target="_blank">طباعة بطاقات السب رول ({{ subs|length }})</a>{% endif %}
+</div>
+{% endblock %}

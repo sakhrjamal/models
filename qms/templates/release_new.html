@@ -1,0 +1,70 @@
+{% extends "base.html" %}{% block title %}إصدار شهادة إفراج{% endblock %}{% block body %}
+<h1>إصدار شهادة الإفراج النهائي</h1>
+<div class="sub">لا يُشحن منتج ولا يُنقل للمخزون الجاهز قبل صدور شهادة موقّعة إلكترونيًا</div>
+
+<div class="card noprint"><form class="searchbar" method="get">
+  <select name="b" onchange="this.form.submit()">
+    <option value="">— اختر تشغيلة مؤهلة —</option>
+    {% for c in pending %}<option value="{{ c.batch_no }}" {{ 'selected' if c.batch_no==batch }}>
+      {{ c.batch_no }} · {{ c.item_code }} · {{ c.qty_boxes or 0 }} بوكس</option>{% endfor %}
+  </select>
+</form></div>
+
+{% if not pending %}
+<div class="hint">لا توجد تشغيلات مؤهلة حاليًا. التشغيلة تصبح مؤهلة بعد: اجتياز دورة التعقيم،
+اكتمال التهوية، وتسجيل الاستلام بعد التعقيم في الحجر.</div>
+{% elif not cand %}
+<div class="hint">اختر تشغيلة من القائمة أعلاه.</div>
+{% else %}
+
+<div class="card"><div class="kv">
+  <div class="row"><span class="k">التشغيلة</span><span class="v">{{ cand.batch_no }}</span></div>
+  <div class="row"><span class="k">المنتج</span><span class="v">{{ cand.item_code }} — {{ cand.size or '' }} {{ cand.ply or '' }} طبقة</span></div>
+  <div class="row"><span class="k">دورة التعقيم</span><span class="v">{{ cand.cycle_no or '—' }}</span></div>
+  <div class="row"><span class="k">تاريخ التعقيم</span><span class="v">{{ cand.ster_date or '—' }}</span></div>
+  <div class="row"><span class="k">الكمية المستلمة</span><span class="v">{{ cand.qty_boxes or 0 }} بوكس / {{ cand.cartons or 0 }} كرتون</span></div>
+  {% if d and d.verdict %}<div class="row"><span class="k">حكم المستكشف</span>
+    <span class="v"><span class="pill {{ cls_for(d.verdict) }}">{{ d.verdict }}</span></span></div>{% endif %}
+</div>
+<a class="mini" href="{{ url_for('trace_view', b=cand.batch_no) }}" target="_blank">فتح سجل التتبع الكامل ↗</a>
+</div>
+
+<form method="post" class="card grid">
+  <input type="hidden" name="batch_no" value="{{ cand.batch_no }}">
+  <div><label>تاريخ الإصدار *</label><input type="date" name="issue_date" value="{{ today() }}" required></div>
+  <div><label>مدة الصلاحية (شهر)</label><input type="number" name="shelf_life_m" value="{{ shelf_default }}"></div>
+  <div><label>تقرير المتبقيات (EO/ECH)</label><input name="residue_report_no"></div>
+  <div><label>الكمية المفرج عنها (بوكس)</label><input name="qty_boxes" value="{{ cand.qty_boxes or 0 }}"></div>
+  <div><label>الكراتين</label><input name="cartons" value="{{ cand.cartons or 0 }}"></div>
+
+  <div class="full sectionline"><b>بنود المراجعة قبل الإفراج</b>
+    <span class="mini">أي بند «غير مطابق» يمنع قرار «مفرج عنها»</span></div>
+  {% for i,n in checks %}
+  <div><label>{{ i }} — {{ n }}</label>
+    <select name="r{{ i }}">
+      <option value="مطابق">مطابق</option>
+      <option value="غير مطابق">غير مطابق</option>
+      <option value="غير منطبق">غير منطبق</option>
+    </select></div>
+  {% endfor %}
+
+  <div class="full"><label>قرار الإفراج *</label>
+    <select name="decision" required>
+      <option value="">— اختر —</option>
+      <option value="مفرج عنها">مفرج عنها</option>
+      <option value="معلّقة">معلّقة</option>
+      <option value="مرفوضة">مرفوضة</option>
+    </select></div>
+  <div class="full"><label>ملاحظات</label><textarea name="notes" rows="2"></textarea></div>
+
+  <div class="full esign">
+    <label>التوقيع الإلكتروني — أعد إدخال كلمة مرورك <span class="mini">({{ me.full_name }})</span></label>
+    <input type="password" name="esign_pw" autocomplete="off" required
+           placeholder="كلمة مرورك تؤكد أنك أنت من أصدر هذه الشهادة">
+  </div>
+  <div class="full actions">
+    <button class="btn" onclick="return confirm('إصدار شهادة الإفراج لهذه التشغيلة؟')">إصدار الشهادة وتوقيعها</button>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

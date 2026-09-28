@@ -1,0 +1,31 @@
+{% extends "base.html" %}{% block body %}
+<h1>شهادات الإفراج</h1>
+<div class="sub">لا يُشحن منتج ولا يُنقل للمخزون الجاهز قبل صدور شهادة</div>
+
+{% if can('qc_sign') %}
+<div class="card noprint">
+  {% if pending %}
+  <b>تشغيلات مؤهلة لإصدار الشهادة ({{ pending|length }}):</b>
+  <div class="pick-list" style="margin-top:10px">
+    {% for c in pending %}
+    <a class="pick" href="{{ url_for('release_new', b=c.batch_no) }}">
+      <span class="info"><b>{{ c.batch_no }}</b>
+        <span>{{ c.item_code }} · {{ c.qty_boxes or 0 }} بوكس · دورة {{ c.cycle_no or '—' }}</span></span>
+      <span class="go">‹</span>
+    </a>{% endfor %}
+  </div>
+  {% else %}
+  <span class="mini">لا توجد تشغيلات مؤهلة لإصدار شهادة حاليًا.</span>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if rows %}<table><tr><th>رقم الشهادة</th><th>التاريخ</th><th>رقم التشغيلة</th><th>الصنف</th>
+<th>الدورة</th><th>تاريخ التعقيم</th><th>انتهاء الصلاحية</th><th>الكمية</th><th>القرار</th><th>مسؤول الجودة</th></tr>
+{% for r in rows %}<tr><td>{{ r.release_no }}</td><td>{{ r.issue_date }}</td>
+<td><a href="{{ url_for('trace_view', b=r.batch_no) }}">{{ r.batch_no }}</a></td>
+<td>{{ r.item_code }}</td><td>{{ r.cycle_no or '—' }}</td><td>{{ r.ster_date or '—' }}</td>
+<td>{{ r.expiry_date or '—' }}</td><td>{{ r.qty_boxes or '—' }}</td>
+<td><span class="pill {{ cls_for(r.decision) }}">{{ r.decision }}</span></td>
+<td>{{ r.qa_officer or '—' }}</td></tr>{% endfor %}</table>
+{% else %}<div class="empty">لا توجد شهادات إفراج بعد.</div>{% endif %}{% endblock %}

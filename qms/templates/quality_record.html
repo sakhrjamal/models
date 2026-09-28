@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% block title %}{{ r.rec_no }}{% endblock %}{% block body %}
+<div class="crumb noprint"><a href="{{ url_for('quality_home') }}">الجودة</a><span class="sep">›</span>
+<a href="{{ url_for('quality_records') }}">السجلات</a><span class="sep">›</span><span class="here">{{ r.rec_no }}</span></div>
+<div class="pagehead"><div><h1>{{ r.title }}</h1>
+<div class="sub">{{ r.rec_no }} · {{ DEPT_AR[r.dept] }} · {{ KIND_AR[r.kind] }} · إصدار القالب {{ r.template_version }}</div></div>
+<div class="actions noprint"><button class="btn g" onclick="window.print()">طباعة</button></div></div>
+<div class="verdict {{ cls_for(r.result) }}">{{ r.result }}{% if r.decision %} — {{ r.decision }}{% endif %}</div>
+<div class="card"><div class="kv">
+<div class="row"><div class="k">التاريخ</div><div class="v">{{ r.rec_date }} {{ r.rec_time or '' }}</div></div>
+<div class="row"><div class="k">الوردية</div><div class="v">{{ r.shift or '—' }}</div></div>
+<div class="row"><div class="k">الخط</div><div class="v">{{ r.line_code or '—' }}</div></div>
+<div class="row"><div class="k">رقم التشغيلة</div><div class="v">{% if r.batch_no %}<a href="{{ url_for('trace_view', b=r.batch_no) }}">{{ r.batch_no }}</a>{% else %}—{% endif %}</div></div>
+<div class="row"><div class="k">الصنف</div><div class="v">{{ r.item_code or '—' }}</div></div>
+<div class="row"><div class="k">القائم بالفحص</div><div class="v">{{ r.inspector or '—' }}</div></div>
+</div></div>
+<table><tr><th>البند</th><th>القيمة</th><th>الحد</th><th>التقييم</th></tr>
+{% for x in rows %}<tr><td class="r">{{ x.f.label }}</td>
+<td>{% if x.v is none %}—{% else %}{{ x.v }}{% if x.f.unit %} {{ x.f.unit }}{% endif %}{% endif %}</td>
+<td>{% if x.f.type=='number' and (x.f.min is defined or x.f.max is defined) %}{% if x.f.min is defined %}{{ '%g'|format(x.f.min) }}{% endif %} – {% if x.f.max is defined %}{{ '%g'|format(x.f.max) }}{% endif %}{% else %}—{% endif %}</td>
+<td>{% if x.v is none %}—{% else %}<span class="pill {{ 'bad' if x.bad else 'ok' }}">{{ 'غير مطابق' if x.bad else 'مطابق' }}</span>{% endif %}</td></tr>{% endfor %}</table>
+{% if r.notes %}<div class="card" style="margin-top:12px"><b>ملاحظات:</b> {{ r.notes }}</div>{% endif %}
+{% if sigs %}<h2>التوقيع الإلكتروني</h2><table><tr><th>الموقّع</th><th>الدور</th><th>المعنى</th><th>الوقت</th></tr>
+{% for x in sigs %}<tr><td>{{ x.full_name }}</td><td>{{ ROLE_AR.get(x.role, x.role) }}</td><td>{{ x.meaning }}</td><td>{{ x.signed_at }}</td></tr>{% endfor %}</table>{% endif %}
+{% endblock %}

@@ -1,0 +1,154 @@
+{% extends "base.html" %}{% block title %}أمر تشغيل جديد{% endblock %}{% block body %}
+<div class="crumb"><a href="{{ url_for('index') }}">الرئيسية</a><span class="sep">›</span>
+<a href="{{ url_for('wo_list') }}">أوامر التشغيل</a><span class="sep">›</span><span class="here">أمر جديد</span></div>
+
+<h1>أمر تشغيل جديد</h1>
+<div class="steps" style="margin-bottom:18px">
+<a class="s {{ 'on' if otype=='إنتاج' }}" href="{{ url_for('wo_new', t='إنتاج') }}">
+<span class="n">١</span> أمر إنتاج — منتج نهائي (رقم التشغيلة)</a>
+<a class="s {{ 'on' if otype=='تقطيع' }}" href="{{ url_for('wo_new', t='تقطيع') }}">
+<span class="n">٢</span> أمر تقطيع — أسليتر</a>
+</div>
+
+{% if otype == 'تقطيع' %}
+<div class="hint"><b>أمر التقطيع</b> يشغّل الأسليتر لتغذية مخزون السب رول. رقمه يبدأ بـ <code>SL</code>
+ولا يرتبط بمنتج نهائي — السب رول الناتج يدخل المخزون وتسحب منه مكائن الطي حسب أمر الإنتاج،
+فيبقى الرقمان مترابطين في التتبع.</div>
+<div class="card"><form class="grid" method="post" id="woForm">
+<input type="hidden" name="order_type" value="تقطيع">
+<div><label>رقم أمر التقطيع</label><input name="wo_no" placeholder="تلقائي: {{ next_wo }}"></div>
+<div><label>تاريخ الإصدار *</label><input type="date" name="issue_date" value="{{ today_iso }}" required></div>
+<div><label>تاريخ بدء التشغيلة *</label><input type="date" name="batch_date" id="batch_date" value="{{ today_iso }}" required></div>
+<div><label>مدير الإنتاج</label><input name="prod_manager" value="{{ me.full_name }}"></div>
+<div><label>نوع السب رول المستهدف</label><select name="sr_spec_key">
+<option value="">— حسب الحاجة (متعدد) —</option>
+{% for m in specs %}<option value="{{ m.key }}">{{ m.std_width_cm }} سم · {{ m.size }} · {{ m.ply }}ط · {{ m.machine_code }}</option>{% endfor %}</select></div>
+<div><label>العدد المستهدف (سب رول)</label><input type="number" name="sr_needed" min="1"></div>
+<div><label>تاريخ التسليم</label><input type="date" name="due_date"></div>
+<div><label>التسلسل (تلقائي — يمكن تعديله)</label><input type="number" name="seq" id="seq" min="1" max="999"></div>
+<div class="full"><div class="batchprev" id="batchPrev">رقم التشغيلة —</div></div>
+<div class="full"><label>ملاحظات</label><textarea name="notes" rows="2"></textarea></div>
+<div class="full wizard-actions"><div class="l"></div>
+<button class="btn big">إصدار أمر التقطيع</button></div>
+</form></div>
+<script>
+const T='تقطيع';
+function nextBatch(){
+  fetch('/api/next_batch?t='+encodeURIComponent(T)+'&date='+document.getElementById('batch_date').value)
+   .then(r=>r.json()).then(d=>{ if(!d.ok) return;
+     const s=document.getElementById('seq'); if(!s.dataset.touched) s.value=d.seq;
+     showBatch(d.stem); });
+}
+function showBatch(stem){const s=document.getElementById('seq').value;
+  document.getElementById('batchPrev').innerHTML='رقم التشغيلة: <b>'+stem+String(s).padStart(3,'0')+'</b>';}
+document.getElementById('batch_date').addEventListener('change',()=>{document.getElementById('seq').dataset.touched='';nextBatch();});
+document.getElementById('seq').addEventListener('input',function(){this.dataset.touched='1';nextBatch();});
+nextBatch();
+</script>
+
+{% else %}
+<div class="hint"><b>أمر الإنتاج</b> يبدأ بالصنف النهائي. اختر الصنف مرة واحدة هنا فيُحمَّل تلقائيًا في كل المراحل
+اللاحقة (طي، فرز، تغليف، تعقيم، إفراج) دون إعادة كتابته. رقم التشغيلة يحمل حرف الماكينة
+(<code>T</code> / <code>S</code> / <code>F</code>) وهو الرقم المطبوع على العبوة، وتُسجَّل به كل المراحل بعد الأسليتر.</div>
+<div class="card"><form class="grid" method="post" id="woForm" onsubmit="return checkItem()">
+<input type="hidden" name="order_type" value="إنتاج">
+<div><label>رقم أمر الإنتاج</label><input name="wo_no" placeholder="تلقائي: {{ next_wo }}"></div>
+<div><label>تاريخ الإصدار *</label><input type="date" name="issue_date" value="{{ today_iso }}" required></div>
+<div><label>تاريخ بدء التشغيلة *</label><input type="date" name="batch_date" id="batch_date" value="{{ today_iso }}" required></div>
+<div><label>مدير الإنتاج</label><input name="prod_manager" value="{{ me.full_name }}"></div>
+
+<div class="full" id="itemPick"><label>الصنف النهائي *</label>
+  <div id="pickBox">
+    <input id="itemSearch" placeholder="ابحث بالكود أو بالوصف — مثال: GS013 أو 10x10" autocomplete="off">
+    <div id="itemResults" class="results"></div>
+  </div>
+  <div id="itemChosen" class="itemcard" hidden></div>
+  <input type="hidden" name="item_code" id="item_code">
+</div>
+
+<div><label>الكمية المطلوبة *</label><input type="number" step="any" min="1" name="qty_required" id="qty" required oninput="plan()"></div>
+<div><label>الوحدة *</label><select name="uom" required><option>قطعة</option><option>بوكس</option><option>كرتون</option></select></div>
+<div><label>تاريخ التسليم</label><input type="date" name="due_date"></div>
+<div><label>التسلسل (تلقائي — يمكن تعديله)</label><input type="number" name="seq" id="seq" min="1" max="999"></div>
+<div class="full"><div class="batchprev" id="batchPrev">اختر الصنف ليظهر رقم التشغيلة</div></div>
+<div class="full" id="planBox"></div>
+<div class="full"><label>ملاحظات</label><textarea name="notes" rows="2"></textarea></div>
+<div class="full wizard-actions"><div class="l"></div>
+<button class="btn big">إصدار أمر الإنتاج ورقم التشغيلة</button></div>
+</form></div>
+<script>
+let t=null, stemNow='';
+const $=id=>document.getElementById(id);
+function esc(x){return String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function plan(){clearTimeout(t);t=setTimeout(go,350);}
+function checkItem(){ if(!$('item_code').value){ alert('اختر الصنف النهائي من القائمة أولًا'); $('itemSearch').focus(); return false;} return true; }
+
+// ---- منتقي الصنف: يُخفي بقية الأصناف فور الاختيار
+let st=null;
+$('itemSearch').addEventListener('input',()=>{clearTimeout(st);st=setTimeout(search,200);});
+$('itemSearch').addEventListener('focus',search);
+function search(){
+  const q=$('itemSearch').value.trim();
+  fetch('/api/items/search?q='+encodeURIComponent(q)).then(r=>r.json()).then(d=>{
+    const box=$('itemResults');
+    if(!d.items.length){box.innerHTML='<div class="none">لا توجد أصناف مطابقة</div>';return;}
+    box.innerHTML=d.items.map(i=>'<a href="#" data-c="'+esc(i.item_code)+'"><b>'+esc(i.item_code)+'</b> · '+
+      esc(i.size||'')+' '+esc(i.ply||'')+'ط · '+esc(i.sterile||'')+'<span>'+esc(i.description||'')+'</span></a>').join('');
+    box.querySelectorAll('a').forEach((a,k)=>a.addEventListener('click',e=>{e.preventDefault();choose(d.items[k]);}));
+  });
+}
+function choose(i){
+  $('item_code').value=i.item_code;
+  $('pickBox').hidden=true; $('itemResults').innerHTML='';
+  const c=$('itemChosen'); c.hidden=false;
+  c.innerHTML='<div><b>'+esc(i.item_code)+'</b> · '+esc(i.description||'')+'</div>'+
+    '<div class="meta">'+esc(i.size||'—')+' · '+esc(i.ply||'—')+' طبقة · '+esc(i.xray||'')+' · ميش '+esc(i.mesh||'—')+
+    ' · '+esc(i.sterile||'')+' · ماكينة '+esc(i.machine_code)+'</div>'+
+    '<button type="button" class="smallbtn g" onclick="changeItem()">تغيير الصنف</button>';
+  $('seq').dataset.touched=''; plan(); nextBatch();
+}
+function changeItem(){
+  $('item_code').value=''; $('itemChosen').hidden=true; $('pickBox').hidden=false;
+  $('itemSearch').value=''; $('itemSearch').focus(); $('planBox').innerHTML='';
+  $('batchPrev').innerHTML='اختر الصنف ليظهر رقم التشغيلة'; search();
+}
+function nextBatch(){
+  const it=$('item_code').value; if(!it) return;
+  fetch('/api/next_batch?t=%D8%A5%D9%86%D8%AA%D8%A7%D8%AC&item='+encodeURIComponent(it)+'&date='+$('batch_date').value)
+   .then(r=>r.json()).then(d=>{ if(!d.ok) return; stemNow=d.stem;
+     if(!$('seq').dataset.touched) $('seq').value=d.seq; showBatch(); });
+}
+function showBatch(){ if(!stemNow) return;
+  $('batchPrev').innerHTML='رقم التشغيلة: <b>'+stemNow+String($('seq').value||'').padStart(3,'0')+'</b>'; }
+$('batch_date').addEventListener('change',()=>{$('seq').dataset.touched='';nextBatch();});
+$('seq').addEventListener('input',function(){this.dataset.touched='1';nextBatch();});
+
+function go(){
+ const it=$('item_code').value.trim(), q=$('qty').value, box=$('planBox');
+ if(!it){box.innerHTML='';return;}
+ fetch('/api/plan?item='+encodeURIComponent(it)+'&qty='+encodeURIComponent(q||''))
+  .then(r=>r.json()).then(d=>{
+   if(!d.ok){box.innerHTML='<div class="msg bad">'+esc(d.msg)+'</div>';return;}
+   let need='';
+   if(d.sr_needed){
+     need='<div class="summary-bar" style="margin-top:10px">'+
+      '<div class="it"><b>'+d.sr_needed+' سب رول</b><span>الاحتياج</span></div>'+
+      '<div class="it"><b>'+(d.jumbo||'—')+' جامبو</b><span>تقريبًا ('+(d.sr_per_jumbo||'—')+' سب/جامبو)</span></div>'+
+      '<div class="it"><b>'+d.available+'</b><span>متاح في المخزون الآن</span></div></div>';
+     if(d.available < d.sr_needed)
+       need+='<div class="msg warn" style="margin-top:8px">المخزون الحالي '+d.available+
+         ' سب رول فقط — تحتاج '+(d.sr_needed-d.available)+' إضافيًا. أصدر أمر تقطيع.</div>';
+     else need+='<div class="msg ok" style="margin-top:8px">المخزون كافٍ لهذا الأمر.</div>';
+   }
+   box.innerHTML='<div class="summary-bar" style="margin-top:4px">'+
+    '<div class="it"><b>'+esc(d.machine)+'</b><span>ماكينة الطي</span></div>'+
+    '<div class="it"><b>'+d.sr_width+' سم</b><span>عرض السب رول المطلوب</span></div>'+
+    '<div class="it"><b>'+d.cut_len+' سم</b><span>طول القطع</span></div>'+
+    '<div class="it"><b>'+d.piece_area+' سم²</b><span>مساحة المسحة</span></div>'+
+    '<div class="it"><b>'+d.per_sr.toLocaleString()+'</b><span>مسحة/سب رول (بطول '+d.plan_len+'م)</span></div>'+
+    '</div>'+need;
+  }).catch(()=>{box.innerHTML='';});
+}
+</script>
+{% endif %}
+{% endblock %}

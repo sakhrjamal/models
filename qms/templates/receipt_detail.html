@@ -1,0 +1,111 @@
+{% extends "base.html" %}{% block title %}{{ rec.grn_no }}{% endblock %}{% block body %}
+<div class="pagehead">
+  <div><h1>{{ rec.grn_no }}</h1><div class="sub">سند استلام مادة خام — {{ rec.receipt_date }}</div></div>
+  <a class="btn g" href="{{ url_for('receipts') }}">كل الاستلامات</a>
+</div>
+
+<div class="card">
+  <div class="kv">
+    <div class="row"><span class="k">المورد</span><span class="v">{{ rec.supplier_name or '—' }}</span></div>
+    <div class="row"><span class="k">بلد المنشأ</span><span class="v">{{ rec.country or '—' }}</span></div>
+    <div class="row"><span class="k">الصنف</span><span class="v">{{ rec.item_code }}</span></div>
+    <div class="row"><span class="k">Supplier Lot</span><span class="v">{{ rec.supplier_lot }}</span></div>
+    <div class="row"><span class="k">PO / Invoice</span><span class="v">{{ rec.po_no or '—' }} / {{ rec.invoice_no or '—' }}</span></div>
+    <div class="row"><span class="k">MFG / EXP</span><span class="v">{{ rec.mfg_date or '—' }} / {{ rec.expiry_date or '—' }}</span></div>
+    <div class="row"><span class="k">COA</span><span class="v">{{ rec.coa or '—' }} {{ rec.coa_no or '' }}</span></div>
+    <div class="row"><span class="k">حالة المخزون</span><span class="v"><span class="pill {{ cls_for(rec.stock_status) }}">{{ rec.stock_status }}</span></span></div>
+  </div>
+</div>
+
+<h2>الرولات الفعلية</h2>
+<div class="card tablewrap">
+<table>
+<tr><th>رقم الرول</th><th>العرض cm</th><th>الطول m</th><th>الوزن kg</th><th>المساحة cm²</th><th>الموقع</th><th>الحالة</th><th>تعديل</th></tr>
+{% for r in rolls %}
+<tr>
+<td><b>{{ r.roll_no }}</b></td>
+<td><input form="rollform-{{ loop.index }}" class="cellinput" name="width_cm" value="{{ r.width_cm if r.width_cm is not none else '' }}"></td>
+<td><input form="rollform-{{ loop.index }}" class="cellinput" name="length_m" value="{{ r.length_m if r.length_m is not none else '' }}"></td>
+<td><input form="rollform-{{ loop.index }}" class="cellinput" name="weight_kg" value="{{ r.weight_kg if r.weight_kg is not none else '' }}"></td>
+<td>{{ '{:,.0f}'.format(r.area_cm2) if r.area_cm2 else '—' }}</td>
+<td><input form="rollform-{{ loop.index }}" class="cellinput" name="location" value="{{ r.location or '' }}"></td>
+<td><span class="pill {{ cls_for(r.stock_status) }}">{{ r.stock_status }}</span></td>
+<td>
+  <form method="post" id="rollform-{{ loop.index }}">
+    <input type="hidden" name="act" value="roll_update"><input type="hidden" name="roll_no" value="{{ r.roll_no }}">
+    <input type="hidden" name="roll_notes" value="{{ r.notes or '' }}">
+    <button class="smallbtn">حفظ</button>
+  </form>
+</td>
+</tr>
+{% endfor %}
+</table>
+</div>
+
+<h2>فحص الجودة للمواد الخام</h2>
+{% if inspection %}
+<div class="card">
+  <div class="verdict {{ cls_for(inspection.decision) }}">قرار الجودة: {{ inspection.decision }}</div>
+  <div class="kv">
+    <div class="row"><span class="k">رقم الفحص</span><span class="v">{{ inspection.inspection_no }}</span></div>
+    <div class="row"><span class="k">تاريخ الفحص</span><span class="v">{{ inspection.insp_date }}</span></div>
+    <div class="row"><span class="k">حجم العينة</span><span class="v">{{ inspection.sample_size or '—' }}</span></div>
+    <div class="row"><span class="k">الفاحص</span><span class="v">{{ inspection.inspector or '—' }}</span></div>
+    <div class="row"><span class="k">مسؤول QA</span><span class="v">{{ inspection.qa_officer or '—' }}</span></div>
+    <div class="row"><span class="k">المبرر/الشرط</span><span class="v">{{ inspection.justification or '—' }}</span></div>
+  </div>
+  <table class="qctable"><tr><th>الاختبار</th><th>النتيجة المسجلة</th></tr>
+    <tr><td>Acidity / Alkalinity — الحموضة والقلوية</td><td>{{ inspection.c1 or '—' }}</td></tr>
+    <tr><td>Dehydration</td><td>{{ inspection.c2 or '—' }}</td></tr>
+    <tr><td>Impurities — الشوائب</td><td>{{ inspection.c3 or '—' }}</td></tr>
+    <tr><td>Distillation</td><td>{{ inspection.c4 or '—' }}</td></tr>
+    <tr><td>Mesh — عدد الخيوط</td><td>{{ inspection.c5 or '—' }}</td></tr>
+    <tr><td>Absorbency — الامتصاص</td><td>{{ inspection.c6 or '—' }}</td></tr>
+    <tr><td>المظهر والنظافة</td><td>{{ inspection.c7 or '—' }}</td></tr>
+    <tr><td>الأبعاد / الوزن</td><td>{{ inspection.c8 or '—' }}</td></tr>
+    <tr><td>مراجعة COA</td><td>{{ inspection.c9 or '—' }}</td></tr>
+  </table>
+  {% if inspection.notes %}<div class="hint"><b>ملاحظات QC:</b> {{ inspection.notes }}</div>{% endif %}
+</div>
+{% elif not can('qc_sign') %}
+<div class="card hint">لم يُسجَّل فحص جودة بعد. اعتماد قرار الجودة متاح لمستخدمي «الجودة» فقط.</div>
+{% else %}
+<form method="post" class="card grid">
+  <input type="hidden" name="act" value="inspect">
+  <div class="full hint">جميع الرولات الآن في <b>الحجر</b>. لن يسمح نظام الأسليتر باستخدامها قبل قرار الجودة.</div>
+  <div><label>رقم الفحص المتوقع</label><input value="{{ next_inspection }}" disabled></div>
+  <div><label>تاريخ الفحص *</label><input type="date" name="insp_date" value="{{ today() }}" required></div>
+  <div><label>حجم العينة</label><input name="sample_size" placeholder="مثال: 5 عينات / 3 رولات"></div>
+  <div><label>الفاحص</label><input name="inspector"></div>
+  <div><label>مسؤول الجودة QA</label><input name="qa_officer"></div>
+
+  <div class="full sectionline"><b>نتائج الاختبارات</b><span class="mini">أدخل القيمة والنتيجة/الحكم حسب طريقة الاختبار المعتمدة لديكم</span></div>
+  <div><label>Acidity / Alkalinity — الحموضة والقلوية</label><input name="c1" placeholder="النتيجة / مطابق"></div>
+  <div><label>Dehydration</label><input name="c2" placeholder="النتيجة / مطابق"></div>
+  <div><label>Impurities — الشوائب</label><input name="c3" placeholder="النتيجة / مطابق"></div>
+  <div><label>Distillation</label><input name="c4" placeholder="النتيجة / مطابق"></div>
+  <div><label>Mesh — عدد الخيوط</label><input name="c5" placeholder="مثال: 19x15 / مطابق"></div>
+  <div><label>Absorbency — الامتصاص</label><input name="c6" placeholder="النتيجة / مطابق"></div>
+  <div><label>المظهر والنظافة</label><input name="c7" placeholder="مطابق / ملاحظة"></div>
+  <div><label>الأبعاد / الوزن</label><input name="c8" placeholder="مطابق / ملاحظة"></div>
+  <div><label>مراجعة COA</label><input name="c9" value="{{ 'مطابق' if rec.coa == 'متوفر' else 'غير متوفر' }}"></div>
+
+  <div><label>قرار الجودة *</label>
+    <select name="decision" required><option value="">— اختر —</option><option>قبول</option><option>قبول مشروط</option><option>رفض</option><option>معلّق</option></select>
+  </div>
+  <div class="full"><label>مبرر / شروط القرار</label><textarea name="justification" rows="2" placeholder="إلزامي في حالة القبول المشروط"></textarea></div>
+  <div class="full"><label>ملاحظات QC</label><textarea name="qc_notes" rows="3"></textarea></div>
+  <div class="full hint"><b>منطق النظام:</b> قبول أو قبول مشروط = مفرج للإنتاج؛ رفض = مرفوض ومحظور؛ معلّق = يبقى في الحجر. القبول المشروط لا يُحفظ بدون مبرر.</div>
+  <div class="full esign">
+    <label>التوقيع الإلكتروني — أعد إدخال كلمة مرورك {% if me %}<span class="mini">({{ me.full_name }})</span>{% endif %}</label>
+    <input type="password" name="esign_pw" autocomplete="off" required
+           placeholder="كلمة مرورك تؤكد أنك أنت من اعتمد قرار الجودة">
+  </div>
+  <div class="full actions"><button class="btn">اعتماد نتيجة الفحص وتحديث حالة الرولات</button></div>
+</form>
+{% endif %}
+
+{% if rec.stock_status == 'مفرج' %}
+<div class="card successbox"><b>الرولات مفرج عنها وجاهزة للإنتاج.</b> يمكن الآن فتح شاشة الأسليتر واستخدام أي رول من هذا الاستلام.</div>
+{% endif %}
+{% endblock %}

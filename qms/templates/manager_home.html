@@ -1,0 +1,49 @@
+{% extends "base.html" %}{% block title %}لوحة المدير{% endblock %}{% block body %}
+<h1>لوحة مدير المصنع</h1>
+<div class="sub">متابعة أوامر الإنتاج والتشغيلات والجودة — {{ today() }}</div>
+<div class="actions noprint" style="margin-bottom:14px">
+<a class="btn" href="{{ url_for('wo_new', t='إنتاج') }}">أمر إنتاج جديد (رقم تشغيلة)</a>
+<a class="btn g" href="{{ url_for('wo_new', t='تقطيع') }}">أمر تقطيع (أسليتر)</a>
+<a class="btn g" href="{{ url_for('reports') }}">التقارير</a>
+<a class="btn g" href="{{ url_for('quality_home') }}">الجودة</a></div>
+<div class="card"><form class="searchbar" action="{{ url_for('trace_view') }}">
+<input type="text" name="b" placeholder="ابحث برقم التشغيلة لعرض السلسلة كاملة (تدقيق / ريكول)…">
+<button class="btn">تتبّع</button></form></div>
+
+<div class="kpis">
+<div class="kpi"><b>{{ k.open_orders }}</b><span>أمر إنتاج مفتوح</span></div>
+<div class="kpi {{ 'bad' if k.late else 'ok' }}"><b>{{ k.late }}</b><span>متأخر عن تاريخ التسليم</span></div>
+<div class="kpi"><b>{{ k.sr_stock }}</b><span>سب رول متاح بالمخزون</span></div>
+<div class="kpi {{ 'warn' if k.wait_release else '' }}"><b>{{ k.wait_release }}</b><span>بانتظار شهادة الإفراج</span></div>
+<div class="kpi {{ 'warn' if k.wait_bi else '' }}"><b>{{ k.wait_bi }}</b><span>دورة بانتظار المؤشر البيولوجي</span></div>
+<div class="kpi {{ 'warn' if k.rolls_hold else '' }}"><b>{{ k.rolls_hold }}</b><span>رول خام بالحجر</span></div>
+<div class="kpi {{ 'warn' if k.qc_due else 'ok' }}"><b>{{ k.qc_due }}</b><span>سجل جودة مستحق</span></div>
+<div class="kpi {{ 'bad' if k.qc_bad else 'ok' }}"><b>{{ k.qc_bad }}</b><span>غير مطابق (7 أيام)</span></div>
+</div>
+
+<h2>أوامر الإنتاج المفتوحة</h2>
+{% if open_orders %}<div class="tablewrap"><table>
+<tr><th>رقم التشغيلة</th><th>الصنف</th><th>الماكينة</th><th>المطلوب</th><th>التسليم</th><th>المرحلة</th><th>طي</th><th>تغليف</th><th>الفاقد</th></tr>
+{% for w in open_orders %}{% set p = w.prog %}<tr>
+<td><a href="{{ url_for('trace_view', b=w.batch_no) }}"><b>{{ w.batch_no }}</b></a></td>
+<td>{{ w.item_code }}<div class="mini">{{ w.size }} · {{ w.ply }}ط · {{ w.route }}</div></td><td>{{ w.fold_machine }}</td>
+<td>{{ '{:,.0f}'.format(w.qty_required) if w.qty_required else '—' }} {{ w.uom or '' }}</td>
+<td>{% if w.due_date %}<span class="pill {{ 'bad' if w.late else 'ok' }}">{{ w.due_date }}</span>{% else %}—{% endif %}</td>
+<td>{{ p.stage }}</td>
+<td style="min-width:120px">{% if p.pct_fold is not none %}<div class="bar"><i style="width:{{ p.pct_fold }}%"></i></div><div class="mini">{{ p.pct_fold }}% · {{ '{:,.0f}'.format(p.fold_good) }}</div>{% else %}{{ '{:,.0f}'.format(p.fold_good) }}{% endif %}</td>
+<td style="min-width:120px">{% if p.pct_pack is not none %}<div class="bar"><i style="width:{{ p.pct_pack }}%"></i></div><div class="mini">{{ p.pct_pack }}%</div>{% else %}—{% endif %}</td>
+<td>{{ p.scrap_pct }}%</td></tr>{% endfor %}</table></div>
+{% else %}<div class="empty">لا توجد أوامر إنتاج مفتوحة.</div>{% endif %}
+
+{% if open_sl %}<h2>أوامر التقطيع المفتوحة</h2>
+<table><tr><th>رقم تشغيلة الأسليتر</th><th>تاريخ البدء</th><th>المستهدف</th><th>سب رول منشأ</th><th>الحالة</th></tr>
+{% for w in open_sl %}<tr><td><a href="{{ url_for('trace_view', b=w.batch_no) }}"><b>{{ w.batch_no }}</b></a></td><td>{{ w.batch_start_date or '—' }}</td>
+<td>{{ '{:,.0f}'.format(w.qty_required) if w.qty_required else '—' }}</td><td>{{ w.subs }}</td><td>{{ w.status }}</td></tr>{% endfor %}</table>{% endif %}
+
+{% if due %}<h2>سجلات جودة مستحقة</h2>
+<table><tr><th>النموذج</th><th>الخط</th><th>الحالة</th></tr>
+{% for x in due %}<tr><td class="r">{{ x.tpl.title }}</td><td>{{ x.line.machine_code }}</td><td><span class="pill warn">{{ x.state }}</span></td></tr>{% endfor %}</table>{% endif %}
+{% if bad %}<h2>سجلات غير مطابقة</h2>
+<table><tr><th>السجل</th><th>النموذج</th><th>التاريخ</th><th>التشغيلة</th><th>الخط</th></tr>
+{% for r in bad %}<tr><td><a href="{{ url_for('quality_record', rid=r.id) }}">{{ r.rec_no }}</a></td><td class="r">{{ r.title }}</td><td>{{ r.rec_date }}</td><td>{{ r.batch_no or '—' }}</td><td>{{ r.line_code or '—' }}</td></tr>{% endfor %}</table>{% endif %}
+{% endblock %}

@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% macro kv(k,v) %}<div class="row"><div class="k">{{ k }}</div><div class="v">{{ v if v not in (None,'') else '—' }}</div></div>{% endmacro %}
+{% macro st(k,v) %}<div class="row"><div class="k">{{ k }}</div><div class="v">{% if v %}<span class="pill {{ cls_for(v) }}">{{ v }}</span>{% else %}—{% endif %}</div></div>{% endmacro %}
+{% block title %}دورة {{ c.cycle_no }}{% endblock %}{% block body %}
+<div class="pagehead"><div><h1>دورة التعقيم {{ c.cycle_no }}</h1><div class="sub">ST-FRM-001 / ST-FRM-005 / ST-FRM-007 · الدورة والـ CI/BI والتهوية والاستلام بعد التعقيم</div></div>
+<div class="actions noprint"><a class="btn g" href="{{ url_for('cycles') }}">كل الدورات</a><a class="btn" href="{{ url_for('cycle_new') }}">دورة جديدة</a></div></div>
+<div class="verdict {{ cls_for(c.status) }}">{{ c.status }}</div>
+
+<h2>١ — بيانات الدورة والحمولة</h2>
+<div class="card"><div class="kv">
+{{ kv('تاريخ الدورة', c.cycle_date) }}{{ kv('الماكينة', c.machine_code) }}
+{{ kv('المشغّل', c.operator) }}{{ kv('الرقم الوظيفي', c.emp_id) }}
+{{ kv('بدء الدورة', c.start_time) }}{{ kv('نهاية الدورة', c.end_time) }}
+{{ kv('مدة الدورة (ساعة)', c.duration_h) }}{{ kv('تقرير الماكينة', c.machine_report_no) }}
+{{ kv('لوط الغاز', c.gas_lot) }}{{ kv('نمط التحميل', c.load_pattern) }}
+{{ st('CI خارجي', c.ci_external) }}{{ st('CI داخلي', c.ci_internal) }}
+{{ kv('عدد BI', c.bi_count) }}{{ st('نتيجة BI', c.bi_result) }}
+</div></div>
+<div class="tablewrap"><table><tr><th>سند التغليف</th><th>التشغيلة</th><th>الصنف</th><th>المقاس</th><th>الطبقات</th><th>داخل</th><th>خارج</th><th>الفارق</th><th>كرتون</th><th>الموضع</th><th>CI الحمولة</th></tr>
+{% for l in loads %}<tr><td>{{ l.pack_doc_no }}</td><td><a href="{{ url_for('trace_view', b=l.batch_no) }}">{{ l.batch_no }}</a></td><td>{{ l.item_code }}</td><td>{{ l.size or '—' }}</td><td>{{ l.ply or '—' }}</td>
+<td>{{ l.boxes_in }}</td><td>{{ l.boxes_out if l.boxes_out is not none else '—' }}</td><td>{% if l.variance %}<span class="pill bad">{{ l.variance }}</span>{% else %}0{% endif %}</td><td>{{ l.cartons_in or 0 }}</td><td>{{ l.position or '—' }}</td><td><span class="pill {{ cls_for(l.ci_load) }}">{{ l.ci_load or 'بانتظار' }}</span></td></tr>{% endfor %}</table></div>
+
+<h2>٢ — إكمال الدورة ونتائج CI / BI</h2>
+<form class="card noprint" method="post" action="{{ url_for('cycle_results', cycle_no=c.cycle_no) }}">
+<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:13px">
+<input type="hidden" name="cycle_date" value="{{ c.cycle_date }}">
+<div><label>الماكينة</label><input name="machine_code" value="{{ c.machine_code or '' }}"></div>
+<div><label>المشغّل</label><input name="operator" value="{{ c.operator or '' }}"></div>
+<div><label>الرقم الوظيفي</label><input name="emp_id" value="{{ c.emp_id or '' }}"></div>
+<div><label>وقت البداية</label><input type="time" name="start_time" value="{{ c.start_time or '' }}"></div>
+<div><label>وقت النهاية</label><input type="time" name="end_time" value="{{ c.end_time or '' }}"></div>
+<div><label>تاريخ النهاية <span class="mini">(اترْكه فارغًا لنفس اليوم)</span></label><input type="date" name="end_date" value=""></div>
+<div><label>رقم تقرير الماكينة</label><input name="machine_report_no" value="{{ c.machine_report_no or '' }}"></div>
+<div><label>لوط الغاز</label><input name="gas_lot" value="{{ c.gas_lot or '' }}"></div>
+<div><label>نمط التحميل</label><input name="load_pattern" value="{{ c.load_pattern or '' }}"></div>
+<div><label>CI الخارجي</label><select name="ci_external"><option></option>{% for x in ['مطابق','غير مطابق','معلّق'] %}<option {{ 'selected' if c.ci_external==x }}>{{ x }}</option>{% endfor %}</select></div>
+<div><label>CI الداخلي</label><select name="ci_internal"><option></option>{% for x in ['مطابق','غير مطابق','معلّق'] %}<option {{ 'selected' if c.ci_internal==x }}>{{ x }}</option>{% endfor %}</select></div>
+<div><label>عدد المؤشرات البيولوجية</label><input type="number" min="0" step="1" name="bi_count" value="{{ c.bi_count or 0 }}"></div>
+<div><label>بدء حضانة BI</label><input type="datetime-local" name="bi_start" value="{{ c.bi_start or '' }}"></div>
+<div><label>انتهاء حضانة BI</label><input type="datetime-local" name="bi_end" value="{{ c.bi_end or '' }}"></div>
+<div><label>نتيجة BI</label><select name="bi_result"><option></option>{% for x in ['قيد الحضانة','سالب — مطابق','موجب — غير مطابق'] %}<option {{ 'selected' if c.bi_result==x }}>{{ x }}</option>{% endfor %}</select></div>
+<div><label>التحكم الموجب</label><select name="ctrl_pos"><option></option>{% for x in ['موجب — مطابق','غير مطابق'] %}<option {{ 'selected' if c.ctrl_pos==x }}>{{ x }}</option>{% endfor %}</select></div>
+<div><label>التحكم السلبي</label><select name="ctrl_neg"><option></option>{% for x in ['سالب — مطابق','غير مطابق'] %}<option {{ 'selected' if c.ctrl_neg==x }}>{{ x }}</option>{% endfor %}</select></div>
+<div style="grid-column:1/-1"><label>ملاحظات الدورة</label><textarea name="notes" rows="2">{{ c.notes or '' }}</textarea></div>
+</div>
+<h3 style="color:var(--brand);font-size:14px">الكمية الخارجة وCI لكل حمولة</h3>
+<div class="tablewrap"><table><tr><th>سند التغليف</th><th>داخل</th><th>خارج</th><th>CI الحمولة</th><th>ملاحظات</th></tr>
+{% for l in loads %}<tr><td>{{ l.pack_doc_no }}<br><span class="mini">{{ l.batch_no }}</span></td><td>{{ l.boxes_in }}</td>
+<td><input class="cellinput" type="number" min="0" max="{{ l.boxes_in }}" step="any" name="boxes_out_{{ l.id }}" value="{{ l.boxes_out if l.boxes_out is not none else l.boxes_in }}"></td>
+<td><select class="cellinput" name="ci_load_{{ l.id }}"><option></option>{% for x in ['مطابق','غير مطابق','معلّق'] %}<option {{ 'selected' if l.ci_load==x }}>{{ x }}</option>{% endfor %}</select></td>
+<td><input class="cellinput" name="load_notes_{{ l.id }}" value="{{ l.notes or '' }}"></td></tr>{% endfor %}</table></div>
+<div class="actions" style="margin-top:14px"><button class="btn">حفظ نتائج الدورة</button><span class="mini">الدورة لا تعتبر مجتازة إلا بعد CI مطابق وBI سالب وتسجيل الكمية الخارجة.</span></div>
+</form>
+
+<h2>٣ — التهوية Aeration</h2>
+{% if c.status == 'مرفوضة' %}<div class="msg bad">الدورة مرفوضة. يمكن توثيق سجل التهوية، لكن النظام لن يسمح باستلام المنتج للإفراج.</div>{% endif %}
+<form class="card noprint" method="post" action="{{ url_for('aeration_save', cycle_no=c.cycle_no) }}">
+<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:13px">
+<div><label>تاريخ دخول التهوية *</label><input type="date" name="in_date" value="{{ aer.in_date if aer else c.cycle_date }}" required></div>
+<div><label>وقت الدخول *</label><input type="time" name="in_time" value="{{ aer.in_time if aer else c.end_time or '' }}" required></div>
+<div><label>تاريخ الخروج *</label><input type="date" name="out_date" value="{{ aer.out_date if aer else '' }}" required></div>
+<div><label>وقت الخروج *</label><input type="time" name="out_time" value="{{ aer.out_time if aer else '' }}" required></div>
+<div><label>المدة الدنيا المعتمدة (ساعة)</label><input type="number" step="any" min="0" name="min_required_h" value="{{ aer.min_required_h if aer else min_aer }}"></div>
+<div><label>حرارة الدخول °C *</label><input type="number" step="any" name="temp_in" value="{{ aer.temp_in if aer else '' }}" required></div>
+<div><label>حرارة الخروج °C *</label><input type="number" step="any" name="temp_out" value="{{ aer.temp_out if aer else '' }}" required></div>
+<div><label>تهوية قسرية</label><select name="forced"><option {{ 'selected' if aer and aer.forced=='نعم' }}>نعم</option><option {{ 'selected' if not aer or aer.forced=='لا' }}>لا</option></select></div>
+<div><label>المشرف *</label><input name="supervisor" value="{{ aer.supervisor if aer else '' }}" required></div>
+<div><label>الرقم الوظيفي</label><input name="emp_id" value="{{ aer.emp_id if aer else '' }}"></div>
+<div style="grid-column:1/-1"><label>ملاحظات</label><textarea name="notes" rows="2">{{ aer.notes if aer else '' }}</textarea></div>
+</div>
+<div class="hint">الإعداد الحالي: مدة دنيا {{ min_aer }} ساعة، ونطاق حرارة {{ temp_min }}–{{ temp_max }} °C.</div>
+<div class="actions"><button class="btn">حفظ / تحديث التهوية</button></div>
+</form>
+{% if aer %}<div class="card"><div class="kv">
+{{ kv('مدة التهوية الفعلية', aer.duration_h) }}{{ kv('الفرق عن الحد الأدنى', aer.delta_h) }}
+{{ st('تقييم المدة', aer.duration_eval) }}{{ st('تقييم الحرارة', aer.temp_eval) }}{{ st('حالة التهوية', aer.status) }}
+</div></div>{% endif %}
+
+<h2>٤ — الاستلام بعد التعقيم والحجر النهائي</h2>
+{% if received %}<div class="tablewrap"><table><tr><th>السند</th><th>التاريخ</th><th>التشغيلة</th><th>البوكسات</th><th>الكراتين</th><th>موقع QC</th><th>بطاقة الحجر</th><th>حالة المخزون</th><th>الحالة النهائية</th></tr>
+{% for r in received %}<tr><td>{{ r.doc_no }}</td><td>{{ r.rdate }}</td><td><a href="{{ url_for('trace_view', b=r.batch_no) }}">{{ r.batch_no }}</a></td><td>{{ r.boxes }}</td><td>{{ r.cartons }}</td><td>{{ r.qc_location or '—' }}</td><td>{{ r.quarantine_card or '—' }}</td><td><span class="pill {{ cls_for(r.stock_status) }}">{{ r.stock_status }}</span></td><td><span class="pill {{ cls_for(r.final_status) }}">{{ r.final_status or '—' }}</span></td></tr>{% endfor %}</table></div>{% endif %}
+{% if aer and aer.status == 'مكتملة — جاهزة للاستلام' and c.status == 'اجتازت التعقيم' %}
+{% set openb = receive_batches|rejectattr('received')|list %}
+{% if openb %}<form class="card noprint" method="post" action="{{ url_for('post_ster_receive', cycle_no=c.cycle_no) }}">
+<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:13px">
+<div><label>التشغيلة *</label><select name="batch_no" id="receiveBatch" required onchange="fillReceive()">{% for b in openb %}<option value="{{ b.batch_no }}" data-boxes="{{ b.boxes or 0 }}" data-cartons="{{ b.cartons or 0 }}">{{ b.batch_no }} · {{ b.item_code }}</option>{% endfor %}</select></div>
+<div><label>رقم السند</label><input name="doc_no" placeholder="يولد تلقائيًا"></div><div><label>تاريخ الاستلام *</label><input type="date" name="rdate" value="{{ today() }}" required></div>
+<div><label>البوكسات *</label><input type="number" step="any" min="0" name="boxes" id="receiveBoxes" required></div><div><label>الكراتين *</label><input type="number" step="any" min="0" name="cartons" id="receiveCartons" required></div>
+<div><label>موقع حجر QC *</label><input name="qc_location" required placeholder="منطقة الحجر A"></div><div><label>بطاقة الحجر</label><input name="quarantine_card" placeholder="تولد تلقائيًا"></div>
+<div><label>تم التسليم بواسطة</label><input name="handed_by"></div><div><label>تم الاستلام بواسطة *</label><input name="received_by" required></div>
+<div style="grid-column:1/-1"><label>ملاحظات</label><textarea name="notes" rows="2"></textarea></div>
+</div><div class="actions"><button class="btn">استلام ووضع في الحجر</button></div></form>
+<script>function fillReceive(){const s=document.getElementById('receiveBatch'),o=s?.options[s.selectedIndex];if(!o)return;document.getElementById('receiveBoxes').value=o.dataset.boxes||0;document.getElementById('receiveCartons').value=o.dataset.cartons||0;}fillReceive();</script>
+{% endif %}
+{% else %}<div class="hint">لن يفتح الاستلام بعد التعقيم إلا عندما تكون الدورة <b>اجتازت التعقيم</b> والتهوية <b>مكتملة — جاهزة للاستلام</b>.</div>{% endif %}
+{% endblock %}

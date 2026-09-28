@@ -1,0 +1,53 @@
+{% extends "base.html" %}{% block title %}تعديل {{ t.code }}{% endblock %}{% block body %}
+<div class="crumb"><a href="{{ url_for('quality_home') }}">الجودة</a><span class="sep">›</span><a href="{{ url_for('quality_templates') }}">القوالب</a><span class="sep">›</span><span class="here">{{ t.code }}</span></div>
+<h1>تعديل القالب {{ t.code }}</h1>
+<div class="sub">{{ DEPT_AR[t.dept] }} · {{ KIND_AR[t.kind] }} · {{ AREA_AR[t.area] }} · الإصدار الحالي {{ t.version }} · {{ used }} سجل مبني عليه</div>
+<div class="hint">معرّف البند لا يتغير بعد إنشائه (يربط القيم المسجّلة). السجلات القديمة تحتفظ بنسختها من القالب.</div>
+<form method="post" id="tplForm" class="card">
+<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:13px">
+<div class="full"><label>العنوان *</label><input name="title" required value="{{ t.title }}"></div>
+<div><label>فاصل الاستحقاق (ساعات) — للسجل اليومي/الدوري</label><input type="number" step="any" min="0.5" name="freq_hours" value="{{ t.freq_hours if t.freq_hours else '' }}"></div>
+<div><label><input type="checkbox" name="needs_batch" style="width:auto" {{ 'checked' if t.needs_batch }}> رقم التشغيلة إلزامي</label></div>
+<div><label><input type="checkbox" name="active" style="width:auto" {{ 'checked' if t.active }}> نموذج فعّال</label></div>
+<div class="full"><label>ملاحظة</label><input name="note" value="{{ t.note or '' }}"></div>
+</div>
+<h2>البنود</h2>
+<div class="tablewrap"><table id="ft"><thead><tr><th>#</th><th>العنوان *</th><th>النوع</th><th>الوحدة</th><th>أدنى</th><th>أقصى</th><th>خيارات (مفصولة بفاصلة)</th><th>إلزامي</th><th></th></tr></thead>
+<tbody id="fbody"></tbody></table></div>
+<div style="margin:10px 0"><button type="button" class="btn back" onclick="addRow()">+ إضافة بند</button></div>
+<input type="hidden" name="fields_json" id="fields_json">
+<div class="wizard-actions"><div class="l"><a class="btn back" href="{{ url_for('quality_templates') }}">إلغاء</a></div><button class="btn big">حفظ القالب (إصدار جديد)</button></div>
+</form>
+<script>
+const TYPES={{ FIELD_TYPES|tojson }};
+const INIT={{ t.fields|tojson }};
+const esc=x=>String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function addRow(f){
+  f=f||{type:'check',required:true};
+  const tr=document.createElement('tr');tr.dataset.id=f.id||'';
+  tr.innerHTML='<td class="rn"></td><td><input class="lb" value="'+esc(f.label)+'" style="min-width:220px"></td>'+
+   '<td><select class="ty">'+Object.keys(TYPES).map(k=>'<option value="'+k+'"'+(k===f.type?' selected':'')+'>'+TYPES[k]+'</option>').join('')+'</select></td>'+
+   '<td><input class="un" value="'+esc(f.unit)+'" style="width:70px"></td>'+
+   '<td><input class="mn" type="number" step="any" value="'+esc(f.min)+'" style="width:80px"></td>'+
+   '<td><input class="mx" type="number" step="any" value="'+esc(f.max)+'" style="width:80px"></td>'+
+   '<td><input class="op" value="'+esc((f.options||[]).join(', '))+'" data-fail="'+esc((f.fail_values||[]).join(', '))+'"></td>'+
+   '<td><input class="rq" type="checkbox" style="width:auto"'+(f.required?' checked':'')+'></td>'+
+   '<td style="white-space:nowrap"><button type="button" class="smallbtn g" onclick="mv(this,-1)">▲</button> <button type="button" class="smallbtn g" onclick="mv(this,1)">▼</button> '+
+   '<button type="button" style="background:none;border:0;color:#b3261e;cursor:pointer;font-size:18px" onclick="this.closest(\'tr\').remove();num()">×</button></td>';
+  document.getElementById('fbody').appendChild(tr);num();
+}
+function num(){document.querySelectorAll('#fbody tr').forEach((r,i)=>r.querySelector('.rn').textContent=i+1);}
+function mv(b,d){const r=b.closest('tr'),p=d<0?r.previousElementSibling:r.nextElementSibling;
+  if(!p)return; d<0?p.before(r):p.after(r);num();}
+INIT.forEach(addRow);
+document.getElementById('tplForm').addEventListener('submit',()=>{
+  const out=[];document.querySelectorAll('#fbody tr').forEach(r=>{
+    const o={id:r.dataset.id,label:r.querySelector('.lb').value.trim(),type:r.querySelector('.ty').value,
+      required:r.querySelector('.rq').checked,unit:r.querySelector('.un').value,
+      min:r.querySelector('.mn').value,max:r.querySelector('.mx').value,
+      options:r.querySelector('.op').value,fail_values:r.querySelector('.op').dataset.fail};
+    if(o.label) out.push(o);});
+  document.getElementById('fields_json').value=JSON.stringify(out);
+});
+</script>
+{% endblock %}

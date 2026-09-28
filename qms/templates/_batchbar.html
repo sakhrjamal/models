@@ -1,0 +1,10 @@
+{# شريط رقم التشغيلة — يظهر في كل مراحل الإنتاج بعد الأسليتر: الصنف يأتي من أمر الإنتاج ولا يُكتب ثانية #}
+{% if b %}<div class="batchbanner">
+<div class="it"><span>رقم التشغيلة</span><div class="no">{{ b.batch_no }}</div></div>
+<div class="it"><b>{{ b.item_code }}</b><span>الصنف النهائي</span></div>
+<div class="it"><b>{{ b.size or '—' }} · {{ b.ply or '—' }} طبقة</b><span>المقاس والطبقات</span></div>
+<div class="it"><b>{{ b.fold_machine or '—' }}</b><span>ماكينة الطي</span></div>
+<div class="it"><b>{{ b.route or '—' }}</b><span>المسار</span></div>
+{% if b.qty_required %}<div class="it"><b>{{ '{:,.0f}'.format(b.qty_required) }} {{ b.uom or '' }}</b><span>الكمية المطلوبة</span></div>{% endif %}
+<div class="it"><b>{{ b.batch_start_date or '—' }}</b><span>تاريخ بدء التشغيلة</span></div>
+</div>{% endif %}
