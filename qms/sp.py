@@ -11,7 +11,7 @@ import json, datetime
 from flask import render_template, request, redirect, url_for, flash, abort, g
 
 import db, auth, mfg, inventory, notify, ncr
-from util import s, num, doc_scope, fmt_qty
+from util import s, num, doc_scope, fmt_qty, lot_taken
 from inventory import InsufficientStock
 
 CLS = 'SP'
@@ -26,7 +26,7 @@ def lot_balance(grn):
 
 
 def compatible_lots(item, only_available=True):
-    """لوطات SP المفرج عنها والمطابقة لمواصفات الصنف النهائي (المقاس، الطبقات، الكاشف، الميش)."""
+    """LOTs SP المفرج عنها والمطابقة لمواصفات الصنف النهائي (المقاس، الطبقات، الكاشف، الميش)."""
     ph = ','.join('?' * len(sp_prefixes())) or "''"
     rows = db.q(f"""SELECT r.grn_no, r.supplier_lot, r.item_code, r.qty, r.uom, r.receipt_date, r.expiry_date,
                           r.wh_location, r.qc_location, i.size, i.ply, i.xray, i.mesh
@@ -51,9 +51,9 @@ def allocated(bn):
 
 
 def lot_ledger(grn):
-    """رصيد لوط SP: مستلم / مصروف / سليم / مرفوض / هالك / متبقٍ.
+    """رصيد LOT SP: مستلم / مصروف / سليم / مرفوض / هالك / متبقٍ.
 
-    الناتج الفعلي يُقاس على مستوى أمر الإنتاج، فإن غذّته عدة لوطات يُوزَّع بنسبة ما صُرف من كل لوط.
+    الناتج الفعلي يُقاس على مستوى أمر الإنتاج، فإن غذّته عدة LOTs يُوزَّع بنسبة ما صُرف من كل LOT.
     """
     rec = db.one('SELECT * FROM receipts WHERE grn_no=?', (grn,)) or {}
     issued = good = rej = scrap = 0.0
@@ -98,17 +98,24 @@ def register(app):
             if not item or item['prefix'] not in sp_prefixes():
                 flash('اختر صنف خام SP من القائمة (فئة الشاش نصف المصنع)', 'bad'); return redirect(back)
             if not (supplier and lot):
-                flash('المورد ولوط المورد بيانات إلزامية', 'bad'); return redirect(back)
+                flash('المورد وLOT المورد بيانات إلزامية', 'bad'); return redirect(back)
             if not qty or qty <= 0 or not pk or pk <= 0:
                 flash('الكمية وعدد العبوات/الأكياس يجب أن يكونا أكبر من صفر', 'bad'); return redirect(back)
             if s(f.get('expiry_date')) and s(f.get('mfg_date')) and f['expiry_date'] < f['mfg_date']:
                 flash('تاريخ الانتهاء قبل تاريخ التصنيع', 'bad'); return redirect(back)
+            dup = lot_taken(lot)
+            if dup:
+                flash(f'رقم LOT المورّد «{lot}» مستخدم مسبقًا في الاستلام {dup}', 'bad'); return redirect(back)
             manual = (s(f.get('grn_no')) or '').upper() or None
             if manual and db.one('SELECT 1 FROM receipts WHERE grn_no=?', (manual,)):
                 flash(f'رقم الاستلام {manual} مستخدم مسبقًا', 'bad'); return redirect(back)
             scope, fmt = doc_scope('SPR', rdate)
             uom = s(f.get('uom')) or item.get('uom') or 'قطعة'
             with db.tx() as con:
+                key = ''.join(lot.split()).upper()
+                if any(''.join(str(r['supplier_lot'] or '').split()).upper() == key
+                       for r in con.execute('SELECT supplier_lot FROM receipts').fetchall()):
+                    flash(f'رقم LOT المورّد «{lot}» مستخدم مسبقًا', 'bad'); return redirect(back)
                 sup = con.execute('SELECT * FROM suppliers WHERE name=?', (supplier,)).fetchone()
                 sid = sup['supplier_id'] if sup else con.execute(
                     'INSERT INTO suppliers(name,country,active) VALUES(?,?,1)', (supplier, s(f.get('country')))).lastrowid
@@ -124,7 +131,7 @@ def register(app):
                              int(pk), s(f.get('wh_location')) or 'منطقة الحجر', g.user['username']))
                 inventory.post(con, grn, 'RM', qty, uom, None, mfg.SP, 'receipt', grn, s(f.get('wh_location')) or 'منطقة الحجر')
                 notify.push(con, 'qc_pending',
-                            f'تم استلام خام شاش نصف مصنع SP رقم {grn} (اللوط {lot}) بكمية {qty:g} {uom} وهو بانتظار الفحص والإفراج',
+                            f'تم استلام خام شاش نصف مصنع SP رقم {grn} (الـ LOT {lot}) بكمية {qty:g} {uom} وهو بانتظار الفحص والإفراج',
                             item['item_code'], url_for('receipt_view', grn_no=grn), grn, mfg.SP, ('qc_record',))
             db.log('create', 'receipts', grn, f'SP; {item["item_code"]}; lot {lot}; {qty:g}')
             flash(f'سُجّل استلام خام SP {grn} — حالته: بانتظار فحص الجودة (Pending QC)', 'ok')
@@ -139,7 +146,7 @@ def register(app):
 
     @route('/sp/lots', 'sp_lots')
     def sp_lots():
-        """دفتر لوطات SP: مستلم / مصروف / سليم / مرفوض / هالك / متبقٍ."""
+        """دفتر LOTs SP: مستلم / مصروف / سليم / مرفوض / هالك / متبقٍ."""
         ph = ','.join('?' * len(sp_prefixes())) or "''"
         rows = db.q(f"""SELECT r.*, i.description FROM receipts r JOIN items i ON i.item_code=r.item_code
                         WHERE i.prefix IN ({ph}) ORDER BY r.receipt_date DESC, r.grn_no DESC LIMIT 200""",
@@ -171,13 +178,13 @@ def register(app):
             if not rec or rec['stock_status'] != 'مفرج':
                 flash('لا يجوز استخدام خام SP غير مفرج عنه من الجودة', 'bad'); return redirect(back)
             if not lot:
-                flash('لوط SP لا يطابق مواصفات الصنف (المقاس / الطبقات / الكاشف / الميش)', 'bad'); return redirect(back)
+                flash('LOT SP لا يطابق مواصفات الصنف (المقاس / الطبقات / الكاشف / الميش)', 'bad'); return redirect(back)
             if lot['expired']:
-                flash('لوط SP منتهي الصلاحية', 'bad'); return redirect(back)
+                flash('LOT SP منتهي الصلاحية', 'bad'); return redirect(back)
             if not qty or qty <= 0:
                 flash('الكمية يجب أن تكون أكبر من صفر', 'bad'); return redirect(back)
             if qty - lot['available'] > 1e-6:
-                flash(f'الكمية {fmt_qty(qty)} أكبر من المتاح في اللوط {fmt_qty(lot["available"])}', 'bad'); return redirect(back)
+                flash(f'الكمية {fmt_qty(qty)} أكبر من المتاح في الـ LOT {fmt_qty(lot["available"])}', 'bad'); return redirect(back)
             if qty - need > 1e-6:
                 flash(f'الكمية {fmt_qty(qty)} تتجاوز المتبقي من احتياج الأمر {fmt_qty(need)}', 'bad'); return redirect(back)
             today = datetime.date.today().isoformat()
@@ -197,7 +204,7 @@ def register(app):
             except InsufficientStock as e:
                 flash(str(e), 'bad'); return redirect(back)
             db.log('create', 'allocations', doc, f'{bn}; {grn}; {qty:g}')
-            flash(f'تم تخصيص {fmt_qty(qty)} من اللوط {grn} للتشغيلة {bn}', 'ok')
+            flash(f'تم تخصيص {fmt_qty(qty)} من الـ LOT {grn} للتشغيلة {bn}', 'ok')
             import prod
             prod.next_bar(('تسجيل التعبئة', url_for('sp_pack', bn=bn)), ('أمر الإنتاج', url_for('order_view', bn=bn), False))
             return redirect(back)

@@ -15,6 +15,13 @@ LH_EXT = ('png', 'jpg', 'jpeg', 'svg', 'webp')
 
 
 def letterhead_path():
+    """مسار الورق الرسمي إن كان مفعّلًا في الإعدادات (معطّل افتراضيًا)."""
+    if db.setting('print_letterhead', '0') != '1':
+        return None
+    return letterhead_file()
+
+
+def letterhead_file():
     d = os.path.dirname(db.DB_PATH)
     for ext in LH_EXT:
         p = os.path.join(d, f'letterhead.{ext}')
@@ -29,6 +36,8 @@ def letterhead_path():
 
 def margins():
     f = lambda k, d: db.setting(k, d)                                   # noqa: E731
+    if db.setting('print_letterhead', '0') != '1':
+        return dict(top='15', bottom='18', side=f('print_margin_side_mm', '15'))
     return dict(top=f('print_margin_top_mm', '46'), bottom=f('print_margin_bottom_mm', '32'), side=f('print_margin_side_mm', '15'))
 
 
@@ -85,7 +94,7 @@ def doc_data(kind, key):
         rc = db.one('SELECT s.name supplier, r.supplier_lot FROM receipts r LEFT JOIN suppliers s ON s.supplier_id=r.supplier_id WHERE r.grn_no=?',
                     (rl.get('grn_no'),)) or {}
         meta = _wo_head(w) + _kv(('رقم تشغيل السليتر', p['plan_no']), ('الجامبو (الرقم الداخلي/الباركود)', p['roll_no']),
-                                 ('رقم رول المورد', rl.get('supplier_roll_no') or '—'), ('لوط المورد', rc.get('supplier_lot') or '—'),
+                                 ('رقم رول المورد', rl.get('supplier_roll_no') or '—'), ('LOT المورد', rc.get('supplier_lot') or '—'),
                                  ('المورد', rc.get('supplier') or '—'), ('كود المادة', f"{rl.get('item_code')} — {rl.get('description') or ''}"),
                                  ('العرض المرجعي / الفعلي (سم)', f"{fmt_qty(p.get('ref_width'))} / {fmt_qty(p.get('actual_width'))}"),
                                  ('الطول المرجعي / الفعلي (م)', f"{fmt_qty(p.get('ref_length'))} / {fmt_qty(p.get('actual_length'))}"),
@@ -104,7 +113,7 @@ def doc_data(kind, key):
         sr = db.one('SELECT * FROM subrolls WHERE tag_no=?', (fo['tag_no'],)) or {}
         meta = _wo_head(w) + _kv(('رقم سند الطي', fo['doc_no']), ('Sub Roll', f"{fo['tag_no']} ({sr.get('sr_code') or '—'})"),
                                  ('رن السليتر', sr.get('run_no') or '—'), ('الجامبو المصدر', sr.get('roll_no') or '—'),
-                                 ('لوط المورد', sr.get('supplier_lot') or '—'), ('الماكينة', fo.get('machine_code')),
+                                 ('LOT المورد', sr.get('supplier_lot') or '—'), ('الماكينة', fo.get('machine_code')),
                                  ('المشغل', fo.get('operator') or '—'), ('التاريخ/الوقت', f"{fo['fdate']} {fo.get('end_time') or ''}"))
         theo = fo.get('theoretical_qty')
         rows = [['الكمية النظرية (مسحة)', fmt_qty(theo)], ['السليم الفعلي (مسحة)', fmt_qty(fo['qty_good'])],
@@ -149,9 +158,9 @@ def doc_data(kind, key):
                    ('البداية', c.get('start_at') or '—'), ('النهاية', c.get('end_at') or '—'), ('الحالة', c.get('status')),
                    ('بدء التهوية', c.get('aer_start_at') or '—'), ('نهاية التهوية', c.get('aer_end_at') or '—'),
                    ('CI خارجي/داخلي', f"{c.get('ci_external') or '—'} / {c.get('ci_internal') or '—'}"), ('المؤشر البيولوجي', c.get('bi_result') or '—'),
-                   ('رقم تقرير الجهاز', c.get('machine_report_no') or '—'), ('لوط الغاز', c.get('gas_lot') or '—'))
+                   ('رقم تقرير الجهاز', c.get('machine_report_no') or '—'), ('LOT الغاز', c.get('gas_lot') or '—'))
         return dict(title='سند دورة التعقيم', no=c['cycle_no'], meta=meta, sections=[
-            _table('اللوطات داخل الدورة', ['المنتج', 'لوط الإنتاج', 'سجل المعالجة', 'بوكسات'],
+            _table('الـ LOTs داخل الدورة', ['المنتج', 'LOT الإنتاج', 'سجل المعالجة', 'بوكسات'],
                    [[f"{l['item_code']}", l['batch_no'], l['rec_no'] or '—', fmt_qty(l['boxes_in'])] for l in lines])], sign=['المسؤول', 'مراقب الجودة', 'ضمان الجودة'])
     if kind == 'release':
         w = db.one('SELECT * FROM work_orders WHERE batch_no=?', (key,))
@@ -199,7 +208,7 @@ def label_data(kind, key):
         r = db.one('SELECT r.*, i.description, rc.supplier_lot slot FROM rolls r LEFT JOIN items i ON i.item_code=r.item_code '
                    'LEFT JOIN receipts rc ON rc.grn_no=r.grn_no WHERE r.roll_no=?', (key,))
         if r:
-            out.append(_label('جامبو رول', r['roll_no'], _kv(('كود المادة', r['item_code']), ('لوط المورد', r.get('slot') or '—'),
+            out.append(_label('جامبو رول', r['roll_no'], _kv(('كود المادة', r['item_code']), ('LOT المورد', r.get('slot') or '—'),
                         ('رقم رول المورد', r.get('supplier_roll_no') or '—'), ('العرض المرجعي', f"{fmt_qty(r.get('ref_width_cm') or r.get('width_cm'))} سم"),
                         ('الطول المرجعي', f"{fmt_qty(r.get('ref_length_m') or r.get('length_m'))} م"), ('الحالة', r.get('use_status') or 'متاح'))))
     elif kind == 'subroll':
@@ -212,7 +221,7 @@ def label_data(kind, key):
                 ('أمر الإنتاج', w.get('wo_no') or '—'), ('المنتج المقصود', w.get('item_code') or '—'),
                 ('العرض', f"{fmt_qty(s_.get('width_cm'))} سم"), ('الطول', f"{fmt_qty(s_.get('length_m'))} م"),
                 ('المواصفات', f"{it.get('mesh') or '—'} · {it.get('xray') or '—'}"), ('الجامبو المصدر', s_.get('roll_no') or '—'),
-                ('لوط المورد', s_.get('supplier_lot') or '—'), ('تاريخ القص', s_.get('sdate') or '—'), ('المشغل', s_.get('operator') or '—'),
+                ('LOT المورد', s_.get('supplier_lot') or '—'), ('تاريخ القص', s_.get('sdate') or '—'), ('المشغل', s_.get('operator') or '—'),
                 ('الحالة', 'جاهز للطي (Available for Folding)' if s_.get('stock_status') in ('متاح', 'مخطط') else s_.get('stock_status'))), 'subroll'))
     elif kind == 'intermediate':
         rows = db.q('SELECT * FROM intermediates WHERE barcode=? OR fold_doc=? OR batch_no=? ORDER BY barcode', (key, key, key))
@@ -221,7 +230,7 @@ def label_data(kind, key):
             it = _item(w.get('item_code'))
             out.append(_label('بطاقة المنتج الوسيط SP', m['barcode'], _kv(
                 ('كود SP', m.get('sp_code') or '—'), ('مصدر SP', 'إنتاج داخلي' if m['sp_source'] == 'INTERNAL_PRODUCTION' else 'استلام مورد'),
-                ('أمر الإنتاج', w.get('wo_no') or '—'), ('لوط الإنتاج', m['batch_no']), ('المقاس', it.get('size') or '—'),
+                ('أمر الإنتاج', w.get('wo_no') or '—'), ('LOT الإنتاج', m['batch_no']), ('المقاس', it.get('size') or '—'),
                 ('الطبقات', it.get('ply') or '—'), ('Mesh', it.get('mesh') or '—'), ('Plain/X-Ray', it.get('xray') or '—'),
                 ('الكمية', f"{fmt_qty(m['qty'])} مسحة"), ('سند الطي', m.get('fold_doc') or '—'), ('Sub Roll', m.get('tag_no') or '—'),
                 ('تاريخ الإنتاج', m.get('prod_date') or '—'), ('المشغل', m.get('operator') or '—')), 'inter'))
@@ -238,7 +247,7 @@ def label_data(kind, key):
             for i in range(max(1, min(n, 200))):
                 out.append(_label(title, f"{r['rec_no']}", _kv(
                     ('المنتج', f"{w.get('item_code')} — {it.get('description') or ''}"), ('كود العبوة', code or '—'), ('المحتوى', per),
-                    ('لوط الإنتاج', r['batch_no']), ('رقم دورة التعقيم', r.get('cycle_no') or 'سيُسجَّل بعد إنشاء الدورة'),
+                    ('LOT الإنتاج', r['batch_no']), ('رقم دورة التعقيم', r.get('cycle_no') or 'سيُسجَّل بعد إنشاء الدورة'),
                     ('المقاس/الطبقات', f"{it.get('size') or '—'} / {it.get('ply') or '—'}"), ('Mesh · نوع', f"{it.get('mesh') or '—'} · {it.get('xray') or '—'}"),
                     ('تاريخ التغليف', r.get('pack_at') or '—')), kind))
     elif kind in ('pack', 'ns_carton'):
@@ -250,14 +259,14 @@ def label_data(kind, key):
             code = ps.get('pack_code') if kind == 'pack' else ps.get('carton_code')
             out.append(_label('بطاقة الباكت' if kind == 'pack' else 'بطاقة الكرتون', r['doc_no'], _kv(
                 ('المنتج', f"{w.get('item_code')} — {it.get('description') or ''}"), ('كود العبوة', code or '—'),
-                ('لوط الإنتاج', r['batch_no']), ('المحتوى', f"{fmt_qty(r['swabs_per_pack'])} مسحة/باكت" if kind == 'pack' else f"{fmt_qty(r['packs_per_carton'])} باكت"),
+                ('LOT الإنتاج', r['batch_no']), ('المحتوى', f"{fmt_qty(r['swabs_per_pack'])} مسحة/باكت" if kind == 'pack' else f"{fmt_qty(r['packs_per_carton'])} باكت"),
                 ('تاريخ التعبئة', r['created_at'])), kind))
     elif kind == 'fg':
         w = db.one('SELECT * FROM work_orders WHERE batch_no=?', (key,))
         if w:
             it = _item(w['item_code'])
             out.append(_label('بطاقة المنتج النهائي', w['batch_no'], _kv(('المنتج', f"{w['item_code']} — {it.get('description') or ''}"),
-                        ('لوط الإنتاج', w['batch_no']), ('الكمية', f"{fmt_qty(w.get('approved_qty'))} {w.get('uom') or ''}"),
+                        ('LOT الإنتاج', w['batch_no']), ('الكمية', f"{fmt_qty(w.get('approved_qty'))} {w.get('uom') or ''}"),
                         ('حالة الجودة', mfg.FS_AR.get(w.get('final_status'), '—')))))
     return out
 
@@ -265,7 +274,7 @@ def label_data(kind, key):
 def register(app):
     @app.route('/letterhead', endpoint='letterhead')
     def letterhead():
-        p = letterhead_path()
+        p = letterhead_file()
         if not p:
             abort(404)
         return send_file(p)

@@ -164,7 +164,7 @@ PAGES = {
     'completed_list': ('المنتجات المكتملة', None), 'production_log': ('سجل الإنتاج', None),
     'tags': ('بطاقات Sub Roll', 'order_view'), 'print_doc': ('طباعة', None), 'print_label': ('طباعة بطاقات', None),
     'sp_supply': ('SP وارد', 'order_view'), 'sp_home': ('خط SP الخارجي', None), 'sp_alloc': ('تخصيص الخام', 'sp_home'), 'sp_pack': ('التعبئة', 'sp_home'),
-    'sp_lots': ('لوطات SP', 'sp_home'), 'sp_receive': ('استلام خام SP', 'receipts'),
+    'sp_lots': ('LOTs SP', 'sp_home'), 'sp_receive': ('استلام خام SP', 'receipts'),
     'bandage_home': ('خط الأربطة', None), 'bandage_alloc': ('تخصيص الجامبو', 'bandage_home'),
     'bandage_machine': ('ماكينة الأربطة', 'bandage_home'), 'bandage_wrap': ('التغليف', 'bandage_home'),
     'quality_pending': ('الإفراجات', None), 'quality_review': ('مراجعة الدفعة {bn}', 'quality_pending'),

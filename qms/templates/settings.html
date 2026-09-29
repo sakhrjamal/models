@@ -5,6 +5,7 @@
 {% for key, label, hint, kind in fields %}<div><label>{{ label }}</label><input name="{{ key }}" value="{{ vals[key] }}" {{ 'type=number step=any min=0' if kind=='num' }}><div class="mini">{{ hint }}</div></div>{% endfor %}
 <div class="full wizard-actions"><div class="l"></div><button class="btn big">حفظ</button></div></form>
 <h2>الورق الرسمي (Letterhead)</h2>
+<form method="post" action="{{ url_for('letterhead_toggle') }}" class="card"><label><input type="checkbox" name="on" style="width:auto" {{ 'checked' if lh_on }} onchange="this.form.submit()"> استخدام الورق الرسمي في الطباعة <span class="mini">(معطّل حاليًا افتراضيًا حتى تُضبط الطباعة)</span></label></form>
 <form method="post" action="{{ url_for('letterhead_upload') }}" enctype="multipart/form-data" class="card">
 {% if lh %}<div class="msg ok">الورق الرسمي مرفوع ويُستخدم خلفية لكل السندات والتقارير. <a href="{{ url_for('letterhead') }}" target="_blank">عرض</a></div>{% else %}<div class="msg warn">لم يُرفع الورق الرسمي بعد.</div>{% endif %}
 <label>ملف الورق الرسمي (صورة بحجم A4: PNG / JPG / SVG / WEBP)</label><input type="file" name="file" accept=".png,.jpg,.jpeg,.svg,.webp">

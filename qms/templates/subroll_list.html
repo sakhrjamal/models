@@ -2,7 +2,7 @@
 <h1>الرولات الفرعية (Sub Rolls)</h1><div class="sub">كل سب رول له باركود فريد ويُستخدم مرة واحدة فقط</div>
 <div class="tabs"><a href="{{ url_for('subroll_list') }}" class="{{ 'on' if not st }}">الكل</a>
 {% for s in ['متاح','مخطط','مستهلك'] %}<a href="{{ url_for('subroll_list', st=s) }}" class="{{ 'on' if st==s }}">{{ s }}</a>{% endfor %}</div>
-{% if rows %}<div class="tablewrap"><table><tr><th>الباركود</th><th>كود Sub Roll</th><th>تشغيل القص</th><th>التشغيلة</th><th>الجامبو</th><th>العرض</th><th>الطول (م)</th><th>لوط المورد</th><th>الحالة</th><th></th></tr>
+{% if rows %}<div class="tablewrap"><table><tr><th>الباركود</th><th>كود Sub Roll</th><th>تشغيل القص</th><th>التشغيلة</th><th>الجامبو</th><th>العرض</th><th>الطول (م)</th><th>LOT المورد</th><th>الحالة</th><th></th></tr>
 {% for r in rows %}<tr><td><b>{{ r.tag_no }}</b></td><td>{{ r.sr_code or '—' }}</td><td>{{ r.run_no or '—' }}</td>
 <td><a href="{{ url_for('order_view', bn=r.batch_no) }}">{{ r.batch_no }}</a></td><td>{{ r.roll_no }}</td><td>{{ fmt(r.width_cm) }}</td><td>{{ fmt(r.length_m) }}</td>
 <td>{{ r.supplier_lot or '—' }}</td><td><span class="pill {{ 'ok' if r.stock_status=='متاح' else ('warn' if r.stock_status=='مخطط' else '') }}">{{ r.stock_status }}</span>{% if r.consumed_by_batch %}<div class="mini">استُخدم في {{ r.consumed_by_batch }}</div>{% endif %}</td>

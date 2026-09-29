@@ -3,11 +3,11 @@
 {% include "_batchbar.html" %}
 {% if product_width %}<div class="hint">عرض المنتج {{ fmt(product_width) }} سم — لا يُقبل جامبو أضيق منه.</div>{% endif %}
 {% if can('enter') and not b.final_status %}<h2>جامبو رول مفرج عنه وغير مخصص</h2>
-{% if free %}<div class="tablewrap"><table><tr><th>الجامبو</th><th>العرض</th><th>المتبقي (م)</th><th>لوط المورّد</th><th></th></tr>
+{% if free %}<div class="tablewrap"><table><tr><th>الجامبو</th><th>العرض</th><th>المتبقي (م)</th><th>LOT المورّد</th><th></th></tr>
 {% for r in free %}<tr><td><b>{{ r.roll_no }}</b></td><td>{{ fmt(r.width_cm) if r.width_cm else '—' }}</td><td>{{ fmt(r.remaining) }}</td><td>{{ r.slot or '—' }}</td>
 <td><form method="post" class="inline"><input type="hidden" name="roll_no" value="{{ r.roll_no }}"><button class="btn sm ok">تخصيص للأمر</button></form></td></tr>{% endfor %}</table></div>
 {% else %}<div class="empty">لا يوجد جامبو مفرج عنه وغير مخصص. يُستلم من «استلام الخام» وينتظر إفراج الجودة.</div>{% endif %}{% endif %}
-{% if mine %}<h2>الجامبو المخصص لهذه التشغيلة</h2><table><tr><th>الرول</th><th>العرض</th><th>المتبقي</th><th>لوط المورّد</th>{% if can('enter') and b.final_status in (none, 'PENDING_QC') %}<th></th>{% endif %}</tr>
+{% if mine %}<h2>الجامبو المخصص لهذه التشغيلة</h2><table><tr><th>الرول</th><th>العرض</th><th>المتبقي</th><th>LOT المورّد</th>{% if can('enter') and b.final_status in (none, 'PENDING_QC') %}<th></th>{% endif %}</tr>
 {% for r in mine %}<tr><td>{{ r.roll_no }}</td><td>{{ fmt(r.width_cm) if r.width_cm else '—' }}</td><td><b>{{ fmt(r.remaining) }} م</b></td><td>{{ r.slot or '—' }}</td>
 {% if can('enter') and b.final_status in (none, 'PENDING_QC') %}<td>{% if adoc.get(r.roll_no) %}<form class="inline" method="post" action="{{ url_for('alloc_delete', doc_no=adoc[r.roll_no]) }}" onsubmit="return confirm('إلغاء تخصيص {{ r.roll_no }}؟')"><input type="hidden" name="next" value="{{ request.path }}"><button class="btn sm bad">إلغاء</button></form>{% endif %}</td>{% endif %}</tr>{% endfor %}</table>{% endif %}
 <div class="wizard-actions noprint"><div class="l"><a class="btn back" href="{{ url_for('order_view', bn=bn) }}">أمر الإنتاج</a></div><a class="btn" href="{{ url_for('bandage_machine', bn=bn) }}">إلى ماكينة الأربطة ◀</a></div>

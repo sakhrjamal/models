@@ -3,7 +3,7 @@
 
   • الشحن (WH-FRM-007): فقط من تشغيلة مفرج عنها، وبكمية لا تتجاوز المفرج مطروحًا منه
     المشحون سابقًا، ولا مع عدم مطابقة مفتوحة. الإبطال بسبب وتوقيع إلكتروني.
-  • صرف المواد: سند صرف مواد التعبئة (فيلم، بوكس، كرتون) لكل تشغيلة بلوط المادة وأمين المخزن.
+  • صرف المواد: سند صرف مواد التعبئة (فيلم، بوكس، كرتون) لكل تشغيلة بLOT المادة وأمين المخزن.
 """
 import datetime
 from flask import render_template, request, redirect, url_for, flash, abort, g
@@ -129,7 +129,7 @@ def register(app):
             elif not q_ or q_ <= 0:
                 flash('الكمية المصروفة يجب أن تكون أكبر من صفر', 'bad')
             elif not (s(f.get('lot')) and s(f.get('issue_date')) and s(f.get('storekeeper'))):
-                flash('لوط المادة والتاريخ واسم أمين المخزن بيانات إلزامية', 'bad')
+                flash('LOT المادة والتاريخ واسم أمين المخزن بيانات إلزامية', 'bad')
             else:
                 db.run("""INSERT INTO bom(wo_no,batch_no,mat_kind,item_code,description,qty_issued,uom,saptco_ref,
                           issue_date,storekeeper,notes,lot,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",

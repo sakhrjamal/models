@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% block title %}{{ it.item_code or 'بطاقة مادة جديدة' }}{% endblock %}{% block body %}
 <h1>{{ 'بطاقة مادة جديدة' if new else 'بطاقة المادة ' ~ it.item_code }}</h1>
 {% if not new %}<div class="stat"><div><b>{{ fmt(bal) }}</b><span>الرصيد ({{ it.uom or '' }})</span></div><div><b>{{ it.category_ar or '—' }}</b><span>النوع</span></div>
-<div><b>{{ 'نعم' if it.lot_tracking else 'لا' }}</b><span>تتبع لوط</span></div><div><b>{{ 'نعم' if it.roll_tracking else 'لا' }}</b><span>تتبع رول/سيريال</span></div></div>{% endif %}
+<div><b>{{ 'نعم' if it.lot_tracking else 'لا' }}</b><span>تتبع LOT</span></div><div><b>{{ 'نعم' if it.roll_tracking else 'لا' }}</b><span>تتبع رول/سيريال</span></div></div>{% endif %}
 {% if can('master') %}<form method="post" class="card"><input type="hidden" name="act" value="save"><div class="grid">
 <div><label>الكود (معرّف فقط)</label>{% if new %}<input name="item_code" required>{% else %}<input value="{{ it.item_code }}" disabled>{% endif %}</div>
 <div><label>الاسم بالعربي</label><input name="name_ar" value="{{ it.name_ar or '' }}"></div>
@@ -13,7 +13,7 @@
 <div><label>المورد</label><input name="supplier_name" value="{{ it.supplier_name or '' }}"></div>
 <div><label>الحد الأدنى للمخزون</label><input name="min_stock" type="number" step="any" value="{{ it.min_stock or '' }}"></div>
 <div><label>الموقع</label><input name="location" value="{{ it.location or '' }}"></div>
-<div><label><input type="checkbox" name="lot_tracking" style="width:auto" {{ 'checked' if it.lot_tracking }}> تتبع بالدفعة/اللوط</label>
+<div><label><input type="checkbox" name="lot_tracking" style="width:auto" {{ 'checked' if it.lot_tracking }}> تتبع بالدفعة/الـ LOT</label>
 <label><input type="checkbox" name="roll_tracking" style="width:auto" {{ 'checked' if it.roll_tracking }}> تتبع بالرول/السيريال</label>
 <label><input type="checkbox" name="active" style="width:auto" {{ 'checked' if new or it.status=='نشط' }}> نشط</label></div>
 <div style="grid-column:1/-1"><label>ملاحظات</label><textarea name="notes" rows="2">{{ it.notes or '' }}</textarea></div></div>

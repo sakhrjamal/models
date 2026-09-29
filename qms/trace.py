@@ -142,7 +142,7 @@ def verdict(d):
     return 'بانتظار نتيجة المؤشر البيولوجي'
 
 def batch_forward(supplier_lot):
-    """تتبع أمامي: من لوط المورّد إلى أوامر التقطيع ثم أوامر الإنتاج التي دخل فيها"""
+    """تتبع أمامي: من LOT المورّد إلى أوامر التقطيع ثم أوامر الإنتاج التي دخل فيها"""
     return q("""SELECT s.batch_no, w.item_code, w.batch_start_date, COALESCE(r.release_no, (SELECT 'APR-'||printf('%06d', a.id) FROM approvals a WHERE a.batch_no=s.batch_no AND a.decision='Approved' ORDER BY a.id DESC LIMIT 1)) release_no, COALESCE(r.decision, (SELECT 'مفرج عنها' FROM approvals a WHERE a.batch_no=s.batch_no AND a.decision='Approved' LIMIT 1)) decision,
                        'أسليتر' AS stage
                 FROM rolls rl

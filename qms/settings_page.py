@@ -42,7 +42,17 @@ def register(app):
             return redirect(url_for('settings_admin'))
         vals = {k: db.setting(k, '') for k, *_ in EDITABLE}
         import printing
-        return render_template('settings.html', nav='settings', fields=EDITABLE, vals=vals, lh=printing.letterhead_path())
+        return render_template('settings.html', nav='settings', fields=EDITABLE, vals=vals, lh=printing.letterhead_file(),
+                               lh_on=db.setting('print_letterhead', '0') == '1')
+
+    @app.route('/admin/letterhead/toggle', endpoint='letterhead_toggle', methods=['POST'])
+    @auth.require('admin')
+    def letterhead_toggle():
+        v = '1' if request.form.get('on') else '0'
+        db.run("INSERT INTO settings(key,value,note) VALUES('print_letterhead',?,'استخدام الورق الرسمي في الطباعة') ON CONFLICT(key) DO UPDATE SET value=excluded.value", (v,))
+        db.log('update', 'settings', 'print_letterhead', v)
+        flash('فُعّل الورق الرسمي في الطباعة' if v == '1' else 'أُوقف الورق الرسمي في الطباعة', 'ok')
+        return redirect(url_for('settings_admin'))
 
     @app.route('/admin/letterhead', endpoint='letterhead_upload', methods=['POST'])
     @auth.require('admin')
@@ -73,5 +83,5 @@ def register(app):
         with open(os.path.join(d, f'letterhead.{ext}'), 'wb') as fh:
             fh.write(data)
         db.log('update', 'letterhead', 'letterhead', f'{ext}; {len(data)} bytes')
-        flash('حُفظ الورق الرسمي وسيُستخدم في كل المطبوعات', 'ok')
+        flash('حُفظ الورق الرسمي (فعّله من مربع «استخدام الورق الرسمي في الطباعة» ليظهر في المطبوعات)', 'ok')
         return redirect(url_for('settings_admin'))

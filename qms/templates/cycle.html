@@ -12,7 +12,7 @@
 {{ kv('المشغّل', c.operator) }}{{ kv('الرقم الوظيفي', c.emp_id) }}
 {{ kv('بدء الدورة', c.start_time) }}{{ kv('نهاية الدورة', c.end_time) }}
 {{ kv('مدة الدورة (ساعة)', c.duration_h) }}{{ kv('تقرير الماكينة', c.machine_report_no) }}
-{{ kv('لوط الغاز', c.gas_lot) }}{{ kv('نمط التحميل', c.load_pattern) }}
+{{ kv('LOT الغاز', c.gas_lot) }}{{ kv('نمط التحميل', c.load_pattern) }}
 {{ st('CI خارجي', c.ci_external) }}{{ st('CI داخلي', c.ci_internal) }}
 {{ kv('عدد BI', c.bi_count) }}{{ st('نتيجة BI', c.bi_result) }}
 </div></div>
@@ -31,7 +31,7 @@
 <div><label>وقت النهاية</label><input type="time" name="end_time" value="{{ c.end_time or '' }}"></div>
 <div><label>تاريخ النهاية <span class="mini">(اترْكه فارغًا لنفس اليوم)</span></label><input type="date" name="end_date" value=""></div>
 <div><label>رقم تقرير الماكينة</label><input name="machine_report_no" value="{{ c.machine_report_no or '' }}"></div>
-<div><label>لوط الغاز</label><input name="gas_lot" value="{{ c.gas_lot or '' }}"></div>
+<div><label>LOT الغاز</label><input name="gas_lot" value="{{ c.gas_lot or '' }}"></div>
 <div><label>نمط التحميل</label><input name="load_pattern" value="{{ c.load_pattern or '' }}"></div>
 <div><label>CI الخارجي</label><select name="ci_external"><option></option>{% for x in ['مطابق','غير مطابق','معلّق'] %}<option {{ 'selected' if c.ci_external==x }}>{{ x }}</option>{% endfor %}</select></div>
 <div><label>CI الداخلي</label><select name="ci_internal"><option></option>{% for x in ['مطابق','غير مطابق','معلّق'] %}<option {{ 'selected' if c.ci_internal==x }}>{{ x }}</option>{% endfor %}</select></div>

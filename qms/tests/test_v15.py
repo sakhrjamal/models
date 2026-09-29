@@ -266,7 +266,7 @@ class V15(unittest.TestCase):
         self.qc.post(f'/quality/decide/{bn}', {'decision': 'approve'})
         w2 = db.one('SELECT * FROM work_orders WHERE batch_no=?', (bn,))
         self.assertEqual((w2['final_status'], w2['approved_qty']), ('APPROVED', 97))
-        # الطباعة: لوط الإنتاج ورقم الدورة على البوكس
+        # الطباعة: LOT الإنتاج ورقم الدورة على البوكس
         page = body(self.op.get(f'/label/box/{rec}'))
         self.assertIn(bn, page); self.assertIn(cn, page)
         for u in (f'/print/ster_record/{rec}', f'/print/cycle/{cn}', f'/label/intermediate/{ic["barcode"]}', f'/label/envelope/{rec}',
@@ -414,17 +414,20 @@ class V15(unittest.TestCase):
     def test_08_letterhead_and_print(self):
         page = body(self.op.get('/print/order/' + db.one('SELECT batch_no b FROM work_orders LIMIT 1')['b']))
         self.assertIn('Page ', page); self.assertIn('@page', page); self.assertIn('dir="rtl"', page)
-        self.assertIn("url('/letterhead')", page)                        # ورق الشركة الافتراضي مُضمَّن
+        self.assertNotIn("url('/letterhead')", page)                     # الورق الرسمي معطّل افتراضيًا
         png = (b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc\xf8\xff\xff?\x00\x05\xfe\x02\xfe\xdc\xccY\xe7\x00\x00\x00\x00IEND\xaeB`\x82')
         r = self.adm.c.post('/admin/letterhead', data={'_csrf': self.adm.tok, 'file': (io.BytesIO(png), 'lh.png')}, content_type='multipart/form-data', follow_redirects=True)
         self.assertIn('حُفظ الورق الرسمي', body(r))
+        self.assertNotIn("url('/letterhead')", body(self.op.get('/print/order/' + db.one('SELECT batch_no b FROM work_orders LIMIT 1')['b'])))   # الرفع وحده لا يفعّله
+        self.assertEqual(self.op.c.post('/admin/letterhead/toggle', data={'_csrf': self.op.tok, 'on': '1'}).status_code, 403)
+        self.adm.post('/admin/letterhead/toggle', {'on': '1'})
         page = body(self.op.get('/print/order/' + db.one('SELECT batch_no b FROM work_orders LIMIT 1')['b']))
         self.assertIn("background:url('/letterhead')", page)            # خلفية كل صفحة مطبوعة
         self.assertIn('Page ', page)
         self.assertEqual(self.op.get('/letterhead').status_code, 200)
         self.assertEqual(self.op.c.post('/admin/letterhead', data={'_csrf': self.op.tok}).status_code, 403)
         self.adm.post('/admin/letterhead', {'act': 'delete'})
-        self.assertEqual(self.op.get('/letterhead').status_code, 200)     # يعود للورق الافتراضي المُضمَّن
+        self.adm.post('/admin/letterhead/toggle', {})                       # إيقاف
         # الباركود Code128
         import barcode
         self.assertIn('<svg', barcode.svg('SR-0001'))
@@ -624,13 +627,47 @@ class V15(unittest.TestCase):
         self.qc.post(f'/quality/sp/{bn2}/decide', {'decision': 'approve'})
         self.op.post('/sterile/new', {'scan': ic['barcode']})
         self.assertEqual(db.one('SELECT received_qty q FROM ster_records WHERE batch_no=?', (bn2,))['q'], 1000)
-        # لوط لا يطابق المنتج مرفوض
+        # LOT لا يطابق المنتج مرفوض
         r = self.op.post(f'/sp-supply/{bn2}', {'grn_no': g1, 'qty': '10', 'operator': self.opn})
         self.assertEqual(db.one("SELECT COUNT(*) n FROM allocations WHERE batch_no=? AND doc_no LIKE 'SPIN-%'", (bn2,))['n'], 1)
         # حذف سطر SP الوارد بعد استهلاكه في سجل ممنوع
         d2 = db.one("SELECT doc_no d FROM allocations WHERE batch_no=? AND doc_no LIKE 'SPIN-%'", (bn2,))['d']
         self.op.post(f'/sp-supply/doc/{d2}/delete')
         self.assertIsNotNone(db.one('SELECT 1 FROM intermediates WHERE fold_doc=?', (d2,)))
+
+    # ================================================================== 18. إشعارات الإفراج، جدول الفرز، تفرّد LOT
+    def test_18_notifications_sorting_ui_lot_unique(self):
+        db.run("UPDATE pack_spec SET swabs_per_envelope=10, swabs_per_box=100 WHERE item_code='GS013M'")
+        w = self.order('GS013M', 10); bn = w['batch_no']
+        self.cut(bn); tag = self.subs(bn)[0]
+        n0 = db.one("SELECT COUNT(*) n FROM notifications WHERE kind='sp_release_needed'")['n']
+        self.fold(bn, tag, 5000)
+        self.assertEqual(db.one("SELECT COUNT(*) n FROM notifications WHERE kind='sp_release_needed'")['n'], n0 + 1)
+        self.assertIn('إفراج SP', txt(self.qc.get('/notifications')))            # يظهر عند الجرس لمستخدم الجودة
+        self.assertNotIn('إفراج SP', txt(self.op.get('/notifications')).split('الإشعارات')[-1][:0] or '')
+        self.qc.post(f'/quality/sp/{bn}/decide', {'decision': 'approve'})
+        ic = db.one('SELECT barcode b FROM intermediates WHERE batch_no=?', (bn,))['b']
+        self.op.post('/sterile/new', {'scan': ic})
+        rec = db.one('SELECT rec_no r FROM ster_records WHERE batch_no=?', (bn,))['r']
+        page = body(self.op.get(f'/sterile/record/{rec}'))                        # جدول/حقول الفرز ظاهرة لا كود مكتوب
+        self.assertIn('<input type="number" name="accepted"', page)
+        self.assertNotIn('&lt;input', page)
+        self.op.post(f'/sterile/record/{rec}', {'act': 'sort', 'accepted': '4900', 'rejected': '100', 'operator': self.opn})
+        self.op.post(f'/sterile/record/{rec}', {'act': 'pack', 'env_actual': '490', 'operator': self.opn})
+        self.op.post(f'/sterile/record/{rec}', {'act': 'box', 'operator': self.opn})
+        self.assertEqual(db.one("SELECT COUNT(*) n FROM notifications WHERE kind='pre_release_needed' AND ref=?", (bn,))['n'], 1)
+        # LOT المورّد لا يتكرر (مطابقة بلا فرق أحرف/مسافات) لا في الخام ولا في SP
+        lot = f'DUP-{self.lot}-X'
+        d = {'supplier_name': 'مورد', 'item_code': 'RR005', 'supplier_lot': lot, 'roll_count': '2'}
+        self.store.post('/receipts/new', d)
+        n = db.one('SELECT COUNT(*) n FROM receipts')['n']
+        r = self.store.post('/receipts/new', dict(d, supplier_lot=' dup-' + lot[4:].lower()))
+        self.assertIn('مستخدم مسبقًا', ' '.join(flashes(r)))
+        r = self.store.post('/receipts/new', dict(d, roll_count='1'))
+        self.assertEqual(db.one('SELECT COUNT(*) n FROM receipts')['n'], n)
+        r = self.store.post('/sp/receive', {'supplier_name': 'مورد', 'item_code': 'SP013M', 'supplier_lot': lot, 'qty': '10', 'packages': '1'})
+        self.assertEqual(db.one('SELECT COUNT(*) n FROM receipts')['n'], n)
+        self.assertNotIn('لوط', body(self.op.get('/')) + body(self.qc.get('/receipts')))    # المصطلح LOT
 
     # ================================================================== 11. كل الصفحات تعمل
     def test_11_all_pages_render(self):
@@ -640,8 +677,8 @@ class V15(unittest.TestCase):
             if 'GET' not in rule.methods or rule.arguments or rule.endpoint in skip:
                 continue
             r = self.adm.get(rule.rule)
-            if r.status_code >= 400:
-                bad.append((rule.rule, r.status_code))
+            if r.status_code >= 400 or '&lt;div' in body(r) or '&lt;input' in body(r):
+                bad.append((rule.rule, r.status_code))                       # كود HTML ظاهر كنص = عطل
         self.assertEqual(bad, [])
         # صفحات ببارامترات
         bn = db.one("SELECT batch_no b FROM work_orders WHERE item_code='GS310M' ORDER BY rowid LIMIT 1")['b']

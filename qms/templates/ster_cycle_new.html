@@ -1,5 +1,5 @@
 {% extends "base.html" %}{% from "_macros.html" import op_select with context %}{% block title %}دورة تعقيم جديدة{% endblock %}{% block body %}
-<h1>دورة تعقيم جديدة</h1><div class="sub">رقم الدورة تلقائي. اختر اللوطات (المُفرجة قبل التعقيم) — يمكن أكثر من لوط في دورة واحدة</div>
+<h1>دورة تعقيم جديدة</h1><div class="sub">رقم الدورة تلقائي. اختر الـ LOTs (المُفرجة قبل التعقيم) — يمكن أكثر من LOT في دورة واحدة</div>
 {% if not ready %}<div class="empty">لا توجد سجلات مُفرجة قبل التعقيم.</div>{% else %}
 <form method="post" class="card"><div class="subrolls">{% for r in ready %}<label><input type="checkbox" name="rec_no" value="{{ r.rec_no }}"> {{ r.rec_no }}<span class="mini">{{ r.batch_no }} · {{ r.item_code }} · {{ fmt(r.boxes_actual) }} بوكس{% if r.cartons %} · {{ fmt(r.cartons) }} كرتون{% endif %}</span></label>{% endfor %}</div>
 <div class="grid" style="margin-top:12px"><div><label>المسؤول *</label>{{ op_select('sterilization') }}</div>

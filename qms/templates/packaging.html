@@ -33,11 +33,11 @@
 
 <div class="full sectionline"><b>مواد التغليف</b></div>
 <div><label>كود الغلاف / الفيلم</label><input name="film_code" list="pkitems" placeholder="PK..."></div>
-<div><label>لوط الغلاف / الفيلم</label><input name="film_lot"></div>
+<div><label>LOT الغلاف / الفيلم</label><input name="film_lot"></div>
 <div><label>كود البوكس</label><input name="box_code" list="bxitems" placeholder="BX..."></div>
-<div><label>لوط البوكس</label><input name="box_lot"></div>
+<div><label>LOT البوكس</label><input name="box_lot"></div>
 <div><label>كود الكرتون الخارجي</label><input name="mb_code" list="mbitems" placeholder="MB..."></div>
-<div><label>لوط الكرتون الخارجي</label><input name="mb_lot"></div>
+<div><label>LOT الكرتون الخارجي</label><input name="mb_lot"></div>
 <datalist id="pkitems">{% for m in mats if m.prefix=='PK' %}<option value="{{ m.item_code }}">{{ m.description }}</option>{% endfor %}</datalist>
 <datalist id="bxitems">{% for m in mats if m.prefix=='BX' %}<option value="{{ m.item_code }}">{{ m.description }}</option>{% endfor %}</datalist>
 <datalist id="mbitems">{% for m in mats if m.prefix=='MB' %}<option value="{{ m.item_code }}">{{ m.description }}</option>{% endfor %}</datalist>

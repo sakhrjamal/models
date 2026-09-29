@@ -21,7 +21,7 @@
 <form method="post" class="card" id="sf">
 <label>اختر الجامبو رول أو امسح باركوده *</label>
 <input id="jscan" class="scanbox" placeholder="امسح باركود الجامبو" autocomplete="off">
-<div class="tablewrap"><table><tr><th></th><th>الجامبو</th><th>رقم رول المورد</th><th>لوط المورد</th><th>العرض المرجعي</th><th>الطول المرجعي</th><th>سب رول ناتج</th></tr>
+<div class="tablewrap"><table><tr><th></th><th>الجامبو</th><th>رقم رول المورد</th><th>LOT المورد</th><th>العرض المرجعي</th><th>الطول المرجعي</th><th>سب رول ناتج</th></tr>
 {% for j in jumbos %}{% set per = ((j.def_w - 2*req.edge_each) // req.sr_width)|int %}<tr>
 <td><input type="radio" name="roll_no" value="{{ j.roll_no }}" data-w="{{ j.def_w or '' }}" data-l="{{ j.def_l or '' }}" required {{ 'checked' if loop.first }}></td>
 <td><b>{{ j.roll_no }}</b></td><td>{{ j.supplier_roll_no or '—' }}</td><td>{{ j.slot or j.supplier_lot or '—' }}</td>

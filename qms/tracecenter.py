@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""مركز التتبع v15: بحث بأي معرّف (باركود، لوط مورّد، جامبو، سب رول، تشغيل قص، سند طي، أمر، تشغيلة،
+"""مركز التتبع v15: بحث بأي معرّف (باركود، LOT مورّد، جامبو، سب رول، تشغيل قص، سند طي، أمر، تشغيلة،
 كرتون SP، سجل تعقيم، دورة تعقيم…) ثم رسم السلسلة كاملة في الاتجاهين:
-  خلفيًا: المنتج النهائي ← سند الطي ← السب رول ← الجامبو ← لوط المورّد
-  أماميًا: لوط المورّد / الجامبو / السب رول ← كل الطي والتعبئة والدورات والمنتجات النهائية."""
+  خلفيًا: المنتج النهائي ← سند الطي ← السب رول ← الجامبو ← LOT المورّد
+  أماميًا: LOT المورّد / الجامبو / السب رول ← كل الطي والتعبئة والدورات والمنتجات النهائية."""
 import db
 from util import fmt_qty
 from flask import render_template, request, redirect, url_for, abort, jsonify
@@ -27,13 +27,13 @@ def resolve(q):
                      WHERE roll_no=? OR supplier_lot=? OR supplier_roll_no=?""", (like, like, like)):
         bs = _batches("SELECT DISTINCT batch_no b FROM cutting_plans WHERE roll_no=? UNION SELECT batch_no FROM allocations WHERE source_ref=? AND voided=0",
                       (r['roll_no'], r['roll_no']))
-        add('جامبو رول', r['roll_no'], f"جامبو {r['roll_no']} — لوط المورّد {r['supplier_lot'] or '—'}", bs)
+        add('جامبو رول', r['roll_no'], f"جامبو {r['roll_no']} — LOT المورّد {r['supplier_lot'] or '—'}", bs)
     for r in db.q("SELECT DISTINCT grn_no, supplier_lot FROM receipts WHERE grn_no=? OR supplier_lot=? OR po_no=?", (like, like, like)):
         bs = _batches("""SELECT DISTINCT cp.batch_no b FROM cutting_plans cp JOIN rolls r ON r.roll_no=cp.roll_no
                          WHERE r.grn_no=? UNION SELECT batch_no FROM allocations WHERE source_ref=? AND voided=0
                          UNION SELECT a.batch_no FROM allocations a JOIN rolls r2 ON r2.roll_no=a.source_ref WHERE r2.grn_no=? AND a.voided=0""",
                       (r['grn_no'], r['grn_no'], r['grn_no']))
-        add('استلام / لوط مورّد', r['grn_no'], f"استلام {r['grn_no']} — لوط {r['supplier_lot']}", bs)
+        add('استلام / LOT مورّد', r['grn_no'], f"استلام {r['grn_no']} — LOT {r['supplier_lot']}", bs)
     for r in db.q("SELECT tag_no, barcode, run_no, roll_no FROM subrolls WHERE tag_no=? OR barcode=?", (like, like)):
         bs = _batches("SELECT batch_no b FROM subrolls WHERE tag_no=? UNION SELECT batch_no FROM folding_in WHERE tag_no=?",
                       (r['tag_no'], r['tag_no']))
@@ -89,11 +89,11 @@ def chain(bn):
 
 
 def forward(kind, ref):
-    """التتبع الأمامي من جامبو/سب رول/لوط: كل التشغيلات والمنتجات النهائية."""
+    """التتبع الأمامي من جامبو/سب رول/LOT: كل التشغيلات والمنتجات النهائية."""
     rolls = []
     if kind == 'جامبو رول':
         rolls = [ref]
-    elif kind == 'استلام / لوط مورّد':
+    elif kind == 'استلام / LOT مورّد':
         rolls = [r['roll_no'] for r in db.q('SELECT roll_no FROM rolls WHERE grn_no=?', (ref,))]
     subs = []
     if kind == 'سب رول':
@@ -120,7 +120,7 @@ def register(app):
         fwd = []
         if q:
             for h in hits:
-                if h['kind'] in ('جامبو رول', 'استلام / لوط مورّد', 'سب رول'):
+                if h['kind'] in ('جامبو رول', 'استلام / LOT مورّد', 'سب رول'):
                     fwd += [dict(x, src=h['label']) for x in forward(h['kind'], h['ref'])]
         return render_template('trace_center.html', nav='trace', q=q, hits=hits, sel=sel, d=d, fwd=fwd, fmt=fmt_qty)
 

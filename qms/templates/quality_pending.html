@@ -14,7 +14,7 @@
 {% if pre %}<h2>إفراج قبل التعقيم</h2><div class="tablewrap"><table><tr><th>السجل</th><th>التشغيلة</th><th>المنتج</th><th>بوكسات</th><th>كراتين</th><th></th></tr>
 {% for x in pre %}<tr><td><b>{{ x.rec_no }}</b></td><td>{{ x.batch_no }}</td><td>{{ x.item_code }}</td><td>{{ fmt(x.boxes_actual) }}</td><td>{{ fmt(x.cartons) if x.cartons is not none else '—' }}</td><td><a class="btn sm" href="{{ url_for('quality_pre_review', rec_no=x.rec_no) }}">مراجعة</a></td></tr>{% endfor %}</table></div>{% endif %}
 {% if raw %}<h2>خام وارد / جامبو بانتظار الفحص</h2>
-<div class="tablewrap"><table><tr><th>الاستلام</th><th>الصنف</th><th>لوط المورد</th><th>الكمية</th><th>التاريخ</th><th></th></tr>
+<div class="tablewrap"><table><tr><th>الاستلام</th><th>الصنف</th><th>LOT المورد</th><th>الكمية</th><th>التاريخ</th><th></th></tr>
 {% for r in raw %}<tr><td>{{ r.grn_no }}</td><td>{{ r.item_code }}<div class="mini">{{ r.description }}</div></td><td>{{ r.supplier_lot }}</td><td>{{ fmt(r.qty) }} {{ r.uom }}</td><td>{{ r.receipt_date }}</td>
 <td><a class="btn sm back" href="{{ url_for('receipt_view', grn_no=r.grn_no) }}">فحص</a></td></tr>{% endfor %}</table></div>{% endif %}
 {% endblock %}

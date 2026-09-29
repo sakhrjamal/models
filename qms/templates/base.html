@@ -7,7 +7,7 @@
 {% if me %}
 <header class="noprint">
   <div class="logo"><a href="{{ url_for('index') }}">نظام إدارة الإنتاج والتتبع</a></div>
-  <form class="hsearch" action="{{ url_for('trace_center') }}"><input name="q" placeholder="تتبّع بأي باركود/لوط/رقم…" aria-label="تتبع تشغيلة"></form>
+  <form class="hsearch" action="{{ url_for('trace_center') }}"><input name="q" placeholder="تتبّع بأي باركود/LOT/رقم…" aria-label="تتبع تشغيلة"></form>
   <div class="usermenu">
     <a class="bell" href="{{ url_for('notifications') }}" title="الإشعارات">🔔{% if notif_unread %}<b>{{ notif_unread }}</b>{% endif %}</a>
     <a href="{{ url_for('account') }}" title="الحساب">{{ me.full_name }}

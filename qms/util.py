@@ -63,3 +63,15 @@ def fmt_qty(v, digits=2):
         return '—'
     s_ = f'{v:,.{digits}f}'.rstrip('0').rstrip('.') if '.' in f'{v:,.{digits}f}' else f'{v:,.{digits}f}'
     return s_ or '0'
+
+
+def lot_taken(lot):
+    """رقم LOT المورّد مستخدم سابقًا في استلام آخر؟ (مطابقة بلا فرق مسافات/حالة أحرف). يعيد رقم الاستلام أو None."""
+    import db
+    key = ''.join(str(lot or '').split()).upper()
+    if not key:
+        return None
+    for r in db.q("SELECT grn_no, supplier_lot FROM receipts"):
+        if ''.join(str(r['supplier_lot'] or '').split()).upper() == key:
+            return r['grn_no']
+    return None

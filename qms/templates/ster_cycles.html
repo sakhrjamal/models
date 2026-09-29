@@ -1,8 +1,8 @@
 {% extends "base.html" %}{% block title %}التعقيم والتهوية{% endblock %}{% block body %}
-<div class="pagehead"><div><h1>{{ 'التهوية' if aer else 'دورات التعقيم' }}</h1><div class="sub">دورة واحدة قد تضم أكثر من لوط · {{ 'التهوية إجراء/حالة داخل الدورة' }}</div></div>
+<div class="pagehead"><div><h1>{{ 'التهوية' if aer else 'دورات التعقيم' }}</h1><div class="sub">دورة واحدة قد تضم أكثر من LOT · {{ 'التهوية إجراء/حالة داخل الدورة' }}</div></div>
 {% if can('enter') %}<div class="actions"><a class="btn" href="{{ url_for('ster_cycle_new') }}">+ دورة تعقيم جديدة</a></div>{% endif %}</div>
 {% if not aer %}<div class="msg {{ 'ok' if ready else '' }}">{{ ready|length }} سجل جاهز للتعقيم (مُفرج قبل التعقيم)</div>{% endif %}
-{% if rows %}<div class="tablewrap"><table><tr><th>الدورة</th><th>الحالة</th><th>البداية</th><th>النهاية</th><th>المسؤول</th><th>اللوطات</th><th></th></tr>
+{% if rows %}<div class="tablewrap"><table><tr><th>الدورة</th><th>الحالة</th><th>البداية</th><th>النهاية</th><th>المسؤول</th><th>الـ LOTs</th><th></th></tr>
 {% for c in rows %}<tr><td><a href="{{ url_for('ster_cycle', cycle_no=c.cycle_no) }}"><b>{{ c.cycle_no }}</b></a></td><td><span class="pill">{{ cyc_ar.get(c.status, c.status) }}</span></td><td>{{ c.start_at or '—' }}</td><td>{{ c.end_at or '—' }}</td><td>{{ c.operator or '—' }}</td>
 <td class="mini">{% for l in c.lines %}{{ l.batch_no }} ({{ fmt(l.boxes_in) }}){{ '، ' if not loop.last }}{% endfor %}</td>
 <td class="noprint"><a href="{{ url_for('print_doc', kind='cycle', key=c.cycle_no) }}" target="_blank">طباعة</a></td></tr>{% endfor %}</table></div>{% else %}<div class="empty">لا دورات.</div>{% endif %}{% endblock %}

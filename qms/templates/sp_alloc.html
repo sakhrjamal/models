@@ -5,13 +5,13 @@
 <div><b>{{ fmt(issued_bal) }}</b><span>مصروف بانتظار التعبئة</span></div><div><b>{{ fmt(need) }}</b><span>المتبقي للتخصيص</span></div></div>
 {% if can('enter') and not b.final_status %}{% set ok = lots|selectattr('available')|selectattr('expired','equalto',false)|list %}
 <h2>خام SP مفرج عنه ومطابق للصنف</h2>
-{% if ok and need > 0 %}<div class="tablewrap"><table><tr><th>الاستلام</th><th>لوط المورّد</th><th>المتاح</th><th>الانتهاء</th><th>الكمية</th><th></th></tr>
+{% if ok and need > 0 %}<div class="tablewrap"><table><tr><th>الاستلام</th><th>LOT المورّد</th><th>المتاح</th><th>الانتهاء</th><th>الكمية</th><th></th></tr>
 {% for l in ok %}<tr><td>{{ l.grn_no }}</td><td>{{ l.supplier_lot }}</td><td>{{ fmt(l.available) }} {{ l.uom }}</td><td>{{ l.expiry_date or '—' }}</td>
 <td colspan="2"><form method="post" class="actions" style="justify-content:center"><input type="hidden" name="grn_no" value="{{ l.grn_no }}">
 <input type="number" step="any" min="0.0001" name="qty" value="{{ [l.available, need]|min|round(2) }}" style="max-width:150px"><button class="btn sm ok">تخصيص</button></form></td></tr>{% endfor %}</table></div>
 {% elif need <= 0 %}<div class="msg ok">خُصّصت الكمية المطلوبة بالكامل.</div>
 {% else %}<div class="empty">لا يوجد خام SP مفرج عنه ومطابق (مقاس · طبقات · كاشف · ميش) ومتاح.</div>{% endif %}{% endif %}
-{% if allocs %}<h2>التخصيصات</h2><table><tr><th>السند</th><th>التاريخ</th><th>اللوط</th><th>الكمية</th>{% if can('enter') and b.final_status in (none, 'PENDING_QC') %}<th></th>{% endif %}</tr>
+{% if allocs %}<h2>التخصيصات</h2><table><tr><th>السند</th><th>التاريخ</th><th>الـ LOT</th><th>الكمية</th>{% if can('enter') and b.final_status in (none, 'PENDING_QC') %}<th></th>{% endif %}</tr>
 {% for a in allocs %}<tr><td>{{ a.doc_no }}</td><td>{{ a.alloc_date }}</td><td>{{ a.source_ref }}</td><td>{{ fmt(a.qty) }} {{ a.unit }}</td>
 {% if can('enter') and b.final_status in (none, 'PENDING_QC') %}<td><form class="inline" method="post" action="{{ url_for('alloc_delete', doc_no=a.doc_no) }}" onsubmit="return confirm('إلغاء التخصيص {{ a.doc_no }}؟')"><input type="hidden" name="next" value="{{ request.path }}"><button class="btn sm bad">إلغاء</button></form></td>{% endif %}</tr>{% endfor %}</table>{% endif %}
 <div class="wizard-actions noprint"><div class="l"><a class="btn back" href="{{ url_for('order_view', bn=bn) }}">أمر الإنتاج</a></div><a class="btn" href="{{ url_for('sp_pack', bn=bn) }}">إلى التعبئة ◀</a></div>

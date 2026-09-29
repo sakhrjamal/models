@@ -36,7 +36,7 @@
 {{ kv('مُصدر الأمر', w.issued_by) }}{{ kv('مدير الإنتاج', w.prod_manager) }}
 </div></div>
 <h2>٢ — المورّد والخام</h2>
-{% if d.supply %}<table><tr><th>رقم الرول</th><th>المورّد</th><th>بلد المنشأ</th><th>لوط المورّد</th>
+{% if d.supply %}<table><tr><th>رقم الرول</th><th>المورّد</th><th>بلد المنشأ</th><th>LOT المورّد</th>
 <th>سند الاستلام</th><th>أمر الشراء</th><th>شهادة التحليل</th><th>تصنيع المادة</th><th>انتهاء المادة</th><th>قرار الفحص</th></tr>
 {% for r in d.supply %}<tr><td>{{ r.roll_no }}</td><td>{{ r.supplier or '—' }}</td><td>{{ r.country or '—' }}</td>
 <td><a href="{{ url_for('forward', lot=r.supplier_lot) }}">{{ r.supplier_lot or '—' }}</a></td>
@@ -86,9 +86,9 @@
 <div class="card"><div class="kv">
 {{ kv('رقم سند التغليف', p.doc_no) }}{{ kv('التاريخ', p.pdate) }}
 {{ kv('مسحات في المغلف', p.per_envelope) }}{{ kv('المشغّل', p.operator) }}
-{{ kv('كود الفيلم', p.film_code) }}{{ kv('لوط الفيلم', p.film_lot) }}
-{{ kv('كود البوكس', p.box_code) }}{{ kv('لوط البوكس', p.box_lot) }}
-{{ kv('كود الكرتون', p.mb_code) }}{{ kv('لوط الكرتون', p.mb_lot) }}
+{{ kv('كود الفيلم', p.film_code) }}{{ kv('LOT الفيلم', p.film_lot) }}
+{{ kv('كود البوكس', p.box_code) }}{{ kv('LOT البوكس', p.box_lot) }}
+{{ kv('كود الكرتون', p.mb_code) }}{{ kv('LOT الكرتون', p.mb_lot) }}
 {{ kv('المغلفات المنتجة', p.env_good) }}{{ kv('البوكسات', p.boxes) }}
 {{ kv('الكراتين', p.cartons) }}
 {{ st('مطابقة الفيلم', p.film_recon) }}{{ st('فحص اللحام', p.seal_check) }}
@@ -105,7 +105,7 @@
 {% for c in d.cycles %}<div class="card" style="margin-top:12px"><div class="kv">
 {{ kv('رقم الدورة', c.cycle_no) }}{{ kv('تاريخ الدورة', c.cycle_date) }}
 {{ kv('مشغّل التعقيم', c.operator) }}{{ kv('مدة الدورة (ساعة)', c.duration_h) }}
-{{ kv('تقرير الماكينة', c.machine_report_no) }}{{ kv('لوط الغاز', c.gas_lot) }}
+{{ kv('تقرير الماكينة', c.machine_report_no) }}{{ kv('LOT الغاز', c.gas_lot) }}
 {{ kv('نمط التحميل', c.load_pattern) }}
 {{ st('المؤشر الكيميائي الخارجي', c.ci_external) }}{{ st('المؤشر الكيميائي الداخلي', c.ci_internal) }}
 {{ st('المؤشر البيولوجي', c.bi_result) }}{{ kv('عدد المؤشرات البيولوجية', c.bi_count) }}
@@ -140,7 +140,7 @@
 {% elif d.qc_release %}<div class="msg ok">أُفرج عن التشغيلة (منتج غير معقم) بسجل ضمان الجودة <a href="{{ url_for('quality_records', batch=d.batch_no) }}">{{ d.qc_release.rec_no }}</a> بتاريخ {{ d.qc_release.rec_date }} — {{ d.qc_release.inspector }}</div>
 {% else %}<div class="hint">لم تصدر شهادة إفراج لهذه التشغيلة — المنتج يبقى بحالة حجر ولا يُشحن.</div>{% endif %}
 {% endif %}
-{% if d.materials %}<h2>مواد التعبئة المصروفة</h2><table><tr><th>التاريخ</th><th>المادة</th><th>الكمية</th><th>اللوط</th><th>أمين المخزن</th></tr>
+{% if d.materials %}<h2>مواد التعبئة المصروفة</h2><table><tr><th>التاريخ</th><th>المادة</th><th>الكمية</th><th>الـ LOT</th><th>أمين المخزن</th></tr>
 {% for m in d.materials %}<tr><td>{{ m.issue_date }}</td><td class="r">{{ m.item_code }} · {{ m.description }}</td><td>{{ m.qty_issued }}</td><td>{{ m.lot or '—' }}</td><td>{{ m.storekeeper or '—' }}</td></tr>{% endfor %}</table>{% endif %}
 {% if d.shipments %}<h2>٩ — الشحن (العملاء)</h2><table><tr><th>السند</th><th>التاريخ</th><th>العميل</th><th>الكمية</th><th>الشهادة</th><th>الحالة</th></tr>
 {% for r in d.shipments %}<tr><td>{{ r.doc_no }}</td><td>{{ r.sdate }}</td><td>{{ r.customer }}</td>

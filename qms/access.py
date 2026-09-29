@@ -42,7 +42,7 @@ EXACT = {
     # ---- الإدارة
     'reports': ('reports',), 'report_view': ('reports',),
     'master_products': ADMIN, 'master_product': ADMIN, 'master_product_new': ADMIN, 'master_routes': ADMIN,
-    'audit_view': ('audit',), 'users_admin': ('admin',), 'backup_admin': ('admin',), 'settings_admin': ('admin',), 'letterhead_upload': ('admin',),
+    'audit_view': ('audit',), 'users_admin': ('admin',), 'backup_admin': ('admin',), 'settings_admin': ('admin',), 'letterhead_upload': ('admin',), 'letterhead_toggle': ('admin',),
     'forward': ('view',), 'items': ('view',),
     'pack_config_list': ADMIN, 'pack_config_edit': ADMIN, 'master_subrolls': ADMIN, 'operators_admin': ADMIN,
     'roles_admin': ('admin',), 'data_alerts': ADMIN, 'master_rename': ADMIN, 'import_center': ADMIN,

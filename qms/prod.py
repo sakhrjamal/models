@@ -745,6 +745,8 @@ def register(app):
                     con.execute("""INSERT INTO intermediates(barcode,batch_no,item_code,sp_code,sp_source,fold_doc,tag_no,qty,prod_date,operator)
                                    VALUES(?,?,?,?,?,?,?,?,?,?)""",
                                 (inter, bn, w['item_code'], it.get('sp_item'), 'INTERNAL_PRODUCTION', doc_no, tag, qty, today, operator))
+                    notify.push(con, 'sp_release_needed', f'كرتون SP {inter} ({fmt_qty(qty)} مسحة) للتشغيلة {bn} بانتظار إفراج الجودة (إفراج SP)',
+                                w['item_code'], url_for('quality_sp_review', bn=bn), bn, mfg.FULL, ('qc_sign',))
                 con.execute("UPDATE work_orders SET status='قيد التنفيذ' WHERE batch_no=? AND status='صادر'", (bn,))
         except SubRollUsed:
             raise
@@ -797,6 +799,8 @@ def register(app):
         else:
             con.execute("""UPDATE intermediates SET qty=?, status='Pending SP Release', tag_no=COALESCE(?,tag_no),
                            operator=COALESCE(?,operator) WHERE fold_doc=?""", (qty, tag, operator, doc_no))
+            notify.push(con, 'sp_release_needed', f'كرتون SP {ic["barcode"]} عُدّل ({fmt_qty(qty)} مسحة) وهو بانتظار إفراج الجودة من جديد',
+                        ic['item_code'], url_for('quality_sp_review', bn=ic['batch_no']), ic['batch_no'], mfg.FULL, ('qc_sign',))
 
     @route('/folding/doc/<doc_no>/edit', 'fold_edit', methods=['GET', 'POST'])
     def fold_edit(doc_no):
@@ -970,7 +974,7 @@ def register(app):
 
     @route('/production/alloc/<doc_no>/delete', 'alloc_delete', methods=['POST'])
     def alloc_delete(doc_no):
-        """إلغاء تخصيص خام (لوط SP / جامبو رباط) لم يُستهلك بعد."""
+        """إلغاء تخصيص خام (LOT SP / جامبو رباط) لم يُستهلك بعد."""
         auth.need('enter')
         a = db.one('SELECT * FROM allocations WHERE doc_no=? AND voided=0', (doc_no,))
         if not a:

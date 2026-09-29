@@ -14,7 +14,7 @@
   <div class="full"><label>كود الصنف SP * <span class="mini">(المقاس · الطبقات · الكاشف — من بيانات الأصناف)</span></label>
     <select name="item_code" required id="itm"><option value="">— اختر —</option>
     {% for x in items %}<option value="{{ x.item_code }}" data-uom="{{ x.uom or 'قطعة' }}">{{ x.item_code }} · {{ x.size or '' }} · {{ x.ply or '' }}ط · {{ x.xray or '' }} · {{ x.mesh or '' }}</option>{% endfor %}</select></div>
-  <div><label>لوط المورّد (Supplier Batch) *</label><input name="supplier_lot" required></div>
+  <div><label>LOT المورّد (Supplier Batch) *</label><input name="supplier_lot" required></div>
   <div><label>الكمية *</label><input type="number" step="any" min="0.0001" name="qty" required></div>
   <div><label>الوحدة</label><input name="uom" id="uom" value="قطعة"></div>
   <div><label>عدد العبوات / الأكياس *</label><input type="number" step="1" min="1" name="packages" required></div>

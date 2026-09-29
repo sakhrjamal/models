@@ -1,13 +1,13 @@
 {% extends "base.html" %}{% from "_macros.html" import op_select with context %}{% block title %}SP وارد — {{ w.batch_no }}{% endblock %}{% block body %}
 <h1>استخدام SP وارد من مورّد — {{ w.batch_no }}</h1>
 <div class="sub">{{ w.item_code }} · {{ 'معقم: يدخل سجل الفرز والتغليف بعد إفراج SP' if it.sterile=='معقم' else 'غير معقم: يدخل التعبئة مباشرة' }} · المطلوب {{ fmt(st.required) }} {{ st.unit }} · المنتج {{ fmt(st.produced) }}</div>
-<div class="msg">لوطات SP المفرج عنها والمطابقة لمقاس/طبقات/كاشف/ميش المنتج فقط. الكمية بالمسحات (قطعة SP = مسحة).</div>
+<div class="msg">LOTs SP المفرج عنها والمطابقة لمقاس/طبقات/كاشف/ميش المنتج فقط. الكمية بالمسحات (قطعة SP = مسحة).</div>
 {% if lots and can('enter') and not w.final_status %}<form method="post" class="card"><div class="grid">
-<div><label>لوط SP *</label><select name="grn_no" required>{% for l in lots %}<option value="{{ l.grn_no }}">{{ l.item_code }} — لوط {{ l.supplier_lot }} — متاح {{ fmt(l.available) }} {{ l.uom }}</option>{% endfor %}</select></div>
+<div><label>LOT SP *</label><select name="grn_no" required>{% for l in lots %}<option value="{{ l.grn_no }}">{{ l.item_code }} — LOT {{ l.supplier_lot }} — متاح {{ fmt(l.available) }} {{ l.uom }}</option>{% endfor %}</select></div>
 <div><label>الكمية (مسحات) <span class="mini">(الافتراضي = كل المتاح)</span></label><input type="number" name="qty" min="1" step="any"></div>
 <div><label>المشغّل *</label>{{ op_select('production') }}</div></div>
 <div class="actions"><button class="btn ok">إدخال إلى التشغيلة</button><a class="btn back" href="{{ url_for('order_view', bn=w.batch_no) }}">رجوع</a></div></form>
-{% elif not lots %}<div class="empty">لا يوجد لوط SP مفرج ومطابق. يُستلم من «خط SP الخارجي ← استلام» ويُفرج عنه.</div>{% endif %}
-<h2>ما أُدخل</h2>{% if docs %}<div class="tablewrap"><table><tr><th>السند</th><th>اللوط</th><th>المسحات</th><th>المشغّل</th><th></th></tr>
+{% elif not lots %}<div class="empty">لا يوجد LOT SP مفرج ومطابق. يُستلم من «خط SP الخارجي ← استلام» ويُفرج عنه.</div>{% endif %}
+<h2>ما أُدخل</h2>{% if docs %}<div class="tablewrap"><table><tr><th>السند</th><th>الـ LOT</th><th>المسحات</th><th>المشغّل</th><th></th></tr>
 {% for d in docs %}<tr><td>{{ d.doc_no }}</td><td>{{ d.source_ref }} · {{ d.supplier_lot or '' }}</td><td>{{ fmt(d.qty) }}</td><td>{{ d.operator }}</td><td>{% if can('enter') %}<form class="inline" method="post" action="{{ url_for('sp_supply_delete', doc_no=d.doc_no) }}" onsubmit="return confirm('حذف {{ d.doc_no }}؟')"><button class="btn sm bad">حذف</button></form>{% endif %}</td></tr>{% endfor %}</table></div>{% else %}<div class="empty">لا شيء.</div>{% endif %}
 {% endblock %}

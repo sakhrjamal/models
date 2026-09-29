@@ -16,7 +16,7 @@ QMS-RPT-001 · طُبع في {{ today() }}</div>
 <tr><td>ماكينة الطي</td><td>{{ w.fold_machine or '—' }}</td><td>رقم تشغيل الماكينة</td><td>{{ w.machine_batch_no or '—' }}</td></tr></table>
 {% if d.supply %}<table style="margin-top:10px"><tr><th colspan="4">المورّد والخام</th></tr>
 {% for r in d.supply %}<tr><td>رقم الرول</td><td>{{ r.roll_no }}</td><td>المورّد</td><td>{{ r.supplier or '—' }}</td></tr>
-<tr><td>لوط المورّد</td><td>{{ r.supplier_lot or '—' }}</td><td>شهادة التحليل</td><td>{{ r.coa_no or '—' }}</td></tr>
+<tr><td>LOT المورّد</td><td>{{ r.supplier_lot or '—' }}</td><td>شهادة التحليل</td><td>{{ r.coa_no or '—' }}</td></tr>
 <tr><td>سند الاستلام</td><td>{{ r.grn_no or '—' }}</td><td>قرار الفحص</td><td>{{ r.qc_decision or '—' }}</td></tr>{% endfor %}</table>{% endif %}
 {% if d.slit_orders %}<table style="margin-top:10px"><tr><th colspan="4">أوامر التقطيع التي غذّت هذه التشغيلة</th></tr>
 {% for o in d.slit_orders %}<tr><td>رقم تشغيلة الأسليتر</td><td>{{ o.batch_no }}</td><td>تاريخ البدء</td><td>{{ o.batch_start_date or '—' }}</td></tr>{% endfor %}</table>{% endif %}
@@ -32,13 +32,13 @@ QMS-RPT-001 · طُبع في {{ today() }}</div>
 {% for r in d.fold_out %}<tr><td>{{ r.doc_no }}</td><td>{{ r.fdate }}</td><td>{{ r.machine_code }}</td>
 <td>{{ r.item_code }}</td><td>{{ r.qty_good }}</td><td>{{ r.scrap }}</td></tr>{% endfor %}</table>{% endif %}
 {% if d.packaging %}<table style="margin-top:10px"><tr><th colspan="4">التغليف</th></tr>
-{% for p in d.packaging %}<tr><td>سند التغليف</td><td>{{ p.doc_no }}</td><td>لوط الفيلم</td><td>{{ p.film_lot or '—' }}</td></tr>
-<tr><td>لوط البوكس</td><td>{{ p.box_lot or '—' }}</td><td>لوط الكرتون</td><td>{{ p.mb_lot or '—' }}</td></tr>
+{% for p in d.packaging %}<tr><td>سند التغليف</td><td>{{ p.doc_no }}</td><td>LOT الفيلم</td><td>{{ p.film_lot or '—' }}</td></tr>
+<tr><td>LOT البوكس</td><td>{{ p.box_lot or '—' }}</td><td>LOT الكرتون</td><td>{{ p.mb_lot or '—' }}</td></tr>
 <tr><td>المغلفات / البوكسات</td><td>{{ p.env_good or '—' }} / {{ p.boxes or '—' }}</td>
 <td>حالة السند</td><td>{{ p.doc_status }}</td></tr>{% endfor %}</table>{% endif %}
 {% if d.cycles %}<table style="margin-top:10px"><tr><th colspan="4">التعقيم والتهوية</th></tr>
 {% for c in d.cycles %}<tr><td>رقم الدورة</td><td>{{ c.cycle_no }}</td><td>تاريخ الدورة</td><td>{{ c.cycle_date }}</td></tr>
-<tr><td>تقرير الماكينة</td><td>{{ c.machine_report_no or '—' }}</td><td>لوط الغاز</td><td>{{ c.gas_lot or '—' }}</td></tr>
+<tr><td>تقرير الماكينة</td><td>{{ c.machine_report_no or '—' }}</td><td>LOT الغاز</td><td>{{ c.gas_lot or '—' }}</td></tr>
 <tr><td>المؤشر البيولوجي</td><td>{{ c.bi_result or '—' }}</td><td>المؤشر الكيميائي</td><td>{{ c.ci_internal or '—' }}</td></tr>
 {% if c.aeration %}<tr><td>مدة التهوية</td><td>{{ c.aeration.duration_h }} ساعة</td>
 <td>تقييم التهوية</td><td>{{ c.aeration.duration_eval or '—' }}</td></tr>{% endif %}{% endfor %}</table>{% endif %}

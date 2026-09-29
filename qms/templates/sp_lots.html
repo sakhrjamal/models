@@ -1,11 +1,11 @@
-{% extends "base.html" %}{% block title %}لوطات SP{% endblock %}{% block body %}
-<h1>لوطات الشاش نصف المصنع SP</h1>
-<div class="sub">مستلم ← مصروف للإنتاج ← ناتج سليم / مرفوض / هالك ← متبقٍ. الأرقام مرتبطة بدفتر المخزون. عند تغذية أمر من عدة لوطات يُوزَّع الناتج بنسبة المصروف.</div>
+{% extends "base.html" %}{% block title %}LOTs SP{% endblock %}{% block body %}
+<h1>LOTs الشاش نصف المصنع SP</h1>
+<div class="sub">مستلم ← مصروف للإنتاج ← ناتج سليم / مرفوض / هالك ← متبقٍ. الأرقام مرتبطة بدفتر المخزون. عند تغذية أمر من عدة LOTs يُوزَّع الناتج بنسبة المصروف.</div>
 {% if can('receive') %}<div class="card noprint actions"><a class="btn" href="{{ url_for('sp_receive') }}">+ استلام خام SP</a></div>{% endif %}
-{% if rows %}<div class="tablewrap"><table><tr><th>الاستلام</th><th>التاريخ</th><th>الصنف</th><th>لوط المورّد</th><th>الحالة</th>
+{% if rows %}<div class="tablewrap"><table><tr><th>الاستلام</th><th>التاريخ</th><th>الصنف</th><th>LOT المورّد</th><th>الحالة</th>
 <th>المستلم</th><th>المصروف</th><th>سليم</th><th>مرفوض</th><th>هالك</th><th>المتبقي</th></tr>
 {% for r in rows %}{% set l = r.led %}<tr><td><a href="{{ url_for('receipt_view', grn_no=r.grn_no) }}"><b>{{ r.grn_no }}</b></a></td><td>{{ r.receipt_date }}</td>
 <td>{{ r.item_code }}</td><td>{{ r.supplier_lot }}</td><td><span class="pill {{ cls_for(r.stock_status) }}">{{ r.stock_status }}</span></td>
 <td>{{ '{:,.0f}'.format(l.received) }}</td><td>{{ '{:,.0f}'.format(l.issued) }}</td><td>{{ '{:,.0f}'.format(l.good) }}</td>
 <td>{{ '{:,.0f}'.format(l.reject) }}</td><td>{{ '{:,.0f}'.format(l.scrap) }}</td><td><b>{{ '{:,.0f}'.format(l.remaining) }}</b></td></tr>{% endfor %}</table></div>
-{% else %}<div class="empty">لا توجد لوطات SP.</div>{% endif %}{% endblock %}
+{% else %}<div class="empty">لا توجد LOTs SP.</div>{% endif %}{% endblock %}

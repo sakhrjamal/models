@@ -193,7 +193,7 @@ def account():
         return redirect(url_for('account'))
     return render_template('account.html', nav='')
 
-from util import num, s, num_unit, doc_scope
+from util import num, s, num_unit, doc_scope, lot_taken
 from util import as_date as _as_date
 
 
@@ -350,7 +350,11 @@ def receipt_new():
             roll_count = 0
 
         if not supplier_name or not item_code or not supplier_lot or roll_count < 1:
-            flash('المورد والصنف ولوط المورد وعدد الرولات بيانات إلزامية', 'bad')
+            flash('المورد والصنف وLOT المورد وعدد الرولات بيانات إلزامية', 'bad')
+            return redirect(url_for('receipt_new'))
+        dup = lot_taken(supplier_lot)
+        if dup:
+            flash(f'رقم LOT المورّد «{supplier_lot}» مستخدم مسبقًا في الاستلام {dup} — لا يُقبل نفس الرقم لاستلامين مختلفين', 'bad')
             return redirect(url_for('receipt_new'))
         if roll_count > 500:
             flash('عدد الرولات كبير بشكل غير معقول (الحد 500)', 'bad')
@@ -379,6 +383,12 @@ def receipt_new():
 
         try:
             with db.tx() as con:
+                key = ''.join(supplier_lot.split()).upper()
+                clash = next((r['grn_no'] for r in con.execute('SELECT grn_no, supplier_lot FROM receipts').fetchall()
+                              if ''.join(str(r['supplier_lot'] or '').split()).upper() == key), None)
+                if clash:                                   # فحص داخل التعامل يمنع التسابق بين نافذتين
+                    flash(f'رقم LOT المورّد «{supplier_lot}» مستخدم مسبقًا في الاستلام {clash}', 'bad')
+                    return redirect(url_for('receipt_new'))
                 sup = con.execute('SELECT * FROM suppliers WHERE name=?', (supplier_name,)).fetchone()
                 if sup:
                     supplier_id = sup['supplier_id']
@@ -413,7 +423,7 @@ def receipt_new():
                 notify.push(con, 'qc_pending',
                             f'تم استلام {"جامبو رول للأربطة" if mclass == "JUMBO" else "رولات شاش خام"} '
                             f'{grn_no} ({roll_count} رول) وينتظر فحص الجودة والإفراج',
-                            f'{item_code} · لوط المورد {supplier_lot}', url_for('receipt_view', grn_no=grn_no), grn_no,
+                            f'{item_code} · LOT المورد {supplier_lot}', url_for('receipt_view', grn_no=grn_no), grn_no,
                             mfg.BANDAGE if mclass == 'JUMBO' else mfg.FULL, ('qc_record',))
         except Exception:
             flash('تعذّر حفظ سند الاستلام — لم يُحفظ شيء. راجع سجل الأخطاء.', 'bad')

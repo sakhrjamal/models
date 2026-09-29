@@ -6,7 +6,7 @@
 <input type="text" name="b" value="{{ b }}" placeholder="رقم التشغيلة النهائية — مثال: SEP-2628-B-001" style="flex:1">
 <button class="btn">عرض السلسلة</button>
 {% if d %}<a class="btn g" href="{{ url_for('genealogy', b=b, print=1) }}" target="_blank">نسخة للطباعة</a>{% endif %}</form>
-<form class="searchbar" method="get" style="margin-top:10px"><input type="text" name="ref" value="{{ ref }}" placeholder="أو: رقم استلام / لوط مورّد / رول جامبو — لمعرفة المنتجات المصنَّعة منه" style="flex:1"><button class="btn g">تتبع أمامي</button></form></div>
+<form class="searchbar" method="get" style="margin-top:10px"><input type="text" name="ref" value="{{ ref }}" placeholder="أو: رقم استلام / LOT مورّد / رول جامبو — لمعرفة المنتجات المصنَّعة منه" style="flex:1"><button class="btn g">تتبع أمامي</button></form></div>
 {% if ref %}<h2>المنتجات المصنَّعة من «{{ ref }}»</h2>
 {% if fwd %}<table><tr><th>التشغيلة</th><th>الصنف</th><th>المسار</th><th>المصدر</th><th>الإفراج</th><th>المستلم بالمخزن</th><th>العملاء</th></tr>
 {% for x in fwd %}<tr><td><a href="{{ url_for('genealogy', b=x.batch_no) }}"><b>{{ x.batch_no }}</b></a></td><td>{{ x.item_code }}</td><td>{{ x.route }}</td><td>{{ x.source }}</td>
@@ -27,7 +27,7 @@
 <div class="row"><div class="k">مستلم بالمخزن</div><div class="v">{{ '{:,.0f}'.format(d.fg) }}</div></div></div></div>
 {% set progress = d.progress %}{% include "_stepbar.html" %}
 <h2>الخام والمورّد</h2>
-{% if d.sources %}<table><tr><th>النوع</th><th>المرجع</th><th>الاستلام</th><th>المورّد</th><th>لوط المورّد</th><th>قرار الجودة</th><th>الكمية</th></tr>
+{% if d.sources %}<table><tr><th>النوع</th><th>المرجع</th><th>الاستلام</th><th>المورّد</th><th>LOT المورّد</th><th>قرار الجودة</th><th>الكمية</th></tr>
 {% for r in d.sources %}<tr><td>{{ r.kind }}</td><td>{{ r.ref }}</td><td>{{ r.grn or '—' }}</td><td>{{ r.supplier or '—' }}</td><td><a href="{{ url_for('genealogy', ref=r.supplier_lot) }}">{{ r.supplier_lot or '—' }}</a></td>
 <td>{% if r.qc %}<span class="pill {{ cls_for(r.qc) }}">{{ r.qc }}</span>{% else %}—{% endif %}</td><td>{{ r.qty }}</td></tr>{% endfor %}</table>
 {% else %}<div class="empty">لم يُخصَّص خام بعد.</div>{% endif %}

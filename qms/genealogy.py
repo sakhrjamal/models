@@ -3,7 +3,7 @@
 
 من رقم تشغيلة نهائية: المنتج والأمر والمسار والخام ومورّده والعمليات والفحوص والمشغّلون والماكينات
 والكميات والمرفوض والهالك والإفراج والمخزن والشحن — خط زمني وشجرة أصل.
-ومن لوط خام / رول جامبو / لوط مورّد: كل التشغيلات والمنتجات النهائية المصنَّعة منه (تتبع أمامي).
+ومن LOT خام / رول جامبو / LOT مورّد: كل التشغيلات والمنتجات النهائية المصنَّعة منه (تتبع أمامي).
 """
 import json
 
@@ -27,7 +27,7 @@ def raw_sources(bn):
     if rc == mfg.SP:
         for a in db.q("SELECT * FROM allocations WHERE batch_no=? AND voided=0 ORDER BY id", (bn,)):
             g_ = _supplier_of_grn(a['source_ref'])
-            out.append(dict(kind='لوط SP', ref=a['source_ref'], grn=g_.get('grn_no'), supplier=g_.get('supplier'),
+            out.append(dict(kind='LOT SP', ref=a['source_ref'], grn=g_.get('grn_no'), supplier=g_.get('supplier'),
                             supplier_lot=g_.get('supplier_lot'), item=g_.get('item_code'), qc=g_.get('qc_decision'),
                             qty=f'{a["qty"]:g} {a["unit"]}', doc=a['doc_no'], date=a['alloc_date'],
                             operator=a['operator']))
@@ -62,7 +62,7 @@ def events(bn):
         f'المسار: {(mfg.route(mfg.route_of_wo(w)) or {}).get("name_ar")} · المطلوب {w.get("qty_required") or "—"} {w.get("uom") or ""}'
         f' · أصدره {w.get("issued_by") or "—"}')
     for r in raw_sources(bn):
-        add(r.get('date'), 'الخام', f'{r["kind"]} {r["ref"]}', f'استلام {r["grn"]} · المورّد {r["supplier"] or "—"} · لوط المورّد {r["supplier_lot"] or "—"} · {r["qty"]}')
+        add(r.get('date'), 'الخام', f'{r["kind"]} {r["ref"]}', f'استلام {r["grn"]} · المورّد {r["supplier"] or "—"} · LOT المورّد {r["supplier_lot"] or "—"} · {r["qty"]}')
     for r in db.q("""SELECT * FROM slitting WHERE batch_no=? OR batch_no IN (SELECT DISTINCT COALESCE(slit_batch,batch_no)
                      FROM subrolls WHERE tag_no IN (SELECT tag_no FROM folding_in WHERE batch_no=?)) ORDER BY id""", (bn, bn)):
         subs = db.q('SELECT tag_no FROM subrolls WHERE plan_no=? ORDER BY tag_no', (r['doc_no'],)) if r.get('doc_no') else []
@@ -114,7 +114,7 @@ def tree(bn):
     srcs = raw_sources(bn)
 
     def src_nodes():
-        return [dict(label=f'{r["kind"]} {r["ref"]}', sub=f'استلام {r["grn"]} · لوط المورّد {r["supplier_lot"] or "—"}',
+        return [dict(label=f'{r["kind"]} {r["ref"]}', sub=f'استلام {r["grn"]} · LOT المورّد {r["supplier_lot"] or "—"}',
                      children=[dict(label=f'المورّد: {r["supplier"] or "—"}', sub='', children=[])]) for r in srcs]
 
     def chain(stages):
@@ -173,7 +173,7 @@ def tree(bn):
 
 
 def forward(ref):
-    """كل التشغيلات والمنتجات النهائية المصنَّعة من خام (رقم استلام / لوط مورّد / رول جامبو / سند)."""
+    """كل التشغيلات والمنتجات النهائية المصنَّعة من خام (رقم استلام / LOT مورّد / رول جامبو / سند)."""
     ref = (ref or '').strip()
     if not ref:
         return []

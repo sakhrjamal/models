@@ -3,9 +3,9 @@
 
   غير معقم :  مسحات الطي (100 مسحة = 1 باكت) ← باكت ← كرتون (حسب Packaging Configuration) ← إفراج ← مخزن
   معقم     :  مسحات الطي ← كرتون وسيط SP (باركود) ← إفراج SP ← سجل معالجة واحد يُحدَّث (فرز وعد ← تغليف ← بوكس)
-              ← إفراج قبل التعقيم ← دورة تعقيم (عدة لوطات) ← تهوية ← إفراج نهائي ← مخزن
+              ← إفراج قبل التعقيم ← دورة تعقيم (عدة LOTs) ← تهوية ← إفراج نهائي ← مخزن
 
-كل مرحلة تأخذ مخرجات السابقة بالهوية نفسها (باركود/رقم سند/لوط) ولا تُطلب مواصفات الصنف مرة ثانية.
+كل مرحلة تأخذ مخرجات السابقة بالهوية نفسها (باركود/رقم سند/LOT) ولا تُطلب مواصفات الصنف مرة ثانية.
 الوحدات: الطي = مسحة. غير المعقم: تعبئة (باكت/كرتون). المعقم: تغليف (مغلف/بوكس/كرتون).
 """
 import datetime, json, math
@@ -244,7 +244,7 @@ def register(app):
 
     @route('/sp-supply/<path:bn>', 'sp_supply', methods=['GET', 'POST'])
     def sp_supply(bn):
-        """استخدام لوط SP وارد (نصف مصنع، مفرج عنه) كمصدر مسحات لأمر شاش كامل — معقم أو غير معقم — بدل الطي الداخلي."""
+        """استخدام LOT SP وارد (نصف مصنع، مفرج عنه) كمصدر مسحات لأمر شاش كامل — معقم أو غير معقم — بدل الطي الداخلي."""
         import sp as sp_mod
         w, it = _sp_order(bn)
         back = url_for('sp_supply', bn=bn)
@@ -257,10 +257,10 @@ def register(app):
             if w.get('final_status'):
                 flash('أُنهي إنتاج هذا الأمر', 'bad'); return redirect(back)
             if not lot:
-                flash('لوط SP غير متاح: يجب أن يكون مفرجًا عنه، غير منتهٍ، ومطابقًا لمقاس/طبقات/كاشف/ميش المنتج', 'bad'); return redirect(back)
+                flash('LOT SP غير متاح: يجب أن يكون مفرجًا عنه، غير منتهٍ، ومطابقًا لمقاس/طبقات/كاشف/ميش المنتج', 'bad'); return redirect(back)
             qty = num(f.get('qty'), lot['available'])
             if not qty or qty <= 0 or qty - lot['available'] > 1e-6:
-                flash(f'الكمية غير صحيحة — المتاح في اللوط {fmt_qty(lot["available"])}', 'bad'); return redirect(back)
+                flash(f'الكمية غير صحيحة — المتاح في الـ LOT {fmt_qty(lot["available"])}', 'bad'); return redirect(back)
             try:
                 operator = prod.get_operator(f)
             except ValueError as e:
@@ -279,11 +279,13 @@ def register(app):
                                 (bn, grn, 'SP_LOT', qty, unit, doc))
                     con.execute("""INSERT INTO folding_out(doc_no,fdate,batch_no,route,item_code,qty_good,unit,operator,notes)
                                    VALUES(?,?,?,?,?,?,?,?,?)""", (doc, today, bn, w.get('route'), w['item_code'], qty, mfg.SWAB, operator,
-                                                                  f'SP وارد من مورّد — اللوط {lot["supplier_lot"]} ({grn})'))
+                                                                  f'SP وارد من مورّد — الـ LOT {lot["supplier_lot"]} ({grn})'))
                     if sterile:
                         inter = db.alloc(con, 'SPC', 'SPC-{n6}')
                         con.execute("""INSERT INTO intermediates(barcode,batch_no,item_code,sp_code,sp_source,fold_doc,qty,prod_date,operator)
                                        VALUES(?,?,?,?,?,?,?,?,?)""", (inter, bn, w['item_code'], lot['item_code'], 'SUPPLIER_RECEIPT', doc, qty, today, operator))
+                        notify.push(con, 'sp_release_needed', f'كرتون SP {inter} (وارد من مورّد، {fmt_qty(qty)} مسحة) للتشغيلة {bn} بانتظار إفراج الجودة (إفراج SP)',
+                                    w['item_code'], url_for('quality_sp_review', bn=bn), bn, mfg.FULL, ('qc_sign',))
                     con.execute("UPDATE work_orders SET status='قيد التنفيذ' WHERE batch_no=? AND status='صادر'", (bn,))
             except inventory.InsufficientStock as e:
                 flash(str(e), 'bad'); return redirect(back)
@@ -321,7 +323,7 @@ def register(app):
             con.execute('UPDATE batch_links SET qty=qty-? WHERE child=? AND parent=? AND link_type=?', (a['qty'], bn, a['source_ref'], 'SP_LOT'))
             prod.withdraw_pending(con, cur)
         db.log('delete', 'allocations', doc_no, f'{bn}; {a["source_ref"]}; {fmt_qty(a["qty"])}')
-        flash(f'حُذف {doc_no} وعادت الكمية إلى لوط SP', 'ok')
+        flash(f'حُذف {doc_no} وعادت الكمية إلى LOT SP', 'ok')
         return redirect(back)
 
     # =================================================================== المعقم: كراتين وسيطة وسجل المعالجة
@@ -497,6 +499,9 @@ def register(app):
             db.log('edit' if reset else 'update', 'ster_records', rec_no, f'{act}; {status}')
             ster_sync(bn)
             if status == 'Ready for Pre-Sterilization QC':
+                with db.tx() as con2:
+                    notify.push(con2, 'pre_release_needed', f'السجل {rec_no} ({fmt_qty(r2["boxes_actual"])} بوكس) للتشغيلة {bn} بانتظار الإفراج قبل التعقيم',
+                                w['item_code'], url_for('quality_pre_review', rec_no=rec_no), bn, mfg.FULL, ('qc_sign',))
                 flash(f'اكتمل السجل {rec_no}: {fmt_qty(r2["boxes_actual"])} بوكس — بانتظار الإفراج قبل التعقيم', 'ok')
                 prod.next_bar(('طباعة بطاقات البوكس', url_for('print_label', kind='box', key=rec_no)),
                               ('طباعة السجل', url_for('print_doc', kind='ster_record', key=rec_no), False),
@@ -569,7 +574,7 @@ def register(app):
             try:
                 op = prod.get_operator(f, 'sterilization')
                 if not recs:
-                    raise ValueError('اختر سجلًا واحدًا على الأقل (لوط جاهز للتعقيم)')
+                    raise ValueError('اختر سجلًا واحدًا على الأقل (LOT جاهز للتعقيم)')
                 chamber = s(f.get('machine')) or 'EO-01'
                 start = s(f.get('start_at')) or now_s()
                 lines = []
@@ -598,7 +603,7 @@ def register(app):
             for r in lines:
                 ster_sync(r['batch_no'])
             db.log('create', 'cycles', cyc, f'{len(lines)} lines; {op}')
-            flash(f'أُنشئت دورة التعقيم {cyc} ({len(lines)} لوط) — طباعة الأغلفة والبوكسات تستخدم رقم الدورة تلقائيًا', 'ok')
+            flash(f'أُنشئت دورة التعقيم {cyc} ({len(lines)} LOT) — طباعة الأغلفة والبوكسات تستخدم رقم الدورة تلقائيًا', 'ok')
             prod.next_bar(('طباعة بيانات الدورة', url_for('print_doc', kind='cycle', key=cyc)),
                           ('متابعة الدورة', url_for('ster_cycle', cycle_no=cyc), False))
             return redirect(url_for('ster_cycle', cycle_no=cyc))
@@ -666,7 +671,7 @@ def register(app):
 
     @route('/sterilization/<path:cycle_no>/delete', 'ster_cycle_delete', methods=['POST'])
     def ster_cycle_delete(cycle_no):
-        """حذف دورة (خطأ إدخال): تعود اللوطات «جاهز للتعقيم». مدير النظام فقط بعد اكتمال التعقيم."""
+        """حذف دورة (خطأ إدخال): تعود الـ LOTs «جاهز للتعقيم». مدير النظام فقط بعد اكتمال التعقيم."""
         auth.need('enter')
         c = db.one('SELECT * FROM cycles WHERE cycle_no=?', (cycle_no,))
         if not c:
@@ -685,5 +690,5 @@ def register(app):
                 if w and w['final_status'] == mfg.FS_PENDING:
                     con.execute("UPDATE work_orders SET final_status=NULL, finished_at=NULL, finished_by=NULL, produced_qty=NULL WHERE batch_no=?", (b_,))
         db.log('delete', 'cycles', cycle_no, json.dumps(dict(c), ensure_ascii=False, default=str))
-        flash(f'حُذفت الدورة {cycle_no} وعادت لوطاتها جاهزة للتعقيم', 'ok')
+        flash(f'حُذفت الدورة {cycle_no} وعادت LOTsها جاهزة للتعقيم', 'ok')
         return redirect(url_for('ster_cycles'))
