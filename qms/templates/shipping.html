@@ -9,13 +9,12 @@
 {% if cur %}<div class="kpis"><div class="kpi ok"><b>{{ '{:,.0f}'.format(cur.released) }}</b><span>المفرج ({{ cur.ref }})</span></div>
 <div class="kpi"><b>{{ '{:,.0f}'.format(cur.shipped) }}</b><span>المشحون</span></div>
 <div class="kpi {{ 'warn' if cur.available else 'bad' }}"><b>{{ '{:,.0f}'.format(cur.available) }}</b><span>المتاح للشحن ({{ cur.unit }})</span></div></div>
-{% if can('enter') and cur.available %}<div class="card noprint"><form class="grid" method="post">
+{% if can('warehouse') and cur.available %}<div class="card noprint"><form class="grid" method="post">
 <input type="hidden" name="batch_no" value="{{ b }}">
-<div><label>رقم السند</label><input name="doc_no" placeholder="تلقائي"></div>
-<div><label>التاريخ *</label><input type="date" name="sdate" value="{{ today() }}" required></div>
+<input type="hidden" name="sdate" value="{{ today() }}">
 <div><label>العميل *</label><input name="customer" required></div>
 <div><label>الكمية ({{ cur.unit }}) *</label><input type="number" step="any" min="0.0001" max="{{ cur.available }}" name="qty" required value="{{ cur.available|int }}"></div>
-<div><label>المسؤول عن الشحن *</label><input name="shipper" required value="{{ me.full_name }}"></div>
+<input type="hidden" name="shipper" value="{{ me.full_name }}">
 <div class="full"><label>ملاحظات (رقم الشاحنة، الفاتورة…)</label><input name="notes"></div>
 <div class="full"><button class="btn">تسجيل الشحن</button></div></form></div>{% endif %}{% endif %}
 <h2>سجل الشحنات {% if b %}— {{ b }}{% endif %}</h2>

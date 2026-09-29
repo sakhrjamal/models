@@ -1,25 +1,18 @@
 {% extends "base.html" %}{% block title %}تخصيص خام SP{% endblock %}{% block body %}
-<div class="crumb"><a href="{{ url_for('sp_home') }}">أوامر SP</a><span class="sep">›</span><span class="here">{{ bn }}</span></div>
-<h1>تخصيص خام SP للتشغيلة</h1>
-{% include "_batchbar.html" %}{% include "_stepbar.html" %}
-<div class="kpis"><div class="kpi"><b>{{ '{:,.0f}'.format(b.qty_required or 0) }}</b><span>المطلوب</span></div>
-<div class="kpi ok"><b>{{ '{:,.0f}'.format(allocated) }}</b><span>المخصص</span></div>
-<div class="kpi warn"><b>{{ '{:,.0f}'.format(issued_bal) }}</b><span>مصروف بانتظار التعبئة</span></div></div>
-{% if can('enter') %}<div class="card noprint"><h2 style="margin-top:0">خام SP مفرج عنه ومطابق للصنف</h2>
-{% set ok = lots|selectattr('available')|selectattr('expired','equalto',false)|list %}
-{% if ok %}<form class="grid" method="post">
-<div><label>التاريخ *</label><input type="date" name="alloc_date" value="{{ today() }}" required></div>
-<div><label>المسؤول *</label><input name="operator" required value="{{ me.full_name }}"></div>
-<div class="full"><label>لوط SP *</label><select name="grn_no" required id="lot"><option value="">— اختر —</option>
-{% for l in ok %}<option value="{{ l.grn_no }}" data-av="{{ l.available }}">{{ l.grn_no }} · {{ l.item_code }} · لوط المورّد {{ l.supplier_lot }} · متاح {{ '{:,.0f}'.format(l.available) }} {{ l.uom }}{% if l.expiry_date %} · ينتهي {{ l.expiry_date }}{% endif %}</option>{% endfor %}</select></div>
-<div><label>الكمية *</label><input type="number" step="any" min="0.0001" name="qty" id="q" required></div>
-<div class="full"><button class="btn">تخصيص وصرف للإنتاج</button></div></form>
-<script>document.getElementById('lot').addEventListener('change',function(){var o=this.selectedOptions[0];var need={{ [(b.qty_required or 0)-allocated,0]|max }};if(o&&o.dataset.av)document.getElementById('q').value=Math.min(parseFloat(o.dataset.av),need);});</script>
-{% else %}<div class="empty">لا يوجد خام SP مفرج عنه ومطابق (مقاس · طبقات · كاشف · ميش) ومتاح. استلم الخام وانتظر إفراج الجودة.</div>{% endif %}</div>{% endif %}
-{% if lots %}<details><summary class="mini">كل لوطات SP المطابقة للصنف ({{ lots|length }})</summary><table><tr><th>الاستلام</th><th>لوط المورّد</th><th>الرصيد</th><th>الانتهاء</th></tr>
-{% for l in lots %}<tr><td>{{ l.grn_no }}</td><td>{{ l.supplier_lot }}</td><td>{{ '{:,.0f}'.format(l.available) }}</td><td>{{ l.expiry_date or '—' }}{% if l.expired %} <span class="pill bad">منتهٍ</span>{% endif %}</td></tr>{% endfor %}</table></details>{% endif %}
-{% if allocs %}<h2>التخصيصات</h2><table><tr><th>السند</th><th>التاريخ</th><th>اللوط</th><th>الكمية</th><th>المسؤول</th></tr>
-{% for a in allocs %}<tr><td>{{ a.doc_no }}</td><td>{{ a.alloc_date }}</td><td>{{ a.source_ref }}</td><td>{{ '{:,.0f}'.format(a.qty) }} {{ a.unit }}</td><td>{{ a.operator }}</td></tr>{% endfor %}</table>{% endif %}
-<div class="actions noprint" style="margin-top:14px"><a class="btn g" href="{{ url_for('sp_home') }}">رجوع</a>
-{% if b.route == 'غير معقم' %}<a class="btn" href="{{ url_for('sp_pack', bn=bn) }}">إلى التعبئة</a>{% else %}<a class="btn" href="{{ url_for('sorting', b=bn) }}">إلى الفرز</a>{% endif %}</div>
+<h1>تخصيص خام SP</h1>
+{% include "_batchbar.html" %}
+<div class="stat"><div><b>{{ fmt(b.qty_required) }}</b><span>المطلوب</span></div><div><b>{{ fmt(allocated) }}</b><span>المخصص</span></div>
+<div><b>{{ fmt(issued_bal) }}</b><span>مصروف بانتظار التعبئة</span></div><div><b>{{ fmt(need) }}</b><span>المتبقي للتخصيص</span></div></div>
+{% if can('enter') and not b.final_status %}{% set ok = lots|selectattr('available')|selectattr('expired','equalto',false)|list %}
+<h2>خام SP مفرج عنه ومطابق للصنف</h2>
+{% if ok and need > 0 %}<div class="tablewrap"><table><tr><th>الاستلام</th><th>لوط المورّد</th><th>المتاح</th><th>الانتهاء</th><th>الكمية</th><th></th></tr>
+{% for l in ok %}<tr><td>{{ l.grn_no }}</td><td>{{ l.supplier_lot }}</td><td>{{ fmt(l.available) }} {{ l.uom }}</td><td>{{ l.expiry_date or '—' }}</td>
+<td colspan="2"><form method="post" class="actions" style="justify-content:center"><input type="hidden" name="grn_no" value="{{ l.grn_no }}">
+<input type="number" step="any" min="0.0001" name="qty" value="{{ [l.available, need]|min|round(2) }}" style="max-width:150px"><button class="btn sm ok">تخصيص</button></form></td></tr>{% endfor %}</table></div>
+{% elif need <= 0 %}<div class="msg ok">خُصّصت الكمية المطلوبة بالكامل.</div>
+{% else %}<div class="empty">لا يوجد خام SP مفرج عنه ومطابق (مقاس · طبقات · كاشف · ميش) ومتاح.</div>{% endif %}{% endif %}
+{% if allocs %}<h2>التخصيصات</h2><table><tr><th>السند</th><th>التاريخ</th><th>اللوط</th><th>الكمية</th>{% if can('enter') and b.final_status in (none, 'PENDING_QC') %}<th></th>{% endif %}</tr>
+{% for a in allocs %}<tr><td>{{ a.doc_no }}</td><td>{{ a.alloc_date }}</td><td>{{ a.source_ref }}</td><td>{{ fmt(a.qty) }} {{ a.unit }}</td>
+{% if can('enter') and b.final_status in (none, 'PENDING_QC') %}<td><form class="inline" method="post" action="{{ url_for('alloc_delete', doc_no=a.doc_no) }}" onsubmit="return confirm('إلغاء التخصيص {{ a.doc_no }}؟')"><input type="hidden" name="next" value="{{ request.path }}"><button class="btn sm bad">إلغاء</button></form></td>{% endif %}</tr>{% endfor %}</table>{% endif %}
+<div class="wizard-actions noprint"><div class="l"><a class="btn back" href="{{ url_for('order_view', bn=bn) }}">أمر الإنتاج</a></div><a class="btn" href="{{ url_for('sp_pack', bn=bn) }}">إلى التعبئة ◀</a></div>
 {% endblock %}

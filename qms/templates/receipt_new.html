@@ -2,22 +2,12 @@
 <h1>{{ 'استلام جامبو رول الأربطة' if cls_sel=='JUMBO' else 'سند استلام مادة خام جديد' }}</h1>
 <div class="sub">WH-FRM-001 — يتم وضع جميع الرولات تلقائيًا في الحجر حتى اعتماد فحص الجودة</div>
 
-<form method="post" class="card grid" id="receiptForm">
+<form method="post" class="card" id="receiptForm">
   <input type="hidden" name="cls" value="{{ cls_sel }}">
-  <div><label>رقم سند الاستلام GRN *</label><input name="grn_no" value="{{ grn_no }}" required></div>
-  <div><label>تاريخ الاستلام *</label><input type="date" name="receipt_date" value="{{ today_date }}" required></div>
-  <div><label>نوع الوارد</label><input name="kind" value="{{ 'جامبو رول أربطة' if cls_sel=='JUMBO' else 'رولات شاش خام' }}"></div>
-  <div><label>المستلم *</label><input name="received_by" required value="{{ me.full_name }}" placeholder="الاسم / الرقم الوظيفي"></div>
-
-  <div><label>اسم المورد *</label><input name="supplier_name" list="supplierList" required autocomplete="off"></div>
-  <datalist id="supplierList">{% for x in suppliers %}<option value="{{ x.name }}">{{ x.country or '' }}</option>{% endfor %}</datalist>
-  <div><label>بلد المنشأ</label><input name="country"></div>
-  <div><label>رقم أمر الشراء PO</label><input name="po_no"></div>
-  <div><label>رقم الفاتورة</label><input name="invoice_no"></div>
-  <div><label>رقم بوليصة الشحن BL</label><input name="bl_no"></div>
-
-  <div class="full sectionline"><b>بيانات المادة الخام</b></div>
-  <div class="full"><label>الصنف *</label>
+  <input type="hidden" name="grn_no" value="{{ grn_no }}"><input type="hidden" name="receipt_date" value="{{ today_date }}">
+  <input type="hidden" name="kind" value="{{ 'جامبو رول أربطة' if cls_sel=='JUMBO' else 'رولات شاش خام' }}">
+  <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px">
+  <div class="full" style="grid-column:1/-1"><label>الصنف *</label>
     <select name="item_code" id="itemCode" required>
       <option value="">— اختر المادة الخام —</option>
       {% for x in items %}
@@ -25,25 +15,29 @@
       {% endfor %}
     </select>
   </div>
+  <div><label>اسم المورد *</label><input name="supplier_name" list="supplierList" required autocomplete="off"></div>
+  <datalist id="supplierList">{% for x in suppliers %}<option value="{{ x.name }}">{{ x.country or '' }}</option>{% endfor %}</datalist>
   <div><label>Supplier Lot / Batch *</label><input name="supplier_lot" required></div>
-  <div><label>تاريخ التصنيع</label><input type="date" name="mfg_date"></div>
-  <div><label>تاريخ الانتهاء</label><input type="date" name="expiry_date"></div>
   <div><label>عدد الرولات *</label><input type="number" name="roll_count" min="1" step="1" value="1" required></div>
-  <div><label>الكمية في السند</label><input type="number" name="qty" min="0" step="0.001" placeholder="إذا تركت فارغة = عدد الرولات"></div>
-  <div><label>الوحدة</label><input name="uom" id="uom" value="رول"></div>
   <div><label>عرض الرول (cm)</label><input name="width_cm" id="widthCm" inputmode="decimal"></div>
   <div><label>طول الرول (m)</label><input name="length_m" id="lengthM" inputmode="decimal"></div>
+  </div>
+  <input type="hidden" name="uom" id="uom" value="رول">
+  <details style="margin-top:14px"><summary class="mini">بيانات إضافية (اختيارية): أمر الشراء، الفاتورة، COA، تواريخ، ملاحظات</summary>
+  <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:10px">
+  <div><label>بلد المنشأ</label><input name="country"></div>
+  <div><label>رقم أمر الشراء PO</label><input name="po_no"></div>
+  <div><label>رقم الفاتورة</label><input name="invoice_no"></div>
+  <div><label>رقم بوليصة الشحن BL</label><input name="bl_no"></div>
+  <div><label>تاريخ التصنيع</label><input type="date" name="mfg_date"></div>
+  <div><label>تاريخ الانتهاء</label><input type="date" name="expiry_date"></div>
   <div><label>وزن الرول الافتراضي (kg)</label><input type="number" name="weight_kg" min="0" step="0.001"></div>
-
-  <div class="full sectionline"><b>الاستلام والحجر</b></div>
-  <div><label>حالة العبوة عند الاستلام</label><select name="pack_cond"><option>سليمة</option><option>تلف ظاهري</option><option>رطوبة</option><option>تمزق</option><option>أخرى</option></select></div>
-  <div><label>موقع الحجر</label><input name="qc_location" value="منطقة الحجر"></div>
+  <div><label>حالة العبوة</label><select name="pack_cond"><option>سليمة</option><option>تلف ظاهري</option><option>رطوبة</option><option>تمزق</option><option>أخرى</option></select></div>
   <div><label>شهادة التحليل COA</label><select name="coa"><option value="yes">متوفرة</option><option value="no">غير متوفرة</option></select></div>
   <div><label>رقم COA</label><input name="coa_no"></div>
-  <div class="full"><label>ملاحظات الاستلام</label><textarea name="notes" rows="3"></textarea></div>
-
-  <div class="full hint">عند الحفظ سيُنشئ النظام الرولات تلقائيًا بأرقام مثل <b>{{ grn_no }}-R001</b>، وتبقى بحالة <b>حجر</b> حتى تسجيل واعتماد فحص QC.</div>
-  <div class="full actions"><button class="btn">حفظ سند الاستلام وإنشاء الرولات</button><a class="btn g" href="{{ url_for('receipts') }}">إلغاء</a></div>
+  <div class="full" style="grid-column:1/-1"><label>ملاحظات</label><textarea name="notes" rows="2"></textarea></div></div></details>
+  <div class="hint">تُنشأ الرولات تلقائيًا بأرقام مثل <b>{{ grn_no }}-R001</b> وتبقى بحالة <b>حجر</b> حتى يعتمد مستخدم الجودة الفحص (إشعار واحد يصله).</div>
+  <div class="wizard-actions"><div class="l"><a class="btn back" href="{{ url_for('receipts') }}">إلغاء</a></div><button class="btn big">حفظ الاستلام</button></div>
 </form>
 
 <script>

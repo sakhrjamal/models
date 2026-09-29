@@ -257,3 +257,42 @@ header nav.menu .drop a{padding:7px 18px;border-bottom:0;color:var(--ink);font-s
 header nav.menu .drop a.subitem{padding-right:32px;font-size:13px}
 header nav.menu .drop a:hover{background:#eaf1f9;color:var(--brand)}
 .menu .drop{max-height:78vh;overflow:auto}
+
+/* ============ v14: هيكل بقائمة جانبية وتنقّل مبسّط ============ */
+header .logo a{color:#fff;text-decoration:none}
+header .hsearch{margin:0;flex:0 1 240px}
+header .hsearch input{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);color:#fff;padding:6px 12px;border-radius:18px}
+header .hsearch input::placeholder{color:#cfe0f0}
+.shell{display:flex;align-items:flex-start;gap:0;min-height:calc(100vh - 56px)}
+.side{width:210px;flex:0 0 210px;background:#fff;border-left:1px solid var(--line);padding:12px 0;position:sticky;top:0;align-self:stretch}
+.side a{display:block;padding:9px 20px;color:var(--ink);font-size:14px;border-right:4px solid transparent}
+.side a:hover{background:#eaf1f9;text-decoration:none}
+.side a.on{background:#eaf1f9;color:var(--brand);font-weight:700;border-right-color:var(--brand)}
+.side .side-grp{padding:14px 20px 4px;color:var(--muted);font-size:12px;font-weight:700}
+.side .side-home{font-weight:700;margin-bottom:2px}
+.shell .wrap{flex:1;min-width:0;max-width:1100px;margin:22px 0;padding:0 24px}
+.crumb .backlink{background:#eef2f7;border-radius:14px;padding:3px 12px;font-weight:600}
+.nextbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#eaf6ee;border:1px solid #b6e0c4;border-radius:10px;padding:12px 16px;margin-bottom:16px}
+.nextbar span{color:var(--ok);font-weight:700}
+.pill.info{background:#e6f0fb;color:var(--brand)}
+.stagecards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+.stagecards a{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;text-align:center;color:inherit;border-top:4px solid var(--brand2)}
+.stagecards a:hover{text-decoration:none;box-shadow:0 3px 10px rgba(20,40,70,.1)}
+.stagecards b{display:block;font-size:26px;color:var(--brand)}
+.stagecards span{color:var(--muted);font-size:12.5px}
+.bigaction{display:block;text-align:center;font-size:18px;padding:16px 26px}
+.btn.ok{background:var(--ok);color:#fff}.btn.ok:hover{background:#0c5f30}
+.btn.warnb{background:#e0a800;color:#fff}.btn.bad{background:var(--bad);color:#fff}
+.btn.sm{padding:5px 12px;font-size:13px}
+.autofill{background:#f1f5f9;border:1px dashed #b8c6d6;border-radius:10px;padding:12px 16px}
+.autofill .kv .v{font-weight:600}
+.autofill h4{margin:0 0 6px;color:var(--brand);font-size:13.5px}
+.subrolls{display:flex;gap:8px;flex-wrap:wrap}
+.subrolls label{display:inline-flex;gap:8px;align-items:center;margin:0;padding:10px 16px;border:2px solid var(--line);border-radius:10px;cursor:pointer;color:var(--ink);font-size:15px;background:#fff}
+.subrolls label:has(input:checked){border-color:var(--brand);background:#eaf1f9;font-weight:700}
+.subrolls input{width:auto}
+.qtyinput{font-size:26px;padding:12px 16px;text-align:center;max-width:280px;font-weight:700}
+form.inline{display:inline;margin:0}
+@media (max-width:900px){.shell{flex-direction:column}.side{width:100%;flex:none;position:static;display:flex;flex-wrap:wrap;border-left:0;border-bottom:1px solid var(--line)}
+ .side a{padding:8px 12px;border-right:0;border-bottom:3px solid transparent}.side a.on{border-bottom-color:var(--brand)}.side .side-grp{width:100%;padding:6px 12px 0}
+ .shell .wrap{padding:0 12px}}

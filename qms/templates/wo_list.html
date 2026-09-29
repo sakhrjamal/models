@@ -1,30 +1,19 @@
-{% extends "base.html" %}{% block body %}
-<h1>أوامر التشغيل</h1>
-<div class="sub">كل أمر يحمل رقم تشغيلة واحدًا لا يتكرر — رقم الإنتاج يحكم مراحل ما بعد الأسليتر، ورقم SL يخص الأسليتر</div>
-{% if can('wo_issue') %}<div class="card noprint actions">
-<a class="btn" href="{{ url_for('wo_new', t='إنتاج') }}">أمر إنتاج جديد</a>
-<a class="btn g" href="{{ url_for('wo_new', t='تقطيع') }}">أمر تقطيع (أسليتر)</a></div>{% endif %}
-{% if rows %}<div class="tablewrap"><table><tr><th>أمر التشغيل</th><th>رقم التشغيلة</th><th>النوع</th>
-<th>الصنف</th><th>المقاس / الطبقات</th><th>المسار</th><th>الماكينة</th><th>الكمية المطلوبة</th>
-<th>مسار التصنيع</th><th>المرحلة / التقدّم</th><th>تاريخ البدء</th><th>الحالة</th><th>الإفراج</th>{% if can('wo_close') %}<th></th>{% endif %}</tr>
-{% for r in rows %}{% set p = r.prog %}<tr><td>{{ r.wo_no }}</td>
-<td><a href="{{ url_for('trace_view', b=r.batch_no) }}"><b>{{ r.batch_no }}</b></a></td>
-<td>{{ r.order_type or 'إنتاج' }}</td>
-<td>{{ r.item_code or '—' }}</td>
-<td>{% if r.size %}{{ r.size }} · {{ r.ply }}ط{% else %}—{% endif %}</td><td>{{ r.route if r.route != '—' else '—' }}</td>
-<td>{{ r.fold_machine or '—' }}</td>
-<td>{% if r.qty_required %}{{ '{:,.0f}'.format(r.qty_required) }} {{ r.uom or '' }}{% else %}—{% endif %}</td>
-<td>{% if r.order_type=='تقطيع' %}<span class="mini">أسليتر</span>{% else %}<span class="mini">{{ (mfg.route(r.route_code) or {}).get('name_ar') or 'الشاش — تصنيع كامل' }}</span>{% if r.route_override %} <span class="pill warn">استثنائي</span>{% endif %}{% endif %}</td>
-<td style="min-width:200px">{% if p and p.route_progress %}<div style="font-size:12px;margin-bottom:3px">{{ p.route_progress.current }}</div>
-<div class="bar"><i style="width:{{ p.route_progress.pct }}%"></i></div><div class="mini">{{ p.route_progress.pct }}%</div>
-{% elif r.order_type=='تقطيع' %}<span class="mini">أسليتر</span>{% endif %}</td>
-<td>{{ r.batch_start_date or '—' }}</td>
-<td><span class="pill {{ cls_for(r.status) }}">{{ r.status }}</span></td>
-<td>{% set dec = r.decision or (p.decision if p else None) %}{% if dec %}<span class="pill {{ cls_for(dec) }}">{{ dec }}</span>{% else %}<span class="pill warn">—</span>{% endif %}</td>
-{% if can('wo_close') %}<td class="noprint">
-  <form method="post" action="{{ url_for('wo_close', batch_no=r.batch_no) }}" style="display:inline"
-        onsubmit="return confirm('{{ 'إعادة فتح' if r.status=='مغلقة' else 'إغلاق' }} التشغيلة {{ r.batch_no }}؟')">
-    <button class="smallbtn g">{{ 'فتح' if r.status=='مغلقة' else 'إغلاق' }}</button>
-  </form></td>{% endif %}
-</tr>{% endfor %}</table></div>
-{% else %}<div class="empty">لا توجد أوامر تشغيل بعد.</div>{% endif %}{% endblock %}
+{% extends "base.html" %}{% block title %}أوامر الإنتاج{% endblock %}{% block body %}
+<div class="pagehead"><div><h1>أوامر الإنتاج</h1><div class="sub">المنتج والكمية والمرحلة الحالية والإجراء التالي</div></div>
+{% if can('wo_issue') %}<div class="actions"><a class="btn" href="{{ url_for('wo_new') }}">+ أمر إنتاج جديد</a></div>{% endif %}</div>
+<div class="tabs">
+  <a href="{{ url_for('wo_list') }}" class="{{ 'on' if not stage }}">الكل ({{ total }})</a>
+  {% for k,v in stages.items() if counts.get(k) %}<a href="{{ url_for('wo_list', stage=k) }}" class="{{ 'on' if stage==k }}">{{ v[0] }} ({{ counts.get(k) }})</a>{% endfor %}
+</div>
+{% if rows %}<div class="tablewrap"><table>
+<tr><th>أمر الإنتاج</th><th>التشغيلة</th><th>المنتج</th><th>المطلوب</th><th>المنتج</th><th>المتبقي</th><th>المرحلة</th><th>الإجراء التالي</th></tr>
+{% for w in rows %}{% set st = w.st %}<tr>
+<td>{{ w.wo_no }}</td>
+<td><a href="{{ url_for('order_view', bn=w.batch_no) }}"><b>{{ w.batch_no }}</b></a></td>
+<td>{{ w.item_code }}<div class="mini">{{ w.size or '' }}{% if w.ply %} · {{ w.ply }} طبقة{% endif %}</div></td>
+<td>{{ fmt(st.required) }} {{ st.unit }}</td><td>{{ fmt(st.produced) }}</td><td>{{ fmt(st.remaining) }}</td>
+<td><span class="pill {{ st.cls }}">{{ st.stage_ar }}</span></td>
+<td>{% if w.nurl and can('enter') and st.next.kind in ('work','finish') %}<a class="btn sm" href="{{ w.nurl }}">{{ 'استكمال العمل' if st.next.kind=='work' else 'إنهاء الإنتاج' }}</a>
+{% else %}<span class="mini">{{ st.next.label if st.next else '' }}</span>{% endif %}</td></tr>{% endfor %}</table></div>
+{% else %}<div class="empty">لا توجد أوامر في هذه المرحلة.</div>{% endif %}
+{% endblock %}

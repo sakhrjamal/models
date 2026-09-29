@@ -1,0 +1,87 @@
+{% extends "base.html" %}{% block title %}{{ w.batch_no }}{% endblock %}{% block body %}
+{% set n = st.next %}
+<div class="batchbanner">
+  <div class="it"><span>رقم التشغيلة</span><div class="no">{{ w.batch_no }}</div></div>
+  <div class="it"><b>{{ w.wo_no }}</b><span>أمر الإنتاج</span></div>
+  <div class="it"><b>{{ w.item_code }}</b><span>المنتج</span></div>
+  <div class="it"><b><span class="pill {{ st.cls }}" style="background:#fff">{{ st.stage_ar }}</span></b><span>المرحلة الحالية</span></div>
+</div>
+
+<div class="stat">
+  <div><b>{{ fmt(st.required) }}</b><span>المطلوب ({{ st.unit }})</span></div>
+  <div><b>{{ fmt(st.produced) }}</b><span>المنتج فعليًا</span></div>
+  <div><b>{{ fmt(st.remaining) }}</b><span>المتبقي</span></div>
+  {% if st.route == 'FULL_GAUZE' %}<div><b>{{ st.sr_executed }}/{{ st.sr_needed or '—' }}</b><span>سب رول مقصوص/مطلوب</span></div>{% endif %}
+</div>
+{% set bar = ((st.produced / st.required * 100) if st.required else 0) %}
+<div class="bar" style="margin-bottom:16px"><i style="width:{{ [bar,100]|min|round|int }}%"></i></div>
+
+{% if n and n.kind in ('work','store') and n.endpoint and can('enter') and n.kind=='work' %}
+<a class="btn big bigaction" href="{{ nurl }}">استكمال العمل ◀ {{ n.label }}</a>
+{% elif n and n.kind == 'wait' %}<div class="hint"><b>{{ n.label }}</b>
+  {% if st.final_status == 'PENDING_QC' and can('qc_sign') %} — <a href="{{ url_for('quality_review', bn=w.batch_no) }}">فتح صفحة الاعتماد</a>{% endif %}
+  {% if w.qc_note %}<div>ملاحظة الجودة: {{ w.qc_note }}</div>{% endif %}</div>
+{% elif n and n.kind == 'store' %}<div class="hint"><b>معتمدة للتخزين</b> — {% if can('warehouse') %}<a href="{{ url_for('warehouse') }}">انتقل إلى المخزن</a>{% else %}بانتظار أمين المخزن{% endif %}</div>
+{% elif n and n.kind == 'done' %}<div class="msg ok">{{ n.label }}</div>{% endif %}
+
+{% if st.can_finish and can('enter') %}
+<div class="card" id="finish" style="margin-top:16px;{{ 'border-right:5px solid var(--ok)' if n.kind=='finish' }}">
+<h3 style="margin:0 0 8px">إنهاء الإنتاج</h3>
+<form method="post" action="{{ url_for('order_finish', bn=w.batch_no) }}" class="actions">
+  {% if st.remaining > 0 %}<label style="margin:0;color:var(--warn)"><input type="checkbox" name="short_ok" value="1" style="width:auto" required>
+    أؤكد الإنهاء بالكمية الفعلية {{ fmt(st.produced) }} (أقل من المطلوب {{ fmt(st.required) }})</label>{% endif %}
+  <button class="btn ok" onclick="return confirm('سيُرسل إشعار واحد إلى الجودة بانتظار الموافقة على التخزين. متابعة؟')">إنهاء الإنتاج وإرساله للجودة</button>
+</form></div>{% endif %}
+
+<h2>بيانات المنتج (تلقائية)</h2>
+<div class="autofill"><div class="kv">
+  <div class="row"><span class="k">الوصف</span><span class="v">{{ card.description }}</span></div>
+  <div class="row"><span class="k">المقاس / الطبقات</span><span class="v">{{ card.size }} · {{ card.ply }} طبقة</span></div>
+  <div class="row"><span class="k">X-Ray</span><span class="v">{{ card.xray or '—' }}</span></div>
+  <div class="row"><span class="k">معقم / غير معقم</span><span class="v">{{ card.sterile or '—' }}</span></div>
+  <div class="row"><span class="k">المسار</span><span class="v">{{ card.route_name }}</span></div>
+  <div class="row"><span class="k">مراحل الأمر</span><span class="v">{{ card.steps|join(' ◀ ') }}</span></div>
+  {% if card.machine %}<div class="row"><span class="k">ماكينة الطي</span><span class="v">{{ card.machine_name or card.machine }}</span></div>{% endif %}
+  {% if card.req %}<div class="row"><span class="k">عرض السب رول</span><span class="v">{{ fmt(card.req.sr_width) }} سم</span></div>
+  <div class="row"><span class="k">إنتاجية السب رول</span><span class="v">{{ fmt(card.req.yield_per_sr) }} {{ card.unit }}</span></div>{% endif %}
+  <div class="row"><span class="k">كود العبوة / البوكس / الكرتون</span><span class="v">{{ card.pack_code or '—' }} / {{ card.box_code or '—' }} / {{ card.carton_code or '—' }}</span></div>
+  {% if card.pack_config %}<div class="row"><span class="k">تكوين التعبئة</span><span class="v">{% for p in card.pack_config %}{{ p.text }}{{ ' · ' if not loop.last }}{% endfor %}</span></div>{% endif %}
+  <div class="row"><span class="k">أُصدر</span><span class="v">{{ w.issue_date }} — {{ w.issued_by }}{% if w.priority and w.priority!='عادي' %} · <span class="pill warn">{{ w.priority }}</span>{% endif %}</span></div>
+</div></div>
+{% if equiv and st.produced %}<div class="mini" style="margin-top:6px">المكافئ التقريبي للمنتج فعليًا: {% for e in equiv %}{{ fmt(e.qty) }} {{ e.unit }}{{ ' · ' if not loop.last }}{% endfor %}</div>{% endif %}
+
+{% if st.route == 'FULL_GAUZE' %}
+{% if card.req %}<h2>احتياج الخامة (Material Requirement)</h2>
+<div class="stat">
+  <div><b>{{ (w.jumbo_needed or card.req.jumbo_needed or 0)|int or '—' }}</b><span>جامبو رول</span></div>
+  <div><b>{{ (w.sr_needed or card.req.sr_needed or 0)|int or '—' }}</b><span>سب رول</span></div>
+  <div><b>{{ card.req.per_jumbo }}</b><span>سب رول / جامبو</span></div>
+  <div><b>{{ fmt(card.req.usable_width) }}</b><span>العرض المفيد (سم)</span></div>
+</div>{% endif %}
+
+<h2 id="subs">السليتر — خطط القص والسب رول</h2>
+{% if plans %}{% for p in plans %}
+<div class="card"><div class="actions" style="justify-content:space-between"><div><b>{{ p.plan_no }}</b> — الجامبو <b>{{ p.roll_no }}</b>
+  <span class="pill {{ 'ok' if p.status=='منفّذ' else 'warn' }}">{{ p.status }}</span>
+  <span class="mini">{{ fmt(p.jumbo_width) }} سم · مفيد {{ fmt(p.usable_width) }} · {{ p.n_sub }} سب رول × {{ fmt(p.sr_width) }} سم</span></div></div>
+<div class="subrolls" style="margin-top:8px">{% for s_ in p.subs %}<span class="chip {{ 'ok' if s_.stock_status=='متاح' else ('bad' if s_.stock_status=='مستهلك' else '') }}"><bdi>{{ s_.tag_no }}</bdi> <i>{{ s_.stock_status }}{% if s_.used_doc %} · <bdi>{{ s_.used_doc }}</bdi>{% endif %}</i></span>{% endfor %}</div></div>
+{% endfor %}{% else %}<div class="empty">لم تُنشأ خطة قص بعد.</div>{% endif %}
+
+<h2>سندات الطي</h2>
+{% if docs %}<div class="tablewrap"><table><tr><th>السند</th><th>السب رول</th><th>الكمية</th><th>المشغّل</th><th>التاريخ</th>{% if editable and can('enter') %}<th></th>{% endif %}</tr>
+{% for d in docs %}<tr><td>{{ d.doc_no }}</td><td>{{ d.tag_no or '—' }}</td><td><b>{{ fmt(d.qty_good) }}</b> {{ d.unit or '' }}</td><td>{{ d.operator or '—' }}</td><td>{{ d.fdate }}</td>
+{% if editable and can('enter') %}<td>{% if d.tag_no %}<a class="btn sm back" href="{{ url_for('fold_edit', doc_no=d.doc_no) }}">تعديل</a>
+<form class="inline" method="post" action="{{ url_for('fold_delete', doc_no=d.doc_no) }}" onsubmit="return confirm('حذف السند {{ d.doc_no }}؟ سيعود السب رول {{ d.tag_no }} متاحًا وتُخصم الكمية من الإنتاج.')"><button class="btn sm bad">حذف</button></form>{% endif %}</td>{% endif %}</tr>{% endfor %}</table></div>
+{% else %}<div class="empty">لا توجد سندات طي.</div>{% endif %}
+{% else %}
+<h2>خطوات المسار</h2>{% set progress = prog %}{% include "_stepbar.html" %}
+{% endif %}
+
+{% if approval %}<h2>قرار الجودة</h2>
+<div class="card"><span class="pill {{ mfg.FS_CLS.get(w.final_status, '') }}">{{ fs_ar.get(w.final_status, '—') }}</span>
+ {{ approval.by_user }} — {{ approval.ts }}{% if approval.note %} · {{ approval.note }}{% endif %}</div>{% endif %}
+
+<div class="wizard-actions noprint"><div class="l"><a class="btn back" href="{{ url_for('wo_list') }}">قائمة الأوامر</a>
+<a class="btn back" href="{{ url_for('trace_view', b=w.batch_no) }}">تتبّع الدفعة</a></div>
+{% if can('wo_close') and not w.final_status %}<form method="post" action="{{ url_for('wo_close', batch_no=w.batch_no) }}"><button class="btn back">{{ 'إعادة فتح الأمر' if w.status=='مغلقة' else 'إغلاق الأمر' }}</button></form>{% endif %}</div>
+{% endblock %}

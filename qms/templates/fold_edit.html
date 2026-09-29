@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% block title %}تعديل السند {{ fo.doc_no }}{% endblock %}{% block body %}
+<h1>تعديل السند {{ fo.doc_no }}</h1>
+<div class="sub">{{ w.batch_no }} — {{ w.item_code }} — التعديل يعيد احتساب الإنتاج والمخزون وحالة السب رول تلقائيًا</div>
+<form method="post" class="card">
+  <label>السب رول</label>
+  <div class="subrolls">{% for s_ in subs %}<label><input type="radio" name="tag_no" value="{{ s_.tag_no }}" {{ 'checked' if s_.tag_no==fo.tag_no }}> {{ s_.tag_no }}<span class="mini">{{ fmt(s_.width_cm) }} سم</span></label>{% endfor %}</div>
+  <div style="margin-top:14px"><label>الكمية الفعلية * ({{ fo.unit or w.uom }})</label>
+    <input type="number" name="qty_good" class="qtyinput" min="0" step="any" required value="{{ fo.qty_good }}" autofocus></div>
+  <div style="margin-top:12px"><label>ملاحظات</label><input name="notes" value="{{ fo.notes or '' }}"></div>
+  {% if w.final_status == 'PENDING_QC' %}<div class="hint">الدفعة مرسلة للجودة — التعديل يسحب طلب الاعتماد ويتطلب إعادة إنهاء الإنتاج.</div>{% endif %}
+  <div class="wizard-actions"><div class="l"><a class="btn back" href="{{ url_for('fold_work', bn=w.batch_no) }}">إلغاء</a></div><button class="btn big">حفظ التعديل</button></div>
+</form>
+{% endblock %}

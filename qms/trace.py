@@ -117,6 +117,10 @@ def verdict(d):
         n = len(d.get('subrolls') or [])
         used = sum(1 for r in d.get('subrolls') or [] if r.get('stock_status') == 'مستهلك')
         return f'أمر تقطيع — {n} سب رول، المسحوب للطي {used}'
+    fs = (d['wo'] or {}).get('final_status')
+    if fs:
+        return {'PENDING_QC': 'بانتظار موافقة الجودة للتخزين', 'APPROVED': 'مفرج عنها — معتمدة للتخزين',
+                'STORED': 'مفرج عنها — مخزّنة', 'REJECTED': 'مرفوضة من الجودة', 'HOLD': 'معلّقة لدى الجودة'}.get(fs, fs)
     if d.get('release'):
         return d['release'].get('decision') or 'معلّقة'
     if d.get('qc_release'):
@@ -139,7 +143,7 @@ def verdict(d):
 
 def batch_forward(supplier_lot):
     """تتبع أمامي: من لوط المورّد إلى أوامر التقطيع ثم أوامر الإنتاج التي دخل فيها"""
-    return q("""SELECT s.batch_no, w.item_code, w.batch_start_date, r.release_no, r.decision,
+    return q("""SELECT s.batch_no, w.item_code, w.batch_start_date, COALESCE(r.release_no, (SELECT 'APR-'||printf('%06d', a.id) FROM approvals a WHERE a.batch_no=s.batch_no AND a.decision='Approved' ORDER BY a.id DESC LIMIT 1)) release_no, COALESCE(r.decision, (SELECT 'مفرج عنها' FROM approvals a WHERE a.batch_no=s.batch_no AND a.decision='Approved' LIMIT 1)) decision,
                        'أسليتر' AS stage
                 FROM rolls rl
                 JOIN slitting s ON s.roll_no = rl.roll_no
@@ -147,7 +151,7 @@ def batch_forward(supplier_lot):
                 LEFT JOIN releases   r ON r.batch_no = s.batch_no
                 WHERE rl.supplier_lot=?
                 UNION
-                SELECT sr.consumed_by_batch, w.item_code, w.batch_start_date, r.release_no, r.decision,
+                SELECT sr.consumed_by_batch, w.item_code, w.batch_start_date, COALESCE(r.release_no, (SELECT 'APR-'||printf('%06d', a.id) FROM approvals a WHERE a.batch_no=sr.consumed_by_batch AND a.decision='Approved' ORDER BY a.id DESC LIMIT 1)) release_no, COALESCE(r.decision, (SELECT 'مفرج عنها' FROM approvals a WHERE a.batch_no=sr.consumed_by_batch AND a.decision='Approved' LIMIT 1)) decision,
                        'إنتاج' AS stage
                 FROM rolls rl
                 JOIN subrolls sr ON sr.roll_no = rl.roll_no

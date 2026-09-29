@@ -1,0 +1,47 @@
+{% extends "base.html" %}{% block title %}الرئيسية{% endblock %}{% block body %}
+<h1>الرئيسية</h1>
+<div class="sub">{{ me.full_name }} — {{ today() }}</div>
+
+{% if prod %}
+<h2 style="margin-top:6px">أوامر الإنتاج حسب المرحلة</h2>
+<div class="stagecards">
+  {% for key, label in (('new','أوامر جديدة'),('slitting','في السليتر'),('ready_fold','جاهزة للطي'),('production','قيد الإنتاج'),('pending_quality','بانتظار الجودة'),('approved','معتمدة بانتظار التخزين'),('stored','مكتملة')) %}
+  <a href="{{ url_for('wo_list', stage=key) }}"><b>{{ by.get(key, 0) }}</b><span>{{ label }}</span></a>{% endfor %}
+</div>
+{% if can('wo_issue') %}<div class="actions noprint" style="margin-bottom:14px"><a class="btn" href="{{ url_for('wo_new') }}">+ أمر إنتاج جديد</a></div>{% endif %}
+<h2>أعمل عليها الآن</h2>
+{% if active %}<div class="tablewrap"><table>
+<tr><th>التشغيلة</th><th>المنتج</th><th>المطلوب</th><th>المنتج</th><th>المتبقي</th><th>المرحلة</th><th></th></tr>
+{% for w in active %}{% set st = w.st %}<tr>
+<td><a href="{{ url_for('order_view', bn=w.batch_no) }}"><b>{{ w.batch_no }}</b></a></td>
+<td>{{ w.item_code }}</td>
+<td>{{ fmt(st.required) }} {{ st.unit }}</td><td>{{ fmt(st.produced) }}</td><td>{{ fmt(st.remaining) }}</td>
+<td><span class="pill {{ st.cls }}">{{ st.stage_ar }}</span></td>
+<td>{% if w.nurl and can('enter') %}<a class="btn sm" href="{{ w.nurl }}">استكمال العمل</a>{% endif %}</td></tr>{% endfor %}</table></div>
+{% else %}<div class="empty">لا توجد أوامر قيد العمل.</div>{% endif %}
+{% endif %}
+
+{% if qual %}
+<h2>الجودة</h2>
+<div class="stagecards">
+  <a href="{{ url_for('quality_pending') }}"><b>{{ pend_q }}</b><span>دفعات بانتظار الاعتماد</span></a>
+  <a href="{{ url_for('quality_pending') }}"><b>{{ raw_pending }}</b><span>خام وارد بانتظار الفحص</span></a>
+  <a href="{{ url_for('quality_held') }}"><b>{{ held }}</b><span>مرفوض / معلّق</span></a>
+  <a href="{{ url_for('quality_history') }}"><b>{{ done_today }}</b><span>اعتُمد اليوم</span></a>
+</div>
+{% if pending_list %}<div class="tablewrap"><table>
+<tr><th>أمر الإنتاج</th><th>المنتج</th><th>المطلوب</th><th>المنتج فعليًا</th><th>التشغيلة</th><th></th></tr>
+{% for w in pending_list %}<tr><td>{{ w.wo_no }}</td><td>{{ w.item_code }}</td><td>{{ fmt(w.qty_required) }} {{ w.uom }}</td>
+<td>{{ fmt(w.produced_qty) }}</td><td>{{ w.batch_no }}</td>
+<td><a class="btn sm" href="{{ url_for('quality_review', bn=w.batch_no) }}">مراجعة</a></td></tr>{% endfor %}</table></div>{% endif %}
+{% endif %}
+
+{% if store and not prod %}
+<h2>المخزن</h2>
+<div class="stagecards"><a href="{{ url_for('warehouse') }}"><b>{{ to_store }}</b><span>دفعات معتمدة بانتظار التخزين</span></a></div>
+{% endif %}
+
+{% if notes %}<h2>إشعارات جديدة</h2>
+<div class="card" style="padding:0">{% for n in notes %}<a class="nrow unread" style="display:block;color:inherit" href="{{ url_for('notification_go', nid=n.id) }}">
+<div class="t">{{ n.title }}</div><div class="m">{{ n.created_at }}</div></a>{% endfor %}</div>{% endif %}
+{% endblock %}

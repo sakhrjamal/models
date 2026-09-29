@@ -1,12 +1,10 @@
 {% extends "base.html" %}{% block title %}استلام خام SP{% endblock %}{% block body %}
-<div class="crumb"><a href="{{ url_for('receipts', cls='SP') }}">استلام خام SP</a><span class="sep">›</span><span class="here">جديد</span></div>
 <h1>استلام شاش نصف مصنع (SP)</h1>
 <div class="sub">Semi-Finished Material Receipt — يدخل الحجر بحالة «بانتظار الفحص»، ولا يُستخدم في أمر إنتاج قبل إفراج الجودة</div>
 <form method="post" class="card grid">
   <div><label>رقم الاستلام (الدفعة الداخلية)</label><input name="grn_no" placeholder="تلقائي: {{ grn_no }}"></div>
   <div><label>تاريخ الاستلام *</label><input type="date" name="receipt_date" value="{{ today_date }}" required></div>
-  <div><label>المستلم *</label><input name="received_by" required value="{{ me.full_name }}"></div>
-  <div><label>موقع المخزن *</label><input name="wh_location" required placeholder="مثال: منطقة الحجر — رف A2"></div>
+  <div><label>موقع المخزن</label><input name="wh_location" placeholder="منطقة الحجر"></div>
   <div><label>المورّد *</label><input name="supplier_name" list="sl" required autocomplete="off"></div>
   <datalist id="sl">{% for x in suppliers %}<option value="{{ x.name }}">{{ x.country or '' }}</option>{% endfor %}</datalist>
   <div><label>بلد المنشأ</label><input name="country"></div>

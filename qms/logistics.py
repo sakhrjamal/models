@@ -50,12 +50,14 @@ def register(app):
     @route('/shipping', 'shipping', methods=['GET', 'POST'])
     def shipping():
         if request.method == 'POST':
-            auth.need('enter')
+            auth.need('warehouse')
             f = request.form
-            bn, cust, sdate, shipper = s(f.get('batch_no')), s(f.get('customer')), s(f.get('sdate')), s(f.get('shipper'))
+            bn, cust = s(f.get('batch_no')), s(f.get('customer'))
+            sdate = s(f.get('sdate')) or datetime.date.today().isoformat()
+            shipper = s(f.get('shipper')) or g.user['full_name']
             back = url_for('shipping', b=bn or '')
-            if not (bn and cust and sdate and shipper):
-                flash('التشغيلة والعميل والتاريخ واسم المسؤول عن الشحن بيانات إلزامية', 'bad')
+            if not (bn and cust):
+                flash('التشغيلة والعميل بيانات إلزامية', 'bad')
                 return redirect(back)
             av, rel, unit, ref = available(bn)
             if rel <= 0:

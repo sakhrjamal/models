@@ -10,9 +10,9 @@ from flask import render_template, request, redirect, url_for, flash, abort, g
 import db, auth, mfg
 from util import s, num
 
-UNITS = {'pack': 'باك', 'box': 'بوكس', 'carton': 'كرتون'}
+UNITS = {'pack': 'باكت', 'box': 'بوكس', 'carton': 'كرتون'}
 CATEGORIES = ('Gauze', 'Bandage', 'Gauze Bandage')
-UOMS = ('قطعة', 'رول', 'باك', 'بوكس', 'كرتون')
+UOMS = ('قطعة', 'باكت', 'رول', 'بوكس', 'كرتون')
 
 
 def register(app):
@@ -116,9 +116,13 @@ def register(app):
                 flash(err, 'bad'); return redirect(url_for('master_product', code=code))
             with db.tx() as con:
                 con.execute("""UPDATE items SET route_code=?, product_category=?, uom=?, description=?, width_cm=?,
-                               length_m=?, status=? WHERE item_code=?""",
+                               length_m=?, status=?, sub_roll_width_cm=?, yield_per_sr=?, raw_item=?, machine_code=?,
+                               pack_code=?, box_code=?, master_box=? WHERE item_code=?""",
                             (rc, s(f.get('product_category')), s(f.get('uom')) or it['uom'], s(f.get('description')) or it['description'],
-                             s(f.get('width_cm')), s(f.get('length_m')), 'نشط' if f.get('active') else 'موقوف', code))
+                             s(f.get('width_cm')), s(f.get('length_m')), 'نشط' if f.get('active') else 'موقوف',
+                             num(f.get('sub_roll_width_cm')), num(f.get('yield_per_sr')),
+                             (s(f.get('raw_item')) or '').upper() or None, s(f.get('machine_code')) or it.get('machine_code'),
+                             s(f.get('pack_code')), s(f.get('box_code')), s(f.get('master_box')), code))
                 con.execute('DELETE FROM pack_config WHERE item_code=?', (code,))
                 con.executemany("""INSERT INTO pack_config(item_code,level,unit,unit_ar,per_parent,allow_partial)
                                    VALUES(?,?,?,?,?,?)""", [(code,) + r for r in rows])
@@ -130,6 +134,8 @@ def register(app):
         open_orders = db.one("""SELECT COUNT(*) n FROM work_orders WHERE item_code=? AND status IN ('صادر','قيد التنفيذ')""",
                              (code,))['n']
         return render_template('master_product.html', nav='master', it=it, routes=mfg.routes(), cats=CATEGORIES, uoms=UOMS,
+                               machines=db.q("SELECT machine_code,name FROM machines WHERE stage='التقطيع والطي' ORDER BY machine_code"),
+                               raws=db.q("SELECT item_code, description FROM items WHERE prefix='RR' AND status='نشط' ORDER BY item_code"),
                                units=UNITS, pack={r['level']: r for r in mfg.pack_levels(code)}, open_orders=open_orders)
 
     @route('/master/routes', 'master_routes')

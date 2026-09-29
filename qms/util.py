@@ -44,3 +44,22 @@ def doc_scope(prefix, date_text=None):
     d = as_date(date_text)
     stem = f"{prefix}-{d.strftime('%y%m%d')}"
     return stem, stem + '-{n3}'
+
+
+MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
+
+
+def batch_stem(date_text, letter):
+    """جذع رقم التشغيلة من التاريخ وحرف الماكينة/المسار: SEP-2610-F-"""
+    d = as_date(date_text)
+    return d, f"{MONTHS[d.month - 1]}-{d.strftime('%y')}{d.day:02d}-{letter}-"
+
+
+def fmt_qty(v, digits=2):
+    """كمية للعرض: فواصل آلاف وبلا أصفار زائدة (25,000 — 24,850 — 1,242.5)."""
+    try:
+        v = float(v or 0)
+    except (TypeError, ValueError):
+        return '—'
+    s_ = f'{v:,.{digits}f}'.rstrip('0').rstrip('.') if '.' in f'{v:,.{digits}f}' else f'{v:,.{digits}f}'
+    return s_ or '0'

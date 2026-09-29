@@ -63,12 +63,20 @@ def events(bn):
         f' · أصدره {w.get("issued_by") or "—"}')
     for r in raw_sources(bn):
         add(r.get('date'), 'الخام', f'{r["kind"]} {r["ref"]}', f'استلام {r["grn"]} · المورّد {r["supplier"] or "—"} · لوط المورّد {r["supplier_lot"] or "—"} · {r["qty"]}')
-    for r in db.q('SELECT * FROM slitting WHERE batch_no IN (SELECT DISTINCT COALESCE(slit_batch,batch_no) FROM subrolls WHERE tag_no IN (SELECT tag_no FROM folding_in WHERE batch_no=?)) ORDER BY id', (bn,)):
-        add(r['sdate'], 'الأسليتر', f'{r["batch_no"]} — الرول {r["roll_no"]}', f'الفني {r["operator"] or "—"} · {r["length_m"]}م × {r["width_cm"]}سم')
-    for r in db.q("SELECT doc_no, fdate, shift, operator, COUNT(*) n, SUM(area_used_cm2) a FROM folding_in WHERE batch_no=? GROUP BY doc_no, fdate, shift, operator ORDER BY fdate", (bn,)):
-        add(r['fdate'], 'الطي — استهلاك', f'سند {r["doc_no"]} — {r["n"]} سب رول', f'المشغّل {r["operator"] or "—"} · وردية {r["shift"] or "—"}')
+    for r in db.q("""SELECT * FROM slitting WHERE batch_no=? OR batch_no IN (SELECT DISTINCT COALESCE(slit_batch,batch_no)
+                     FROM subrolls WHERE tag_no IN (SELECT tag_no FROM folding_in WHERE batch_no=?)) ORDER BY id""", (bn, bn)):
+        subs = db.q('SELECT tag_no FROM subrolls WHERE plan_no=? ORDER BY tag_no', (r['doc_no'],)) if r.get('doc_no') else []
+        add(r['sdate'], 'السليتر', f'{r["doc_no"] or r["batch_no"]} — الجامبو {r["roll_no"]}',
+            f'{r["length_m"] or "—"}م × {r["width_cm"]}سم' + (f' · سب رول: {subs[0]["tag_no"]} … {subs[-1]["tag_no"]} ({len(subs)})' if subs else ''))
     for r in db.q('SELECT * FROM folding_out WHERE batch_no=? ORDER BY id', (bn,)):
-        add(r['fdate'], 'الطي — ناتج', f'سند {r["doc_no"]} — {r["qty_good"]:g} قطعة', f'ماكينة {r["machine_code"]} · تالف {r["scrap"] or 0:g} · كرتونة {r["carton_code"] or "—"}')
+        add(r['fdate'], 'الطي', f'سند {r["doc_no"]} — {r["qty_good"]:g} {r.get("unit") or "قطعة"}',
+            f'ماكينة {r["machine_code"]} · السب رول {r.get("tag_no") or "—"} · المشغّل {r.get("operator") or "—"}')
+    if w.get('finished_at'):
+        add(w['finished_at'][:10], 'إنهاء الإنتاج', f'{w.get("produced_qty") or 0:g} {w.get("uom") or ""}', f'أنهاها {w.get("finished_by") or "—"}')
+    for a in db.q('SELECT * FROM approvals WHERE batch_no=? ORDER BY id', (bn,)):
+        add((a['ts'] or '')[:10], 'قرار الجودة', {'Approved': 'اعتماد للتخزين', 'Rejected': 'رفض', 'Hold': 'تعليق'}.get(a['decision'], a['decision']),
+            f'{a["by_user"] or "—"} · {a["qty"]:g} {a["unit"] or ""}' + (f' · {a["note"]}' if a['note'] else ''),
+            'qc' if a['decision'] == 'Approved' else 'bad')
     for r in db.q('SELECT * FROM proc_batches WHERE batch_no=? ORDER BY work_date, proc_no', (bn,)):
         names = {'BM': 'ماكينة الأربطة', 'BW': 'تغليف الأربطة', 'BX': 'تعبئة البوكسات', 'CT': 'تعبئة الكراتين', 'SPK': 'تعبئة SP'}
         add(r['work_date'], names.get(r['stage_code'], r['stage_code']), f'{r["proc_no"]} — {r["qty_out"]:g} {r["unit"]}',
@@ -145,6 +153,14 @@ def tree(bn):
     else:
         d = trace.batch_chain(bn)
         stages = []
+        if mfg.is_v14(w):
+            ap = db.one("SELECT id FROM approvals WHERE batch_no=? AND decision='Approved' ORDER BY id DESC LIMIT 1", (bn,))
+            if ap:
+                stages.append(('موافقة الجودة', f'APR-{ap["id"]:06d}'))
+            stages += [('الطي', '، '.join(sorted({r['doc_no'] for r in d.get('fold_out', [])})) or '—'),
+                       ('السليتر — خطط القص', '، '.join(r['plan_no'] for r in db.q('SELECT plan_no FROM cutting_plans WHERE batch_no=?', (bn,))) or '—')]
+            top['children'].append(chain(stages))
+            return top
         if mfg.variant_for(w) == mfg.STERILE:
             stages += [('التعقيم والتهوية', '، '.join(c['cycle_no'] for c in d.get('cycles', [])) or '—')]
         stages += [('التغليف', '، '.join(r['doc_no'] for r in d.get('packaging', [])) or '—')]

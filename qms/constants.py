@@ -8,39 +8,38 @@
 import re
 
 # ----------------------------------------------------------- أدوار المستخدمين
-# v12: الصلاحيات صريحة لكل دور (لا ترتيب هرمي) حتى لا يرث مدير المصنع
-# صلاحية اعتماد الجودة، ولا يرث مراقب الجودة صلاحية إصدار أوامر الإنتاج.
+# v14: فصل كامل بين واجهات الإنتاج والجودة — يُفرض في الخادم (access.py) لا بإخفاء الأيقونات فقط.
+#   الإنتاج  : prod_view + enter (لا يرى شيئًا من الجودة)
+#   الجودة   : qual_view + qc_* (لا يرى ولا يُدخل أي تشغيل إنتاج)
+#   الأدمن/المدير: كل الصلاحيات
 ROLES = {'viewer': 0, 'operator': 1, 'store': 2, 'qc': 3, 'qa': 4, 'manager': 5, 'admin': 6}
 ROLE_AR = {
     'viewer':   'عرض فقط',
-    'operator': 'إدخال إنتاج',
+    'operator': 'مستخدم إنتاج',
     'store':    'أمين مخزن',
-    'qc':       'مراقب جودة (QC)',
-    'qa':       'ضمان جودة (QA)',
+    'qc':       'مستخدم جودة',
+    'qa':       'مستخدم جودة (QA)',
     'manager':  'مدير المصنع (كل الصلاحيات)',
     'admin':    'مدير النظام',
 }
 PERMS = {
-    # view       فتح الشاشات للقراءة
-    # enter      إدخال بيانات الإنتاج (استلام، أسليتر، طي، فرز، تغليف، دورات)
-    # wo_issue   إصدار أوامر الإنتاج/التقطيع وأرقام التشغيلات
-    # wo_close   إغلاق/إعادة فتح التشغيلة
-    # reports    التقارير ولوحة المتابعة
-    # audit      سجل التدقيق
-    # qc_record  تسجيل سجلات الجودة (يومي/دوري/إفراج مرحلة)
-    # qc_sign    اعتماد قرارات الجودة: فحص الخام، شهادة الإفراج، سجلات QA
-    # qc_template تعديل قوالب الجودة
-    # admin      المستخدمون والنسخ الاحتياطي
-    'viewer':   {'view'},
-    'operator': {'view', 'enter', 'receive'},            # الإنتاج: إدخال بيانات التشغيل واستلام الخام
-    'store':    {'view', 'receive', 'warehouse'},        # أمين المخزن: استلام الخام + مخزن المنتج التام
-    'qc':       {'view', 'qc_record'},                   # مراقب الجودة: الفحوص والسجلات وفحص الخام
-    'qa':       {'view', 'qc_record', 'qc_sign', 'qc_template', 'audit', 'wo_close'},   # ضمان الجودة
-    'manager':  None,                                    # المستخدم الرئيسي: كل الصلاحيات (تُملأ أدناه)
+    # view        الصفحات العامة (الرئيسية، الإشعارات، التتبع)
+    # prod_view   شاشات الإنتاج    | enter  إدخال بيانات التشغيل وإنهاء الإنتاج
+    # qual_view   شاشات الجودة     | qc_record فحص الخام/سجلات | qc_sign اعتماد المنتج النهائي
+    # warehouse   إدخال المنتج التام للمخزن | receive استلام الخام
+    # wo_issue    إصدار أوامر الإنتاج | reports التقارير | audit سجل التدقيق | admin المستخدمون والنسخ
+    # master      بيانات المنتجات | route_override تغيير المسار استثنائيًا | qc_template/ncr إعدادات الجودة (أدمن)
+    'viewer':   {'view', 'prod_view', 'qual_view'},
+    'operator': {'view', 'prod_view', 'enter'},
+    'store':    {'view', 'receive', 'warehouse'},
+    'qc':       {'view', 'qual_view', 'qc_record', 'qc_sign', 'ncr'},
+    'qa':       {'view', 'qual_view', 'qc_record', 'qc_sign', 'ncr'},
+    'manager':  None,
     'admin':    None,
 }
-ALL_PERMS = {'view', 'enter', 'wo_issue', 'wo_close', 'reports', 'audit',
-             'qc_record', 'qc_sign', 'qc_template', 'admin', 'receive', 'warehouse', 'route_override'}
+ALL_PERMS = {'view', 'prod_view', 'qual_view', 'enter', 'wo_issue', 'wo_close', 'reports', 'audit',
+             'qc_record', 'qc_sign', 'qc_template', 'ncr', 'admin', 'receive', 'warehouse',
+             'route_override', 'master'}
 PERMS['manager'] = set(ALL_PERMS)
 PERMS['admin'] = set(ALL_PERMS)
 

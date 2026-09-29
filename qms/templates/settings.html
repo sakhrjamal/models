@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% block title %}الإعدادات{% endblock %}{% block body %}
+<h1>الإعدادات</h1>
+<div class="sub">ما يحتاجه النظام للحساب التلقائي — وروابط أدوات الإدارة المتقدمة</div>
+<form method="post" class="card grid">
+{% for key, label, hint, kind in fields %}<div><label>{{ label }}</label><input name="{{ key }}" value="{{ vals[key] }}" {{ 'type=number step=any min=0' if kind=='num' }}><div class="mini">{{ hint }}</div></div>{% endfor %}
+<div class="full wizard-actions"><div class="l"></div><button class="btn big">حفظ</button></div></form>
+<h2>أدوات متقدمة</h2>
+<div class="tiles">
+<a class="tile" href="{{ url_for('audit_view') }}"><b>سجل التدقيق</b><span>كل العمليات بالمستخدم والوقت</span></a>
+<a class="tile" href="{{ url_for('backup_admin') }}"><b>النسخ الاحتياطي</b><span>نسخ يدوي وتلقائي</span></a>
+<a class="tile" href="{{ url_for('ncr_list') }}"><b>عدم المطابقة NCR</b><span>الحالات المفتوحة والمغلقة</span></a>
+<a class="tile" href="{{ url_for('master_routes') }}"><b>مسارات التصنيع</b><span>خطوات كل مسار</span></a>
+<a class="tile" href="{{ url_for('quality_templates') }}"><b>قوالب الجودة (متقدم)</b><span>نماذج الفحص القديمة — غير مطلوبة لسير الإنتاج</span></a>
+<a class="tile" href="{{ url_for('shipping') }}"><b>الشحن</b><span>صرف المنتج التام للعملاء</span></a>
+</div>
+{% endblock %}

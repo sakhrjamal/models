@@ -6,15 +6,8 @@
 </head><body>
 {% if me %}
 <header class="noprint">
-  <div class="logo">نظام إدارة الإنتاج والتتبع</div>
-  <nav class="menu">
-    <a href="{{ url_for('index') }}" class="{{ 'on' if nav=='home' }}">الرئيسية</a>
-    {% for grp in menu %}
-    <div class="grp {{ 'on' if nav==grp.key }}"><a tabindex="0">{{ grp.title }} ▾</a>
-      <div class="drop">{% for it in grp['items'] %}{% if it.sec %}<div class="sec">{{ it.sec }}</div>
-        {% else %}<a href="{{ it.url }}" class="{{ 'subitem' if it.sub }}">{{ it.label }}</a>{% endif %}{% endfor %}</div></div>
-    {% endfor %}
-  </nav>
+  <div class="logo"><a href="{{ url_for('index') }}">نظام إدارة الإنتاج والتتبع</a></div>
+  <form class="hsearch" action="{{ url_for('trace_view') }}"><input name="b" placeholder="تتبّع رقم تشغيلة…" aria-label="تتبع تشغيلة"></form>
   <div class="usermenu">
     <a class="bell" href="{{ url_for('notifications') }}" title="الإشعارات">🔔{% if notif_unread %}<b>{{ notif_unread }}</b>{% endif %}</a>
     <a href="{{ url_for('account') }}" title="الحساب">{{ me.full_name }}
@@ -22,12 +15,25 @@
     <a class="logout" href="{{ url_for('logout') }}">خروج</a>
   </div>
 </header>
-{% endif %}
-<div class="wrap">
+<div class="shell">
+<aside class="side noprint">
+  <a href="{{ url_for('index') }}" class="side-home {{ 'on' if nav=='home' }}">الرئيسية</a>
+  {% for grp in menu %}<div class="side-grp">{{ grp.title }}</div>
+    {% for it in grp['items'] %}<a href="{{ it.url }}" class="{{ 'on' if it.active or nav==it.nav }}">{{ it.label }}</a>{% endfor %}
+  {% endfor %}
+</aside>
+<main class="wrap">
+{% else %}<div class="wrap">{% endif %}
+{% if me and crumbs %}<div class="crumb noprint">
+  {% if crumbs|length > 1 %}<a class="backlink" href="{{ (crumbs[-2][1]) or url_for('index') }}">◀ رجوع</a><span class="sep">|</span>{% endif %}
+  {% for title, url in crumbs %}{% if not loop.first %}<span class="sep">›</span>{% endif %}{% if url %}<a href="{{ url }}">{{ title }}</a>{% else %}<span class="here">{{ title }}</span>{% endif %}{% endfor %}
+</div>{% endif %}
 {% with m = get_flashed_messages(with_categories=true) %}{% for c,t in m %}
   <div class="msg {{ c }}">{{ t }}</div>{% endfor %}{% endwith %}
+{% if next_actions %}<div class="nextbar noprint"><span>الخطوة التالية:</span>
+  {% for b in next_actions %}<a class="btn {{ '' if b.primary else 'back' }}" href="{{ b.url }}">{{ b.label }}</a>{% endfor %}</div>{% endif %}
 {% block body %}{% endblock %}
-</div>
+{% if me %}</main></div>{% else %}</div>{% endif %}
 <script>
 // إضافة رمز التحقق CSRF تلقائيًا لكل نموذج POST — دون تعديل كل قالب
 (function () {

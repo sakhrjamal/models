@@ -1,0 +1,37 @@
+{% extends "base.html" %}{% block title %}مراجعة {{ w.batch_no }}{% endblock %}{% block body %}
+<div class="batchbanner">
+  <div class="it"><span>رقم التشغيلة</span><div class="no">{{ w.batch_no }}</div></div>
+  <div class="it"><b>{{ w.wo_no }}</b><span>أمر الإنتاج</span></div>
+  <div class="it"><b>{{ w.item_code }}</b><span>المنتج</span></div>
+  <div class="it"><b><span class="pill {{ fs_cls.get(w.final_status,'') }}" style="background:#fff">{{ fs_ar.get(w.final_status, st.stage_ar) }}</span></b><span>الحالة</span></div>
+</div>
+<div class="stat">
+  <div><b>{{ fmt(w.qty_required) }}</b><span>المطلوب ({{ st.unit }})</span></div>
+  <div><b>{{ fmt(qty) }}</b><span>المنتج فعليًا</span></div>
+  <div><b>{{ fmt(qty - w.qty_required) }}</b><span>الفرق عن المطلوب</span></div>
+</div>
+<div class="autofill"><div class="kv">
+  <div class="row"><span class="k">الوصف</span><span class="v">{{ it.description }}</span></div>
+  <div class="row"><span class="k">معقم / غير معقم</span><span class="v">{{ it.sterile or '—' }}</span></div>
+  <div class="row"><span class="k">أنهى الإنتاج</span><span class="v">{{ w.finished_by or '—' }} — <bdi>{{ w.finished_at or '' }}</bdi></span></div>
+  {% if equiv %}<div class="row"><span class="k">المكافئ التقريبي</span><span class="v">{% for e in equiv %}{{ fmt(e.qty) }} {{ e.unit }}{{ ' · ' if not loop.last }}{% endfor %}</span></div>{% endif %}
+</div></div>
+
+{% if decidable and can('qc_sign') %}
+<form method="post" action="{{ url_for('quality_decide', bn=w.batch_no) }}" class="card" style="margin-top:16px">
+  <label>ملاحظة الجودة <span class="mini">(إلزامية عند الرفض أو التعليق)</span></label>
+  <textarea name="note" rows="2" id="note"></textarea>
+  <div class="actions" style="margin-top:14px">
+    <button class="btn ok big" name="decision" value="approve" onclick="return confirm('اعتماد {{ fmt(qty) }} {{ st.unit }} للتخزين؟')">اعتماد للتخزين</button>
+    <button class="btn warnb" name="decision" value="hold" onclick="return needNote()">تعليق</button>
+    <button class="btn bad" name="decision" value="reject" onclick="return needNote() && confirm('رفض الدفعة؟')">رفض</button>
+  </div>
+</form>
+<script>function needNote(){var n=document.getElementById('note');if(!n.value.trim()){alert('اكتب السبب أولًا');n.focus();return false}return true}</script>
+{% elif not decidable %}<div class="hint">القرار الحالي: <b>{{ fs_ar.get(w.final_status, '—') }}</b> — لا يمكن تغييره من هنا.</div>{% endif %}
+
+{% if hist %}<h2>سجل القرارات</h2><table><tr><th>القرار</th><th>الكمية</th><th>بواسطة</th><th>الوقت</th><th>ملاحظة</th></tr>
+{% for h in hist %}<tr><td><span class="pill {{ dec_cls.get(h.decision,'') }}">{{ dec_ar.get(h.decision, h.decision) }}</span></td><td>{{ fmt(h.qty) }} {{ h.unit }}</td><td>{{ h.by_user }}</td><td>{{ h.ts }}</td><td>{{ h.note or '—' }}</td></tr>{% endfor %}</table>{% endif %}
+<div class="wizard-actions noprint"><div class="l"><a class="btn back" href="{{ url_for('quality_pending') }}">بانتظار الاعتماد</a>
+<a class="btn back" href="{{ url_for('trace_view', b=w.batch_no) }}">تتبّع الدفعة</a></div></div>
+{% endblock %}

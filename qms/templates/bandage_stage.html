@@ -1,43 +1,32 @@
 {% extends "base.html" %}{% block title %}{{ title }}{% endblock %}{% block body %}
-<div class="crumb"><a href="{{ url_for('bandage_home') }}">الرباط الضاغط</a><span class="sep">›</span><span class="here">{{ bn }}</span></div>
 <h1>{{ title }}</h1>
-{% include "_batchbar.html" %}{% include "_stepbar.html" %}
-{% if can('enter') %}<div class="card noprint">
-{% if not srcs %}<div class="empty">{% if code=='BM' %}لا يوجد جامبو مخصص بمتبقٍ لهذه التشغيلة — <a href="{{ url_for('bandage_alloc', bn=bn) }}">خصّص جامبو</a>.
-{% else %}لا توجد كمية متاحة من المرحلة السابقة. لا يمكن إدخال كمية لم تخرج فعليًا.{% endif %}</div>
-{% else %}<form method="post" class="grid">
-<div><label>التاريخ *</label><input type="date" name="work_date" value="{{ today() }}" required></div>
-<div><label>الوردية *</label><select name="shift" required><option>أ</option><option>ب</option><option>ج</option></select></div>
-<div><label>المشغّل *</label><input name="operator" required value="{{ me.full_name }}"></div>
-{% if code in ('BM','BW') %}<div><label>الماكينة *</label><select name="machine" required>{% for m in machines %}<option value="{{ m.machine_code }}">{{ m.machine_code }} · {{ m.name }}</option>{% endfor %}</select></div>
-<div><label>وقت البدء *</label><input type="time" name="start_time" required></div>
-<div><label>وقت الانتهاء *</label><input type="time" name="end_time" required></div>{% endif %}
-
+{% include "_batchbar.html" %}
+<div class="stat"><div><b>{{ fmt(st.required) }}</b><span>المطلوب (رول)</span></div><div><b>{{ fmt(st.produced) }}</b><span>المنتج (مغلَّف)</span></div><div><b>{{ fmt(st.remaining) }}</b><span>المتبقي</span></div></div>
+{% if can('enter') and not b.final_status %}
+{% if not srcs %}<div class="hint">{% if code=='BM' %}لا يوجد جامبو مخصص بمتبقٍ — <a href="{{ url_for('bandage_alloc', bn=bn) }}">خصّص جامبو</a>.
+{% else %}لا توجد رولات ناتجة بانتظار التغليف.{% endif %}</div>
+{% else %}<form method="post" class="card">
 {% if code=='BM' %}
-<div class="full"><label>الجامبو رول *</label><select name="roll_no" required>{% for r in srcs %}<option value="{{ r.roll_no }}">{{ r.roll_no }} · المتبقي {{ '{:,.0f}'.format(r.remaining) }} م · عرض {{ r.width_cm or '؟' }} سم</option>{% endfor %}</select></div>
-<div><label>طول المدخل من الجامبو (م) *</label><input type="number" step="any" min="0.01" name="input_len" required></div>
-<div><label>وزن المدخل (كجم)</label><input type="number" step="any" min="0" name="input_weight"></div>
-<div><label>عدد الرولات السليمة الناتجة *</label><input type="number" step="1" min="1" name="output_rolls" required></div>
-<div><label>طول الرول الواحد (م)</label><input type="number" step="any" min="0" name="roll_len" value="{{ defaults.roll_len or '' }}"></div>
+<label>الجامبو رول *</label>
+<div class="subrolls">{% for r in srcs %}<label><input type="radio" name="roll_no" value="{{ r.roll_no }}" required {{ 'checked' if loop.first }}> {{ r.roll_no }}<span class="mini">متبقٍ {{ fmt(r.remaining) }} م</span></label>{% endfor %}</div>
+<div style="margin-top:14px"><label>عدد الرولات السليمة الناتجة *</label><input type="number" step="1" min="1" name="output_rolls" required class="qtyinput" autofocus></div>
+<details style="margin-top:12px"><summary class="mini">طول المدخل / مرفوض / هالك (اختياري — الافتراضي الجامبو كاملًا)</summary>
+<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:8px">
+<div><label>طول المدخل (م)</label><input type="number" step="any" min="0" name="input_len"></div>
 <div><label>رولات مرفوضة</label><input type="number" step="1" min="0" name="reject_rolls" value="0"></div>
 <div><label>هالك</label><input type="number" step="any" min="0" name="scrap" value="0"></div>
 <div><label>وحدة الهالك</label><select name="scrap_unit"><option>كجم</option><option>م</option></select></div>
+{% if machines|length > 1 %}<div><label>الماكينة</label><select name="machine">{% for m in machines %}<option value="{{ m.machine_code }}">{{ m.machine_code }} · {{ m.name }}</option>{% endfor %}</select></div>{% endif %}</div></details>
+{% if roll_len %}<div class="mini" style="margin-top:8px">طول الرول من بيانات المنتج: {{ fmt(roll_len) }} م</div>{% endif %}
 {% else %}
-<div class="full"><label>{{ 'دفعة الأربطة الناتجة' if code=='BW' else ('دفعة الأربطة المغلفة' if code=='BX' else 'دفعة البوكسات') }} *</label>
-<select name="src" required>{% for r in srcs %}<option value="{{ r.proc_no }}">{{ r.proc_no }} · المتاح {{ '{:,.0f}'.format(r.available) }} {{ 'رول' if code in ('BW','BX') else 'بوكس' }} (من {{ '{:,.0f}'.format(r.qty_out) }})</option>{% endfor %}</select></div>
-{% if code=='CT' %}<div><label>عدد البوكسات *</label><input type="number" step="1" min="1" name="boxes_in" required></div>
-{% else %}<div><label>كمية المدخل (رول) *</label><input type="number" step="1" min="1" name="input_qty" required id="iq"></div>
-<div><label>{{ 'المغلَّف السليم' if code=='BW' else 'السليم للتعبئة' }} *</label><input type="number" step="1" min="0" name="good" required id="gq"></div>
-<div><label>مرفوض</label><input type="number" step="1" min="0" name="reject" value="0" id="rq"></div>
-<div class="mini" style="align-self:end">السليم + المرفوض = المدخل</div>{% endif %}
-{% if code=='BW' %}<div><label>مادة التغليف المستخدمة</label><input name="material"></div><div><label>لوط مادة التغليف</label><input name="material_lot"></div>{% endif %}
-{% if code=='BX' %}<div class="full mini">تكوين التعبئة: {% if pm.box %}<b>{{ pm.box.per_parent|int }}</b> رول = 1 بوكس{{ ' (بوكس جزئي مسموح)' if pm.box.allow_partial else '' }}{% else %}<span class="pill bad">غير معرَّف</span> <a href="{{ url_for('master_product', code=b.item_code) }}">عرّفه</a>{% endif %}</div>{% endif %}
-{% if code=='CT' %}<div class="full mini">تكوين التعبئة: {% if pm.carton %}<b>{{ pm.carton.per_parent|int }}</b> بوكس = 1 كرتون{{ ' (كرتون جزئي مسموح)' if pm.carton.allow_partial else '' }}{% else %}<span class="pill bad">غير معرَّف</span> <a href="{{ url_for('master_product', code=b.item_code) }}">عرّفه</a>{% endif %}</div>{% endif %}
+<label>الدفعة الناتجة من ماكينة الأربطة *</label>
+<div class="subrolls">{% for r in srcs %}<label><input type="radio" name="src" value="{{ r.proc_no }}" required {{ 'checked' if loop.first }} data-av="{{ r.available }}"> {{ r.proc_no }}<span class="mini">متاح {{ fmt(r.available) }} رول</span></label>{% endfor %}</div>
+<div style="margin-top:14px"><label>الكمية المغلّفة السليمة (رول) *</label><input type="number" step="1" min="0" name="good" required class="qtyinput" value="{{ srcs[0].available|int }}" autofocus></div>
+<details style="margin-top:12px"><summary class="mini">مرفوض / ملاحظات (اختياري)</summary><div style="margin-top:8px"><label>رولات مرفوضة</label><input type="number" step="1" min="0" name="reject" value="0" style="max-width:200px"></div></details>
 {% endif %}
-<div class="full"><label>ملاحظات</label><input name="notes"></div>
-<div class="full"><button class="btn">تسجيل {{ title }}</button></div></form>{% endif %}</div>{% endif %}
-{% if rows %}<h2>السندات المسجّلة</h2><div class="tablewrap"><table><tr><th>السند</th><th>الأب</th><th>التاريخ</th><th>الوردية</th><th>المشغّل</th><th>الماكينة</th><th>المدخل</th><th>الناتج</th><th>مرفوض</th><th>هالك</th></tr>
-{% for r in rows %}<tr><td>{{ r.proc_no }}</td><td>{{ r.parent_proc or r.source_ref or '—' }}</td><td>{{ r.work_date }}</td><td>{{ r.shift }}</td><td>{{ r.operator }}</td><td>{{ r.machine or '—' }}</td>
-<td>{{ '{:,.0f}'.format(r.qty_in or 0) }}</td><td><b>{{ '{:,.0f}'.format(r.qty_out or 0) }} {{ r.unit }}</b></td><td>{{ (r.qty_reject or 0)|int }}</td><td>{{ r.qty_scrap or 0 }}</td></tr>{% endfor %}</table></div>{% endif %}
-<div class="actions noprint" style="margin-top:14px"><a class="btn g" href="{{ url_for('bandage_home') }}">رجوع</a><a class="btn g" href="{{ url_for('genealogy', b=bn) }}">الأصل والفرع</a></div>
+<div class="wizard-actions"><div class="l"><a class="btn back" href="{{ url_for('order_view', bn=bn) }}">أمر الإنتاج</a></div><button class="btn big ok">حفظ</button></div></form>{% endif %}{% endif %}
+{% if rows %}<h2>السندات المسجّلة</h2><div class="tablewrap"><table><tr><th>السند</th><th>الأصل</th><th>التاريخ</th><th>المشغّل</th><th>المدخل</th><th>الناتج</th><th>مرفوض</th><th>هالك</th>{% if can('enter') and b.final_status in (none, 'PENDING_QC') %}<th></th>{% endif %}</tr>
+{% for r in rows %}<tr><td>{{ r.proc_no }}</td><td>{{ r.parent_proc or r.source_ref or '—' }}</td><td>{{ r.work_date }}</td><td>{{ r.operator }}</td>
+<td>{{ fmt(r.qty_in) }}</td><td><b>{{ fmt(r.qty_out) }} {{ r.unit }}</b></td><td>{{ (r.qty_reject or 0)|int }}</td><td>{{ r.qty_scrap or 0 }}</td>
+{% if can('enter') and b.final_status in (none, 'PENDING_QC') %}<td><form class="inline" method="post" action="{{ url_for('proc_delete', proc_no=r.proc_no) }}" onsubmit="return confirm('حذف السند {{ r.proc_no }}؟ يُعكس المخزون. (لتعديله: احذفه وأعد إدخاله)')"><input type="hidden" name="next" value="{{ request.path }}"><button class="btn sm bad">حذف</button></form></td>{% endif %}</tr>{% endfor %}</table></div>{% endif %}
 {% endblock %}

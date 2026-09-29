@@ -11,7 +11,7 @@ import json, datetime
 from flask import render_template, request, redirect, url_for, flash, abort, g
 
 import db, auth, mfg, inventory, notify, ncr
-from util import s, num, doc_scope
+from util import s, num, doc_scope, fmt_qty
 from inventory import InsufficientStock
 
 CLS = 'SP'
@@ -97,8 +97,8 @@ def register(app):
             back = url_for('sp_receive')
             if not item or item['prefix'] not in sp_prefixes():
                 flash('اختر صنف خام SP من القائمة (فئة الشاش نصف المصنع)', 'bad'); return redirect(back)
-            if not (supplier and lot and s(f.get('received_by')) and s(f.get('wh_location'))):
-                flash('المورد ولوط المورد والمستلم وموقع المخزن بيانات إلزامية', 'bad'); return redirect(back)
+            if not (supplier and lot):
+                flash('المورد ولوط المورد بيانات إلزامية', 'bad'); return redirect(back)
             if not qty or qty <= 0 or not pk or pk <= 0:
                 flash('الكمية وعدد العبوات/الأكياس يجب أن يكونا أكبر من صفر', 'bad'); return redirect(back)
             if s(f.get('expiry_date')) and s(f.get('mfg_date')) and f['expiry_date'] < f['mfg_date']:
@@ -120,9 +120,9 @@ def register(app):
                             (grn, rdate, 'شاش نصف مصنع SP', sid, s(f.get('country')), s(f.get('po_no')),
                              s(f.get('invoice_no')), item['item_code'], lot, s(f.get('mfg_date')), s(f.get('expiry_date')),
                              qty, uom, 'متوفر' if f.get('coa') == 'yes' else 'غير متوفر', s(f.get('coa_no')),
-                             s(f.get('pack_cond')), 'منطقة الحجر', 'حجر', s(f.get('received_by')), s(f.get('notes')),
-                             int(pk), s(f.get('wh_location')), g.user['username']))
-                inventory.post(con, grn, 'RM', qty, uom, None, mfg.SP, 'receipt', grn, s(f.get('wh_location')))
+                             s(f.get('pack_cond')), 'منطقة الحجر', 'حجر', s(f.get('received_by')) or g.user['full_name'], s(f.get('notes')),
+                             int(pk), s(f.get('wh_location')) or 'منطقة الحجر', g.user['username']))
+                inventory.post(con, grn, 'RM', qty, uom, None, mfg.SP, 'receipt', grn, s(f.get('wh_location')) or 'منطقة الحجر')
                 notify.push(con, 'qc_pending',
                             f'تم استلام خام شاش نصف مصنع SP رقم {grn} (اللوط {lot}) بكمية {qty:g} {uom} وهو بانتظار الفحص والإفراج',
                             item['item_code'], url_for('receipt_view', grn_no=grn), grn, mfg.SP, ('qc_record',))
@@ -150,118 +150,108 @@ def register(app):
 
     @route('/sp/<path:bn>/alloc', 'sp_alloc', methods=['GET', 'POST'])
     def sp_alloc(bn):
-        """تخصيص خام SP مفرج عنه لأمر إنتاج — لا يُقبل غير المفرج ولا أكبر من المتاح."""
+        """تخصيص خام SP مفرج عنه لأمر إنتاج — لا يُقبل غير المفرج ولا أكبر من المتاح. الكمية المقترحة جاهزة."""
         w = _sp_batch(bn)
         if not w:
             flash('اختر أمر إنتاج على مسار SP', 'bad')
             return redirect(url_for('sp_home'))
         auth.need_line(mfg.SP)
         item = db.one('SELECT * FROM items WHERE item_code=?', (w['item_code'],)) or {}
+        back = url_for('sp_alloc', bn=bn)
         if request.method == 'POST':
             auth.need('enter')
             f = request.form
-            grn, qty = s(f.get('grn_no')), num(f.get('qty'))
-            back = url_for('sp_alloc', bn=bn)
-            if not (s(f.get('alloc_date')) and s(f.get('operator'))):
-                flash('التاريخ واسم المسؤول إلزاميان', 'bad'); return redirect(back)
+            grn = s(f.get('grn_no'))
             lot = next((x for x in compatible_lots(item, only_available=False) if x['grn_no'] == grn), None)
             rec = db.one('SELECT stock_status FROM receipts WHERE grn_no=?', (grn,)) if grn else None
+            need = max(float(w.get('qty_required') or 0) - allocated(bn), 0)
+            qty = num(f.get('qty'), min(lot['available'], need) if lot else None)
+            if w.get('final_status'):
+                flash('أُنهي إنتاج هذا الأمر', 'bad'); return redirect(back)
             if not rec or rec['stock_status'] != 'مفرج':
                 flash('لا يجوز استخدام خام SP غير مفرج عنه من الجودة', 'bad'); return redirect(back)
             if not lot:
                 flash('لوط SP لا يطابق مواصفات الصنف (المقاس / الطبقات / الكاشف / الميش)', 'bad'); return redirect(back)
             if lot['expired']:
                 flash('لوط SP منتهي الصلاحية', 'bad'); return redirect(back)
-            need = max(float(w.get('qty_required') or 0) - allocated(bn), 0)
             if not qty or qty <= 0:
                 flash('الكمية يجب أن تكون أكبر من صفر', 'bad'); return redirect(back)
             if qty - lot['available'] > 1e-6:
-                flash(f'الكمية {qty:g} أكبر من المتاح في اللوط {lot["available"]:g}', 'bad'); return redirect(back)
+                flash(f'الكمية {fmt_qty(qty)} أكبر من المتاح في اللوط {fmt_qty(lot["available"])}', 'bad'); return redirect(back)
             if qty - need > 1e-6:
-                flash(f'الكمية {qty:g} تتجاوز المتبقي من احتياج الأمر {need:g}', 'bad'); return redirect(back)
-            ascope, afmt = doc_scope('ALC', f.get('alloc_date'))
+                flash(f'الكمية {fmt_qty(qty)} تتجاوز المتبقي من احتياج الأمر {fmt_qty(need)}', 'bad'); return redirect(back)
+            today = datetime.date.today().isoformat()
+            ascope, afmt = doc_scope('ALC', today)
             try:
                 with db.tx() as con:
                     doc = db.alloc(con, ascope, afmt)
                     inventory.move(con, grn, 'RM', bn, 'ISSUED', qty, lot['uom'] or 'قطعة', bn, mfg.SP, 'alloc', doc)
                     con.execute("""INSERT INTO allocations(doc_no,batch_no,route_code,source_type,source_ref,qty,unit,
                                 alloc_date,operator,created_by) VALUES(?,?,?,?,?,?,?,?,?,?)""",
-                                (doc, bn, mfg.SP, 'SP', grn, qty, lot['uom'] or 'قطعة', s(f.get('alloc_date')),
-                                 s(f.get('operator')), g.user['username']))
+                                (doc, bn, mfg.SP, 'SP', grn, qty, lot['uom'] or 'قطعة', today,
+                                 g.user['full_name'], g.user['username']))
                     con.execute("""INSERT INTO batch_links(child,parent,link_type,qty,unit,ref_doc) VALUES(?,?,?,?,?,?)
                                 ON CONFLICT(child,parent,link_type) DO UPDATE SET qty=qty+excluded.qty""",
                                 (bn, grn, 'SP_LOT', qty, lot['uom'], doc))
                     con.execute("UPDATE work_orders SET status='قيد التنفيذ' WHERE batch_no=? AND status='صادر'", (bn,))
-                    if mfg.variant_for(w) == mfg.STERILE:
-                        # المعقم: الكمية المصروفة تدخل شاشات الفرز والتغليف كـ«كرتونة مصدر» بلا طي
-                        cscope, cfmt = doc_scope('CT', f.get('alloc_date'))
-                        con.execute("""INSERT INTO cartons(carton_code,cdate,source,source_ref,batch_no,item_code,size,ply,
-                                    xray,mesh,qty,operator,status) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,'متاحة')""",
-                                    (db.alloc(con, cscope, cfmt), s(f.get('alloc_date')), 'خام SP', grn, bn,
-                                     w['item_code'], w.get('size'), w.get('ply'), w.get('xray'), w.get('mesh'), qty,
-                                     s(f.get('operator'))))
-                    notify.push(con, 'order', f'صُرف خام SP للتشغيلة {bn} ({qty:g} {lot["uom"] or ""}) من اللوط {grn}',
-                                f'مستند التخصيص {doc}', url_for('sp_alloc', bn=bn), bn, mfg.SP, ('enter',))
             except InsufficientStock as e:
                 flash(str(e), 'bad'); return redirect(back)
             db.log('create', 'allocations', doc, f'{bn}; {grn}; {qty:g}')
-            flash(f'تم تخصيص {qty:g} من اللوط {grn} للتشغيلة {bn} — السند {doc}', 'ok')
+            flash(f'تم تخصيص {fmt_qty(qty)} من اللوط {grn} للتشغيلة {bn}', 'ok')
+            import prod
+            prod.next_bar(('تسجيل التعبئة', url_for('sp_pack', bn=bn)), ('أمر الإنتاج', url_for('order_view', bn=bn), False))
             return redirect(back)
         return render_template('sp_alloc.html', nav='sp', bn=bn, b=w, lots=compatible_lots(item, only_available=False),
                                allocs=db.q('SELECT * FROM allocations WHERE batch_no=? AND voided=0 ORDER BY id', (bn,)),
                                issued_bal=inventory.balance(bn, 'ISSUED'), allocated=allocated(bn),
-                               progress=mfg.progress(bn))
+                               progress=mfg.progress(bn), fmt=fmt_qty,
+                               need=max(float(w.get('qty_required') or 0) - allocated(bn), 0))
 
     @route('/sp', 'sp_home')
     def sp_home():
-        """أوامر إنتاج مسار SP المفتوحة مع تقدّمها وروابط شاشاتها."""
-        rows = db.q("""SELECT * FROM work_orders WHERE route_code=? AND COALESCE(order_type,'إنتاج')='إنتاج'
-                       AND status IN ('صادر','قيد التنفيذ') ORDER BY batch_start_date DESC, batch_no DESC""", (mfg.SP,))
-        for r in rows:
-            r['prog'] = mfg.progress(r['batch_no'])
-        return render_template('sp_home.html', nav='sp', rows=rows)
+        """أوامر إنتاج مسار SP المفتوحة مع الإجراء التالي."""
+        import prod
+        rows = prod.visible_orders(200, "AND route_code='SP_GAUZE' AND final_status IS NULL AND status IN ('صادر','قيد التنفيذ')")
+        return render_template('line_orders.html', nav='sp', title='خط الشاش نصف المصنع SP', rows=rows, fmt=fmt_qty, gen='sp',
+                               sub='تخصيص خام SP مفرج عنه ← التعبئة — ثم إنهاء الإنتاج وإرساله للجودة', extra='')
 
     @route('/sp/<path:bn>/pack', 'sp_pack', methods=['GET', 'POST'])
     def sp_pack(bn):
-        """تعبئة SP غير المعقم: قطعة ← باك ← بوكس ← كرتون حسب تكوين تعبئة الصنف."""
+        """تعبئة SP (معقم وغير معقم): يُدخل المستخدم السليم/المرفوض/الهالك فقط؛ الباك والبوكس والكرتون تُحسب تلقائيًا."""
         w = _sp_batch(bn)
-        if not w or mfg.variant_for(w) != mfg.NON_STERILE:
-            flash('التعبئة هنا لأوامر SP غير المعقمة فقط — المعقم يمر بالفرز والتغليف الأولي', 'bad')
+        if not w:
+            flash('اختر أمر إنتاج على مسار SP', 'bad')
             return redirect(url_for('sp_home'))
         auth.need_line(mfg.SP)
         pm = mfg.pack_map(w['item_code'])
+        avail = inventory.balance(bn, 'ISSUED')
+        back = url_for('sp_pack', bn=bn)
         if request.method == 'POST':
             auth.need('enter')
             f = request.form
-            back = url_for('sp_pack', bn=bn)
-            if not all(s(f.get(k)) for k in ('work_date', 'shift', 'operator')):
-                flash('التاريخ والوردية واسم المشغّل إلزامية', 'bad'); return redirect(back)
-            if not {'pack', 'box', 'carton'} <= set(pm):
-                flash('تكوين التعبئة (باك / بوكس / كرتون) غير معرَّف لهذا الصنف — عرّفه من «بيانات المنتجات»', 'bad')
-                return redirect(back)
-            good, rej, scrap = num(f.get('good'), 0) or 0, num(f.get('reject'), 0) or 0, num(f.get('scrap'), 0) or 0
+            if w.get('final_status'):
+                flash('أُنهي إنتاج هذا الأمر', 'bad'); return redirect(back)
+            good = num(f.get('good'), 0) or 0
+            rej, scrap = num(f.get('reject'), 0) or 0, num(f.get('scrap'), 0) or 0
             if good < 0 or rej < 0 or scrap < 0 or good + rej + scrap <= 0:
                 flash('الكميات يجب ألا تكون سالبة ولا كلها صفرًا', 'bad'); return redirect(back)
-            avail = inventory.balance(bn, 'ISSUED')
             if good + rej + scrap - avail > 1e-6:
-                flash(f'المجموع {good + rej + scrap:g} أكبر من المصروف المتاح {avail:g} — خصّص خام SP أولًا', 'bad')
+                flash(f'المجموع {fmt_qty(good + rej + scrap)} أكبر من المصروف المتاح {fmt_qty(avail)} — خصّص خام SP أولًا', 'bad')
                 return redirect(back)
-            calc = pack_calc(good, pm)
-            if calc.get('error'):
-                flash(calc['error'], 'bad'); return redirect(back)
-            n = db.one("SELECT COUNT(*) n FROM proc_batches WHERE batch_no=? AND stage_code='SPK'", (bn,))['n'] + 1
-            proc = f'{bn}/SPK{n:02d}'
             lots = ', '.join(r['source_ref'] for r in db.q(
                 'SELECT DISTINCT source_ref FROM allocations WHERE batch_no=? AND voided=0', (bn,)))
+            now = datetime.datetime.now()
+            equiv = {e['unit']: e['qty'] for e in mfg.pack_equiv(w['item_code'], good, 'قطعة')}
             try:
                 with db.tx() as con:
+                    proc = mfg.alloc_proc_no(con, bn, 'SPK')
                     con.execute("""INSERT INTO proc_batches(proc_no,batch_no,route_code,stage_code,source_ref,item_code,operator,
-                                shift,work_date,qty_in,qty_out,qty_reject,qty_scrap,scrap_unit,unit,extra_json,notes,created_by)
+                                work_date,end_time,qty_in,qty_out,qty_reject,qty_scrap,scrap_unit,unit,extra_json,notes,created_by)
                                 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                                (proc, bn, mfg.SP, 'SPK', lots, w['item_code'], s(f.get('operator')), s(f.get('shift')),
-                                 s(f.get('work_date')), good + rej + scrap, calc['cartons'], rej, scrap, 'قطعة', 'كرتون',
-                                 json.dumps(dict(pieces=good, **{k: v for k, v in calc.items() if k != 'error'})),
-                                 s(f.get('notes')), g.user['username']))
+                                (proc, bn, mfg.SP, 'SPK', lots, w['item_code'], g.user['full_name'], now.date().isoformat(),
+                                 now.strftime('%H:%M'), good + rej + scrap, good, rej, scrap, 'قطعة', 'قطعة',
+                                 json.dumps(dict(pieces=good, equiv=equiv), ensure_ascii=False), s(f.get('notes')),
+                                 g.user['username']))
                     u = 'قطعة'
                     if good:
                         inventory.move(con, bn, 'ISSUED', proc, 'SPK_OUT', good, u, bn, mfg.SP, 'proc', proc)
@@ -272,41 +262,22 @@ def register(app):
                     con.execute("INSERT OR IGNORE INTO batch_links(child,parent,link_type,qty,unit,ref_doc) VALUES(?,?,?,?,?,?)",
                                 (proc, bn, 'PROC', good, u, proc))
                     con.execute("UPDATE work_orders SET status='قيد التنفيذ' WHERE batch_no=? AND status='صادر'", (bn,))
-                    if inventory.balance(bn, 'ISSUED', con) <= 1e-6 and allocated(bn) >= float(w.get('qty_required') or 0) - 1e-6:
-                        notify.push(con, 'ready_qc', f'اكتملت تعبئة التشغيلة {bn} وأصبحت جاهزة للفحص النهائي',
-                                    f'{w["item_code"]} — {calc["cartons"]} كرتون', url_for('quality_home'), bn, mfg.SP,
-                                    ('qc_record',))
             except InsufficientStock as e:
                 flash(str(e), 'bad'); return redirect(back)
-            db.log('create', 'proc_batches', proc, f'good={good:g}; packs={calc["packs"]}; boxes={calc["boxes"]}; cartons={calc["cartons"]}')
-            flash(f'سُجّلت التعبئة {proc}: {calc["packs"]} باك · {calc["boxes"]} بوكس · {calc["cartons"]} كرتون', 'ok')
+            db.log('create', 'proc_batches', proc, f'good={good:g}; rej={rej:g}; scrap={scrap:g}')
+            flash(f'سُجّلت التعبئة {proc}: {fmt_qty(good)} قطعة سليمة', 'ok')
+            import prod
+            st = mfg.order_state(bn)
+            nx = st['next']
+            btns = []
+            if nx and nx['kind'] in ('work', 'finish') and nx.get('endpoint'):
+                btns.append((nx['label'], url_for(nx['endpoint'], bn=bn) + ('#finish' if nx['kind'] == 'finish' else '')))
+            btns.append(('أمر الإنتاج', url_for('order_view', bn=bn), not btns))
+            prod.next_bar(*btns)
             return redirect(back)
         rows = db.q("SELECT * FROM proc_batches WHERE batch_no=? AND stage_code='SPK' ORDER BY proc_no", (bn,))
         for r in rows:
             r['x'] = json.loads(r['extra_json'] or '{}')
-        return render_template('sp_pack.html', nav='sp', bn=bn, b=w, pm=pm, rows=rows,
-                               pm_js={u: {'per': x['per_parent'], 'part': x['allow_partial']} for u, x in pm.items()},
-                               issued_bal=inventory.balance(bn, 'ISSUED'), progress=mfg.progress(bn))
-
-
-def pack_calc(pieces, pm):
-    """يحسب الباكات والبوكسات والكراتين من عدد القطع السليمة وفق تكوين تعبئة الصنف.
-
-    يرفض الكسر إن كان المستوى لا يسمح بعبوة جزئية (allow_partial=0).
-    """
-    def level(unit, count, per):
-        full, rest = divmod(count, per)
-        if rest and not pm[unit]['allow_partial']:
-            return None, f'{count:g} لا تكمل {pm[unit]["unit_ar"]} كاملًا (لكل {pm[unit]["unit_ar"]} {per:g}) والتعبئة الجزئية غير مسموحة'
-        return int(full + (1 if rest else 0)), (int(rest) if rest else 0)
-    packs, pp = level('pack', pieces, pm['pack']['per_parent'])
-    if packs is None:
-        return dict(error=pp)
-    boxes, pb = level('box', packs, pm['box']['per_parent'])
-    if boxes is None:
-        return dict(error=pb)
-    cartons, pc = level('carton', boxes, pm['carton']['per_parent'])
-    if cartons is None:
-        return dict(error=pc)
-    return dict(packs=packs, boxes=boxes, cartons=cartons, partial_pack_pieces=pp, partial_box_packs=pb,
-                partial_carton_boxes=pc)
+        return render_template('sp_pack.html', nav='sp', bn=bn, b=w, pm=pm, rows=rows, issued_bal=avail, fmt=fmt_qty,
+                               progress=mfg.progress(bn), st=mfg.order_state(bn),
+                               equiv_unit_ar={'pack': 'باكت', 'box': 'بوكس', 'carton': 'كرتون'})

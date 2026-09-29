@@ -1,5 +1,4 @@
 {% extends "base.html" %}{% block title %}صنف جديد{% endblock %}{% block body %}
-<div class="crumb"><a href="{{ url_for('master_products') }}">بيانات المنتجات</a><span class="sep">›</span><span class="here">جديد</span></div>
 <h1>إضافة صنف نهائي</h1><div class="sub">بعد الحفظ عرّف تكوين التعبئة. المقاسات والأكواد كلها بيانات — لا حصر لها في الكود.</div>
 <form method="post" class="card grid">
 <div><label>الكود *</label><input name="item_code" required pattern="[A-Za-z0-9._-]+"></div>

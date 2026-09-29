@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% block title %}المنتجات المكتملة{% endblock %}{% block body %}
+<h1>المنتجات المكتملة</h1>
+<div class="sub">دفعات أنهى الإنتاج تصنيعها — بانتظار الجودة أو معتمدة أو مخزّنة</div>
+<div class="tabs"><a href="{{ url_for('completed_list') }}" class="{{ 'on' if not f }}">الكل</a>
+{% for k,v in fs_ar.items() %}<a href="{{ url_for('completed_list', s=k) }}" class="{{ 'on' if f==k }}">{{ v }}</a>{% endfor %}</div>
+{% if rows %}<div class="tablewrap"><table><tr><th>التشغيلة</th><th>أمر الإنتاج</th><th>المنتج</th><th>المطلوب</th><th>المنتج</th><th>الحالة</th><th>أنهاها</th></tr>
+{% for w in rows %}<tr><td><a href="{{ url_for('order_view', bn=w.batch_no) }}"><b>{{ w.batch_no }}</b></a></td><td>{{ w.wo_no }}</td><td>{{ w.item_code }}</td>
+<td>{{ fmt(w.qty_required) }} {{ w.uom }}</td><td>{{ fmt(w.produced_qty if w.produced_qty is not none else w.st.produced) }}</td>
+<td><span class="pill {{ fs_cls.get(w.final_status,'') }}">{{ fs_ar.get(w.final_status) }}</span></td><td>{{ w.finished_by or '—' }}<div class="mini">{{ w.finished_at or '' }}</div></td></tr>{% endfor %}</table></div>
+{% else %}<div class="empty">لا توجد دفعات.</div>{% endif %}
+{% endblock %}

@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block title %}السليتر{% endblock %}{% block body %}
+<h1>السليتر</h1>
+<div class="sub">أوامر تحتاج قصًا — اختر الأمر ثم الجامبو، وتُنشأ خطة القص والسب رول تلقائيًا · جامبو مفرج متاح: <b>{{ free }}</b></div>
+{% if rows %}<div class="pick-list">
+{% for w in rows %}{% set st = w.st %}<a class="pick" href="{{ url_for('slit_work', bn=w.batch_no) }}">
+<div class="info"><b>{{ w.batch_no }} — {{ w.item_code }}</b>
+<span>{{ fmt(st.required) }} {{ st.unit }} · سب رول {{ st.sr_executed }}/{{ st.sr_needed or '—' }} · خطط {{ st.plans }} · <span class="pill {{ st.cls }}">{{ st.stage_ar }}</span></span></div><div class="go">◀</div></a>{% endfor %}
+</div>{% else %}<div class="empty">لا توجد أوامر بانتظار القص.</div>{% endif %}
+{% endblock %}

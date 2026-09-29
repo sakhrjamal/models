@@ -1,5 +1,4 @@
 {% extends "base.html" %}{% block title %}سجلات الجودة{% endblock %}{% block body %}
-<div class="crumb"><a href="{{ url_for('quality_home') }}">الجودة</a><span class="sep">›</span><span class="here">السجلات</span></div>
 <h1>سجلات الجودة</h1>
 <div class="card noprint"><form class="grid" method="get" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">
 <div><label>النموذج</label><select name="tpl"><option value="">الكل</option>{% for t in tpls %}<option value="{{ t.code }}" {{ 'selected' if a.get('tpl')==t.code }}>{{ t.title }}</option>{% endfor %}</select></div>

@@ -1,5 +1,4 @@
 {% extends "base.html" %}{% block title %}نموذج جودة جديد{% endblock %}{% block body %}
-<div class="crumb"><a href="{{ url_for('quality_home') }}">الجودة</a><span class="sep">›</span><a href="{{ url_for('quality_templates') }}">القوالب</a><span class="sep">›</span><span class="here">جديد</span></div>
 <h1>نموذج جودة جديد</h1>
 <div class="card"><form class="grid" method="post" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:13px">
 <div><label>الرمز *</label><input name="code" required placeholder="QC-FLD-XYZ" pattern="[A-Za-z0-9_-]+"></div>

@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% block title %}{{ title }}{% endblock %}{% block body %}
+<h1>{{ title }}</h1>
+<div class="sub">{{ sub }}{% if extra %} · <b>{{ extra }}</b>{% endif %}</div>
+{% if rows %}<div class="tablewrap"><table>
+<tr><th>التشغيلة</th><th>المنتج</th><th>المطلوب</th><th>المنتج</th><th>المتبقي</th><th>المرحلة</th><th></th></tr>
+{% for w in rows %}{% set st = w.st %}<tr>
+<td><a href="{{ url_for('order_view', bn=w.batch_no) }}"><b>{{ w.batch_no }}</b></a></td><td>{{ w.item_code }}</td>
+<td>{{ fmt(st.required) }} {{ st.unit }}</td><td>{{ fmt(st.produced) }}</td><td>{{ fmt(st.remaining) }}</td>
+<td><span class="pill {{ st.cls }}">{{ st.stage_ar }}</span></td>
+<td>{% if w.nurl and can('enter') and st.next.kind in ('work','finish') %}<a class="btn sm" href="{{ w.nurl }}">{{ 'استكمال العمل ◀ ' ~ st.next.label if st.next.kind=='work' else 'إنهاء الإنتاج' }}</a>{% endif %}</td></tr>{% endfor %}</table></div>
+{% else %}<div class="empty">لا توجد أوامر مفتوحة على هذا الخط. يصدرها مدير المصنع بالمنتج والكمية.</div>{% endif %}
+{% endblock %}

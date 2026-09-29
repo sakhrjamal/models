@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% block title %}سجل الجودة{% endblock %}{% block body %}
+<h1>سجل الجودة</h1>
+<div class="sub">كل قرارات الاعتماد والرفض والتعليق — بالمستخدم والوقت</div>
+<div class="tabs"><a href="{{ url_for('quality_history') }}" class="{{ 'on' if not d }}">الكل</a>
+{% for k,v in dec_ar.items() %}<a href="{{ url_for('quality_history', d=k) }}" class="{{ 'on' if d==k }}">{{ v }}</a>{% endfor %}</div>
+{% if rows %}<div class="tablewrap"><table><tr><th>الوقت</th><th>التشغيلة</th><th>أمر الإنتاج</th><th>المنتج</th><th>القرار</th><th>الكمية</th><th>بواسطة</th><th>ملاحظة</th></tr>
+{% for r in rows %}<tr><td class="c">{{ r.ts }}</td><td><a href="{{ url_for('quality_review', bn=r.batch_no) }}">{{ r.batch_no }}</a></td><td>{{ r.wo_no or '—' }}</td><td>{{ r.item_code or '—' }}</td>
+<td><span class="pill {{ dec_cls.get(r.decision,'') }}">{{ dec_ar.get(r.decision, r.decision) }}</span></td><td>{{ fmt(r.qty) }} {{ r.unit }}</td><td>{{ r.by_user }}</td><td>{{ r.note or '—' }}</td></tr>{% endfor %}</table></div>
+{% else %}<div class="empty">لا توجد قرارات مسجلة.</div>{% endif %}
+{% endblock %}

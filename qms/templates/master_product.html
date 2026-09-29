@@ -1,5 +1,4 @@
 {% extends "base.html" %}{% block title %}{{ it.item_code }}{% endblock %}{% block body %}
-<div class="crumb"><a href="{{ url_for('master_products') }}">بيانات المنتجات</a><span class="sep">›</span><span class="here">{{ it.item_code }}</span></div>
 <h1>{{ it.item_code }}</h1><div class="sub">{{ it.description }}</div>
 {% if open_orders %}<div class="hint">يوجد {{ open_orders }} أمر مفتوح لهذا الصنف — تغيير المسار يسري على الأوامر الجديدة فقط.</div>{% endif %}
 <form method="post" class="card grid">
@@ -8,10 +7,18 @@
 <div><label>وحدة الإنتاج الأساسية</label><select name="uom">{% for u in uoms %}<option {{ 'selected' if it.uom==u }}>{{ u }}</option>{% endfor %}</select></div>
 <div><label>معقم / غير معقم</label><div class="lockedfield">{{ it.sterile or '—' }}</div></div>
 <div class="full"><label>الوصف</label><input name="description" value="{{ it.description or '' }}"></div>
+<div class="full sectionline"><b>ما يُعبَّأ تلقائيًا في أمر الإنتاج</b><span class="mini">لا يُكتب أي منها عند إصدار الأمر أو في السليتر أو الطي</span></div>
+<div><label>ماكينة الطي</label><select name="machine_code"><option value="">—</option>{% for m in machines %}<option value="{{ m.machine_code }}" {{ 'selected' if it.machine_code==m.machine_code }}>{{ m.machine_code }} — {{ m.name }}</option>{% endfor %}</select></div>
+<div><label>عرض السب رول (سم)</label><input type="number" step="any" min="0" name="sub_roll_width_cm" value="{{ ('%g' % it.sub_roll_width_cm) if it.sub_roll_width_cm is not none else '' }}"></div>
+<div><label>إنتاجية السب رول الواحد (بوحدة الإنتاج)</label><input type="number" step="any" min="0" name="yield_per_sr" value="{{ it.yield_per_sr|int if it.yield_per_sr and it.yield_per_sr==it.yield_per_sr|int else (it.yield_per_sr or '') }}"></div>
+<div><label>الخامة (BOM)</label><select name="raw_item"><option value="">— أي خامة مفرج عنها —</option>{% for r in raws %}<option value="{{ r.item_code }}" {{ 'selected' if it.raw_item==r.item_code }}>{{ r.item_code }} — {{ (r.description or '')[:40] }}</option>{% endfor %}</select></div>
+<div><label>كود العبوة (Pack)</label><input name="pack_code" value="{{ it.pack_code or '' }}"></div>
+<div><label>كود البوكس</label><input name="box_code" value="{{ it.box_code or '' }}"></div>
+<div><label>كود الكرتون الرئيسي</label><input name="master_box" value="{{ it.master_box or '' }}"></div>
 <div><label>العرض (مثال: 10 cm)</label><input name="width_cm" value="{{ it.width_cm or '' }}"></div>
 <div><label>الطول (مثال: 4.5)</label><input name="length_m" value="{{ it.length_m or '' }}"></div>
 <div><label><input type="checkbox" name="active" style="width:auto" {{ 'checked' if it.status=='نشط' }}> صنف نشط</label></div>
-<div class="full sectionline"><b>تكوين التعبئة</b><span class="mini">وحدة الأساس ← باك ← بوكس ← كرتون. اترك المستوى فارغًا إن لم يُستخدم. مثال الرباط: بوكس = 10 (رول)، كرتون = 10 (بوكس).</span></div>
+<div class="full sectionline"><b>تكوين التعبئة</b><span class="mini">وحدة الأساس ← باكت ← بوكس ← كرتون. اترك المستوى فارغًا إن لم يُستخدم. مثال الرباط: بوكس = 10 (رول)، كرتون = 10 (بوكس).</span></div>
 {% for lv in (1,2,3) %}{% set p = pack.get(lv) %}
 <div><label>المستوى {{ lv }} — الوحدة</label><select name="pc_unit_{{ lv }}"><option value="">—</option>{% for k,v in units.items() %}<option value="{{ k }}" {{ 'selected' if p and p.unit==k }}>{{ v }}</option>{% endfor %}</select></div>
 <div><label>عدد وحدات المستوى الأدنى فيها</label><input type="number" step="any" min="0" name="pc_per_{{ lv }}" value="{{ p.per_parent|int if p and p.per_parent==p.per_parent|int else (p.per_parent if p else '') }}"></div>

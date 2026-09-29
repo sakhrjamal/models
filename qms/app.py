@@ -6,7 +6,7 @@
 import os, secrets, datetime, re
 from flask import (Flask, render_template, request, redirect, url_for,
                    flash, abort, session, g)
-import db, trace, forms, auth, backup, constants, ncr, mfg, notify, inventory
+import db, trace, forms, auth, backup, constants, ncr, mfg, notify, inventory, access
 
 app = Flask(__name__)
 
@@ -63,6 +63,11 @@ def _security_gate():
         flash('يجب تغيير كلمة المرور قبل متابعة العمل', 'warn')
         return redirect(url_for('account'))
 
+    # فصل الإنتاج عن الجودة في الخادم: فتح رابط قسم لا تملك صلاحيته = 403 حتى لو اختفت الأيقونة
+    need = access.required(ep)
+    if need and not any(auth.can(p) for p in need):
+        abort(403)
+
 
 @app.context_processor
 def _inject():
@@ -71,6 +76,8 @@ def _inject():
     return dict(me=u, can=auth.can, ROLE_AR=constants.ROLE_AR, can_line=auth.line_ok, mfg=mfg,
                 csrf_token=lambda: session.get('_csrf', ''),
                 menu=navmenu.build() if u else [],
+                crumbs=navmenu.crumbs() if u else [],
+                next_actions=session.pop('_next', None) if u else None,
                 notif_unread=notify.unread_count(u) if u else 0)
 
 
@@ -142,7 +149,7 @@ def login():
         nxt = request.args.get('next') or ''
         if nxt.startswith('/'):
             return redirect(nxt)
-        return redirect(url_for('manager_home') if u['role'] == 'manager' else url_for('index'))
+        return redirect(url_for('index'))
     return render_template('login.html')
 
 
@@ -252,34 +259,12 @@ def cycle_state(cycle_no):
         return C.CYC_INCUB
     return C.CYC_REVIEW
 
-# ---------------------------------------------------------------- الرئيسية
-@app.route('/')
-def index():
-    st = {
-      'الأصناف'       : db.one('SELECT COUNT(*) n FROM items')['n'],
-      'أوامر التشغيل' : db.one('SELECT COUNT(*) n FROM work_orders')['n'],
-      'دورات التعقيم' : db.one('SELECT COUNT(*) n FROM cycles')['n'],
-      'شهادات الإفراج': db.one('SELECT COUNT(*) n FROM releases')['n'],
-      'استلامات خام'  : db.one('SELECT COUNT(*) n FROM receipts')['n'],
-      'رولات بالحجر'    : db.one("SELECT COUNT(*) n FROM rolls WHERE stock_status='حجر'")['n'],
-      'منتج بعد التعقيم بالحجر': db.one("SELECT COUNT(*) n FROM post_ster_receipts WHERE stock_status='حجر'")['n'],
-    }
-    recent = db.q("""SELECT w.batch_no, w.item_code, w.batch_start_date, w.status,
-                            r.decision
-                     FROM work_orders w LEFT JOIN releases r ON r.batch_no=w.batch_no
-                     ORDER BY w.rowid DESC LIMIT 10""")
-    pend = db.q("""SELECT c.cycle_no, c.cycle_date, c.bi_result, c.status
-                   FROM cycles c WHERE IFNULL(c.bi_result,'')<>'سالب — مطابق'
-                   ORDER BY c.cycle_no DESC LIMIT 8""")
-    import lines as _lines
-    return render_template('index.html', nav='home', st=st, recent=recent, pend=pend, routes_=_lines.visible_routes())
-
 # ---------------------------------------------------------------- التتبع
 @app.route('/trace')
 def trace_view():
     b = (request.args.get('b') or '').strip()
-    w = db.one('SELECT route_code, order_type FROM work_orders WHERE batch_no=?', (b,)) if b else None
-    if w and (w.get('order_type') or 'إنتاج') == 'إنتاج' and mfg.route_of_wo(w) != mfg.FULL:
+    w = db.one('SELECT route_code, order_type, final_status FROM work_orders WHERE batch_no=?', (b,)) if b else None
+    if w and (w.get('order_type') or 'إنتاج') == 'إنتاج' and (mfg.route_of_wo(w) != mfg.FULL or mfg.is_v14(dict(w, batch_no=b))):
         return redirect(url_for('genealogy', b=b))          # SP / الرباط: تقرير الأصل والفرع الموحّد
     d = trace.batch_chain(b) if b else None
     return render_template('trace.html', nav='trace', b=b, d=d)
@@ -356,8 +341,8 @@ def receipt_new():
         except ValueError:
             roll_count = 0
 
-        if not supplier_name or not item_code or not supplier_lot or roll_count < 1 or not s(f.get('received_by')):
-            flash('المورد والصنف ولوط المورد وعدد الرولات واسم المستلم بيانات إلزامية', 'bad')
+        if not supplier_name or not item_code or not supplier_lot or roll_count < 1:
+            flash('المورد والصنف ولوط المورد وعدد الرولات بيانات إلزامية', 'bad')
             return redirect(url_for('receipt_new'))
         if roll_count > 500:
             flash('عدد الرولات كبير بشكل غير معقول (الحد 500)', 'bad')
@@ -489,12 +474,8 @@ def receipt_view(grn_no):
             mc_ = mfg.mat_class(it_.get('prefix'))
             rt_ = {'JUMBO': mfg.BANDAGE, 'SP': mfg.SP}.get(mc_, mfg.FULL)
             what = {'JUMBO': 'الجامبو رول', 'SP': 'خام الشاش نصف المصنع SP'}.get(mc_, 'رولات الشاش الخام')
-            with db.tx() as con_:
-                if status == 'مفرج':
-                    notify.push(con_, 'released', f'تم الإفراج عن {what} {grn_no} ويمكن استخدامه في الإنتاج',
-                                f'{rec["item_code"]} · قرار الجودة: {decision}', url_for('receipt_view', grn_no=grn_no),
-                                grn_no, rt_, ('enter', 'wo_issue'))
-                else:
+            if status != 'مفرج':          # إشعار واحد فقط عند رفض/تعليق الخام؛ الإفراج لا يحتاج إشعارًا
+                with db.tx() as con_:
                     notify.push(con_, 'qc_' + ('reject' if status == 'مرفوض' else 'hold'),
                                 f'{what} {grn_no}: قرار الجودة «{decision}»', rec['item_code'] or '',
                                 url_for('receipt_view', grn_no=grn_no), grn_no, rt_, ('wo_issue', 'receive'))
@@ -530,379 +511,6 @@ def receipt_view(grn_no):
     return render_template('receipt_detail.html', nav='receipts', rec=rec, mclass=mclass, labels=labels,
                            inspection=inspection, rolls=rolls,
                            next_inspection=next_doc_no('QC-RM','inspections','inspection_no'))
-
-# ---------------------------------------------------------------- أوامر التشغيل
-@app.route('/wo')
-def wo_list():
-    rows = db.q("""SELECT w.*, r.decision FROM work_orders w
-                   LEFT JOIN releases r ON r.batch_no=w.batch_no
-                   ORDER BY w.batch_start_date DESC, w.rowid DESC LIMIT 200""")
-    for r in rows:
-        r['prog'] = forms.batch_progress(r['batch_no']) if (r.get('order_type') or 'إنتاج') == 'إنتاج' else None
-    return render_template('wo_list.html', nav='wo', rows=rows)
-
-@app.route('/api/plan')
-def api_plan():
-    """حساب حي لاحتياج أمر الإنتاج — يستدعيه المتصفح أثناء الكتابة"""
-    from flask import jsonify
-    code = (request.args.get('item') or '').strip().upper()
-    qty  = num(request.args.get('qty'))
-    p = forms.plan_production(code, qty) if code else None
-    if not p:
-        return jsonify(ok=False, msg='الصنف غير موجود أو ليس له ماكينة طي محددة')
-    sp, it = p['spec'], p['item']
-    return jsonify(ok=True, item=it['item_code'], desc=it.get('description'),
-        size=it.get('size'), ply=it.get('ply'), xray=it.get('xray'), mesh=it.get('mesh'),
-        sterile=it.get('sterile'), machine=sp['machine_code'], letter=
-        (db.one('SELECT letter FROM machines WHERE machine_code=?',(sp['machine_code'],)) or {}).get('letter'),
-        spec_key=p['spec_key'], sr_width=sp['std_width_cm'],
-        cut_len=forms.cut_length(sp['machine_code']),
-        piece_area=forms.piece_area_cm2(sp['machine_code'], sp['std_width_cm']),
-        per_sr=p['per_sr'], sr_needed=p['sr_needed'], sr_per_jumbo=p.get('sr_per_jumbo'),
-        jumbo=p['jumbo'], plan_len=p['sr_length_m'],
-        available=len(forms.sr_stock(p['spec_key'])))
-
-
-def _batch_stem(date_text, letter):
-    """جذع رقم التشغيلة من التاريخ وحرف الماكينة: SEP-2610-F-"""
-    d = _as_date(date_text)
-    return d, f"{MONTHS[d.month-1]}-{d.strftime('%y')}{d.day:02d}-{letter}-"
-
-
-@app.route('/api/next_batch')
-def api_next_batch():
-    """الرقم المقترح للتشغيلة القادمة — يتغير بتغير التاريخ والصنف (والمسار)."""
-    from flask import jsonify
-    kind = request.args.get('t') or 'إنتاج'
-    letter = 'SL'
-    if kind != 'تقطيع':
-        it = db.one('SELECT * FROM items WHERE item_code=?', ((request.args.get('item') or '').strip().upper(),))
-        rc = (request.args.get('route') or '').strip() if auth.can('route_override') else ''
-        rc = rc or (it or {}).get('route_code')
-        letter = mfg.batch_letter(rc, it) if it and rc else None
-        if not letter:
-            return jsonify(ok=False)
-    _, stem = _batch_stem(request.args.get('date'), letter)
-    seq = forms.next_batch_seq(stem)
-    return jsonify(ok=True, stem=stem, seq=seq, batch=f'{stem}{seq:03d}')
-
-
-@app.route('/api/items/search')
-def api_items_search():
-    """بحث الأصناف النهائية المرتبطة بمسار تصنيع — لمنتقي الصنف في أمر الإنتاج"""
-    from flask import jsonify
-    q_ = (request.args.get('q') or '').strip()
-    like = f'%{q_}%'
-    rows = db.q("""SELECT i.item_code, i.description, i.size, i.ply, i.xray, i.mesh, i.sterile, i.machine_code,
-                          i.route_code, i.product_category, i.width_cm, r.name_ar route_name
-                   FROM items i JOIN routes r ON r.code=i.route_code AND r.active=1
-                   WHERE i.status='نشط' AND (i.item_code LIKE ? OR i.description LIKE ?)
-                     AND (i.route_code<>'FULL_GAUZE' OR i.machine_code IS NOT NULL)
-                   ORDER BY i.item_code LIMIT 40""", (like, like))
-    return jsonify(items=rows)
-
-
-@app.route('/api/route_preview')
-def api_route_preview():
-    """مسار التصنيع الذي يحدّده الصنف تلقائيًا + خطواته + تحذيرات الجاهزية."""
-    from flask import jsonify
-    it = db.one('SELECT * FROM items WHERE item_code=?', ((request.args.get('item') or '').strip().upper(),))
-    rc = (request.args.get('route') or '').strip() if auth.can('route_override') else ''
-    rc = rc or (it or {}).get('route_code')
-    r = mfg.route(rc)
-    if not it or not r:
-        return jsonify(ok=False, msg='الصنف بلا مسار تصنيع — حدّده من بيانات المنتجات')
-    var = mfg.variant_of(it.get('sterile'))
-    steps = [s['name_ar'] for s in mfg.steps_for(rc, var)]
-    warn = []
-    if rc == mfg.SP:
-        if not sp_mod.compatible_lots(it):
-            warn.append('لا يوجد خام SP مفرج عنه ومطابق لهذا الصنف حاليًا')
-        if var == mfg.NON_STERILE and 'pack' not in mfg.pack_map(it['item_code']):
-            warn.append('تكوين التعبئة (قطعة ← باك ← بوكس ← كرتون) غير معرَّف لهذا الصنف')
-    if rc == mfg.BANDAGE:
-        if not bandage_mod.free_jumbo():
-            warn.append('لا يوجد جامبو رول مفرج عنه وغير مخصص حاليًا')
-        if 'box' not in mfg.pack_map(it['item_code']):
-            warn.append('تكوين التعبئة (رول ← بوكس ← كرتون) غير معرَّف لهذا الصنف')
-    return jsonify(ok=True, route=r['code'], route_name=r['name_ar'], route_en=r['name_en'], variant=var,
-                   steps=steps, warn=warn, uom=r['base_uom'])
-
-
-def _wo_no_for(con, manual, issue_date):
-    scope, fmt = doc_scope('WO', issue_date)
-    return db.use_number(con, (manual or '').upper() or None, scope, fmt)
-
-
-@app.route('/wo/new', methods=['GET','POST'])
-@auth.require('wo_issue')
-def wo_new():
-    """إصدار أمر تشغيل ورقم تشغيلة — صلاحية مدير المصنع فقط.
-
-    • أمر إنتاج: يحمل الصنف النهائي، ومسار التصنيع يُحدَّد تلقائيًا من الصنف (بيانات المنتجات).
-      ورقمه بحرف المسار (SP / B) أو حرف ماكينة الطي (T/S/F) وهو ما يُطبع على العبوة.
-    • أمر تقطيع: رقمه SL ويغذّي مخزون السب رول (مسار الشاش الكامل).
-    """
-    otype = (request.args.get('t') or request.form.get('order_type') or 'إنتاج').strip()
-    if otype not in ('إنتاج', 'تقطيع'):
-        otype = 'إنتاج'
-    if request.method == 'POST':
-        f = request.form
-        issue_date = s(f.get('issue_date')) or datetime.date.today().isoformat()
-        batch_date = s(f.get('batch_date')) or issue_date
-        issued_by = g.user['full_name']
-        prod_manager = s(f.get('prod_manager')) or issued_by
-        back = url_for('wo_new', t=otype)
-        try:
-            seq_in = int(f.get('seq')) if s(f.get('seq')) else None
-        except ValueError:
-            seq_in = None
-        if seq_in is not None and not (1 <= seq_in <= 999):
-            flash('تسلسل رقم التشغيلة يجب أن يكون بين 1 و999', 'bad')
-            return redirect(back)
-
-        rc, override, route_note = mfg.FULL, 0, None
-        if otype == 'تقطيع':
-            letter, it, p = 'SL', None, None
-            qty = num(f.get('sr_needed'))
-        else:
-            code = (s(f.get('item_code')) or '').upper()
-            it = db.one("SELECT * FROM items WHERE item_code=? AND status='نشط'", (code,))
-            if not it or not it.get('route_code'):
-                flash('اختر الصنف النهائي من القائمة — الصنف غير موجود أو بلا مسار تصنيع (بيانات المنتجات)', 'bad')
-                return redirect(back)
-            rc = it['route_code']
-            want = s(f.get('route_override'))
-            if want and want != rc:
-                if not auth.can('route_override'):
-                    abort(403)
-                if not s(f.get('route_reason')) or not mfg.route(want):
-                    flash('تغيير المسار الاستثنائي يتطلب مسارًا صحيحًا وسببًا مكتوبًا', 'bad')
-                    return redirect(back)
-                rc, override, route_note = want, 1, s(f.get('route_reason'))
-            if not mfg.route(rc):
-                flash('مسار التصنيع غير معرَّف', 'bad')
-                return redirect(back)
-            if rc == mfg.FULL and not it.get('machine_code'):
-                flash(f'الصنف {code} ليس له ماكينة طي محددة — راجع بيانات المنتجات', 'bad')
-                return redirect(back)
-            qty = num(f.get('qty_required'))
-            if not qty or qty <= 0:
-                flash('الكمية المطلوبة إلزامية ويجب أن تكون أكبر من صفر', 'bad')
-                return redirect(back)
-            letter = mfg.batch_letter(rc, it)
-            if not letter:
-                flash(f'لا يوجد حرف ترقيم لمسار/ماكينة الصنف {code}', 'bad')
-                return redirect(back)
-            p = forms.plan_production(code, qty) if rc == mfg.FULL else None
-
-        d, stem = _batch_stem(batch_date, letter)
-        mo, yy, dd = MONTHS[d.month-1], int(d.strftime('%y')), d.day
-        bd = d.isoformat()
-        manual_wo = (s(f.get('wo_no')) or '').upper() or None
-        if manual_wo and db.one('SELECT 1 FROM work_orders WHERE wo_no=?', (manual_wo,)):
-            flash(f'رقم أمر التشغيل {manual_wo} مستخدم مسبقًا', 'bad')
-            return redirect(back)
-        try:
-            with db.tx() as con:
-                seq = seq_in or forms.next_batch_seq(stem)
-                batch = f'{stem}{seq:03d}'
-                if con.execute('SELECT 1 FROM work_orders WHERE batch_no=?', (batch,)).fetchone():
-                    raise ValueError(f'رقم التشغيلة {batch} مستخدم مسبقًا — غيّر التسلسل')
-                wo_no = _wo_no_for(con, manual_wo, issue_date)
-                if otype == 'تقطيع':
-                    con.execute("""INSERT INTO work_orders(wo_no,issue_date,issued_by,prod_manager,
-                          order_type,batch_kind,route,qty_required,uom,due_date,
-                          month_code,yy,dd,seq,stage_code,batch_no,machine_letter,
-                          batch_start_date,status,notes,sr_spec_key,sr_needed,route_code)
-                          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                        (wo_no, issue_date, issued_by, prod_manager, 'تقطيع', 'تصنيع من الرولات', '—',
-                         qty, 'سب رول', s(f.get('due_date')), mo, yy, dd, seq, 'SL', batch, 'SL', bd,
-                         'صادر', s(f.get('notes')), s(f.get('sr_spec_key')),
-                         int(qty) if qty else None, mfg.FULL))
-                else:
-                    r_ = mfg.route(rc)
-                    con.execute("""INSERT INTO work_orders(wo_no,issue_date,issued_by,prod_manager,
-                          order_type,batch_kind,item_code,size,ply,xray,mesh,route,
-                          qty_required,uom,due_date,month_code,yy,dd,seq,stage_code,batch_no,
-                          machine_letter,machine_batch_no,batch_start_date,fold_machine,
-                          std_width_cm,status,notes,sr_spec_key,sr_needed,pieces_per_sr,jumbo_needed,
-                          route_code,route_override,route_note)
-                          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                        (wo_no, issue_date, issued_by, prod_manager, 'إنتاج', r_['name_ar'],
-                         it['item_code'], it.get('size'), it.get('ply'), it.get('xray'), it.get('mesh'),
-                         it.get('sterile') or s(f.get('route')) or 'معقم', qty,
-                         s(f.get('uom')) or r_['base_uom'] or 'قطعة', s(f.get('due_date')), mo, yy, dd, seq, letter,
-                         batch, letter, batch, bd, it.get('machine_code') if rc == mfg.FULL else None,
-                         (p['spec']['std_width_cm'] if p else None), 'صادر', s(f.get('notes')),
-                         (p['spec_key'] if p else None), (p['sr_needed'] if p else None),
-                         (p['per_sr'] if p else None), (p['jumbo'] if p else None), rc, override, route_note))
-                    notify.push(con, 'order', f'صدر أمر الإنتاج {wo_no} — التشغيلة {batch}',
-                                f'{it["item_code"]} · {qty:g} {s(f.get("uom")) or r_["base_uom"]} · {r_["name_ar"]}',
-                                url_for('wo_list'), batch, rc, ('enter', 'view'))
-        except ValueError as e:
-            flash(str(e), 'bad')
-            return redirect(back)
-        db.log('create', 'work_orders', batch, f'{wo_no}; {otype}; {(it or {}).get("item_code") or ""}; route={rc}')
-        if override:
-            db.log('route_override', 'work_orders', batch, f'{rc}: {route_note}')
-        if otype == 'تقطيع':
-            flash(f'صدر أمر التقطيع {wo_no} — رقم تشغيلة الأسليتر: {batch}', 'ok')
-            return redirect(url_for('slit_roll', bn=batch))
-        flash(f'صدر أمر الإنتاج {wo_no} — رقم التشغيلة: {batch} — المسار: {mfg.route(rc)["name_ar"]}'
-              + (f' · يحتاج {p["sr_needed"]} سب رول عرض {p["spec"]["std_width_cm"]} سم'
-                 if p and p.get('sr_needed') else ''), 'ok')
-        return redirect(url_for('wo_list'))
-
-    today_iso = datetime.date.today().isoformat()
-    return render_template('wo_new.html', nav='wo', otype=otype, specs=forms.slit_specs(),
-                           next_wo=db.peek_number(*doc_scope('WO', today_iso)),
-                           today_iso=today_iso, all_routes=mfg.routes())
-
-
-# ---------------------------------------------------------------- الأسليتر
-# =====================================================================
-#  الأسليتر — مسار من أربع خطوات منفصلة
-#  الخطوة 0: اختيار التشغيلة   /slit
-#  الخطوة 1: تسجيل الرول        /slit/<bn>/roll
-#  الخطوة 2: خطة القص           /slit/<bn>/plan
-#  الخطوة 3: المطابقة والبطاقات /slit/<bn>/review
-# =====================================================================
-
-def _slit_ctx(bn):
-    """السياق المشترك لكل خطوات الأسليتر"""
-    return dict(
-        bn=bn, b=forms.batch(bn),
-        rolls=db.q('SELECT * FROM slitting WHERE batch_no=? ORDER BY id', (bn,)),
-        subs=db.q('SELECT * FROM subrolls WHERE batch_no=? ORDER BY roll_no, tag_no', (bn,)),
-        recon=forms.slit_recon(bn),
-    )
-
-@app.route('/slit')
-def slit():
-    """الخطوة 0 — لوحة اختيار أمر التقطيع (رقم SL).
-
-    الأسليتر يعمل تحت رقمه الخاص؛ رقم الإنتاج يبدأ من الطي. تظهر أيضًا أوامر إنتاج قديمة
-    سُجّل قصّها مباشرة تحت رقمها قبل هذا الفصل حتى لا تضيع.
-    """
-    rows = []
-    legacy = {r['batch_no'] for r in db.q('SELECT DISTINCT batch_no FROM slitting')}
-    for x in forms.batches():
-        if (x.get('order_type') or 'إنتاج') != 'تقطيع' and x['batch_no'] not in legacy:
-            continue
-        bn = x['batch_no']
-        nr = db.one('SELECT COUNT(*) n FROM slitting WHERE batch_no=?', (bn,))['n']
-        ns = db.one('SELECT COUNT(*) n FROM subrolls WHERE batch_no=?', (bn,))['n']
-        x = dict(x); x['nrolls'] = nr; x['nsubs'] = ns
-        x['stage'] = 'لم يبدأ' if not nr else ('اكتمل' if ns else 'خطة القص ناقصة')
-        rows.append(x)
-    return render_template('slit_pick.html', nav='slit', rows=rows)
-
-@app.route('/slit/<path:bn>/roll', methods=['GET','POST'])
-def slit_roll(bn):
-    """الخطوة 1 — تسجيل الرول الداخل"""
-    b = forms.batch(bn)
-    if not b:
-        flash('رقم التشغيلة غير موجود', 'bad'); return redirect(url_for('slit'))
-    if request.method == 'POST':
-        auth.need('enter')
-        f = request.form
-        rl = db.one('SELECT * FROM rolls WHERE roll_no=?', (s(f.get('roll_no')),))
-        if not (s(f.get('sdate')) and s(f.get('shift')) and s(f.get('operator'))):
-            flash('التاريخ والوردية واسم فني الأسليتر بيانات إلزامية', 'bad')
-        elif not rl:
-            flash('رقم الرول غير مسجّل في المخزون — سجّله في سند الاستلام أولًا', 'bad')
-        elif rl['stock_status'] != 'مفرج':
-            flash(f"الرول {rl['roll_no']} بحالة «{rl['stock_status']}» — لا يجوز قصّه قبل الإفراج", 'bad')
-        elif rl.get('batch_no'):
-            flash(f"الرول {rl['roll_no']} مرتبط مسبقًا بالتشغيلة {rl['batch_no']}", 'bad')
-        elif db.one('SELECT 1 FROM slitting WHERE batch_no=? AND roll_no=?', (bn, rl['roll_no'])):
-            flash(f"الرول {rl['roll_no']} مسجل مسبقًا في هذه التشغيلة", 'bad')
-        else:
-            L = num(f.get('length_m'), num(rl.get('length_m')))
-            W = num(f.get('width_cm'), num(rl.get('width_cm')))
-            if not L or L <= 0 or not W or W <= 0:
-                flash('يجب أن يكون طول وعرض الرول أكبر من صفر', 'bad')
-                return redirect(url_for('slit_roll', bn=bn))
-            blocked = qc_gate('slitter', bn, None)
-            if blocked:
-                return redirect(url_for('slit_roll', bn=bn))
-            dseq = forms.doc_seq(bn)
-            with db.tx() as con:
-                con.execute("""INSERT INTO slitting(doc_no,sdate,shift,wo_no,batch_no,roll_no,item_code,
-                          supplier_lot,internal_no,length_m,width_cm,area_cm2,operator,purpose,notes,doc_seq)
-                          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                       (s(f.get('doc_no')) or dseq, s(f.get('sdate')), s(f.get('shift')),
-                        b.get('wo_no'), bn, rl['roll_no'], rl['item_code'], rl['supplier_lot'],
-                        f.get('internal_no') or None, L, W, forms.area(L, W),
-                        s(f.get('operator')), s(f.get('purpose')), s(f.get('notes')), dseq))
-                con.execute('UPDATE rolls SET batch_no=?, issue_date=? WHERE roll_no=? AND IFNULL(batch_no,\'\')=\'\'',
-                            (bn, s(f.get('sdate')), rl['roll_no']))
-                con.execute("UPDATE work_orders SET status='قيد التنفيذ' WHERE batch_no=? AND status='صادر'", (bn,))
-            db.log('create','slitting',rl['roll_no'], f'W={W};L={L}')
-            flash(f"سُجّل الرول {rl['roll_no']} بسند {dseq} — انتقل الآن إلى خطة القص", 'ok')
-            return redirect(url_for('slit_plan', bn=bn))
-        return redirect(url_for('slit_roll', bn=bn))
-    ctx = _slit_ctx(bn)
-    ctx['free'] = db.q("""SELECT roll_no,item_code,supplier_lot,width_cm,length_m
-                          FROM rolls WHERE IFNULL(batch_no,'')='' AND stock_status='مفرج'
-                          ORDER BY roll_no""")
-    return render_template('slit_roll.html', nav='slit', **ctx)
-
-@app.route('/slit/<path:bn>/plan', methods=['GET','POST'])
-def slit_plan(bn):
-    """الخطوة 2 — خطة القص"""
-    b = forms.batch(bn)
-    if not b:
-        flash('رقم التشغيلة غير موجود', 'bad'); return redirect(url_for('slit'))
-    if request.method == 'POST':
-        auth.need('enter')
-        act = request.form.get('act')
-        if act == 'del_sub':
-            tag = s(request.form.get('tag_no'))
-            if db.one('SELECT 1 FROM folding_in WHERE tag_no=?', (tag,)):
-                flash(f'لا يمكن حذف {tag} لأنه استُخدم بالفعل في ماكينة الطي', 'bad')
-            else:
-                db.run('DELETE FROM subrolls WHERE tag_no=?', (tag,))
-                db.log('delete','subrolls',tag or '')
-                flash('حُذف السب رول — راجع المطابقة', 'ok')
-        else:
-            made, msg, ok = forms.add_subroll_plan(request.form)
-            if ok:
-                db.log('create','subrolls',s(request.form.get('roll_no')) or '',
-                       f"count={len(made)}")
-                flash(msg, 'warn' if 'تحذير' in msg else 'ok')
-            else:
-                flash(msg, 'bad')
-        return redirect(url_for('slit_plan', bn=bn))
-    ctx = _slit_ctx(bn)
-    if not ctx['rolls']:
-        flash('سجّل الرول الداخل أولًا', 'bad')
-        return redirect(url_for('slit_roll', bn=bn))
-    ctx['matrix'] = forms.slit_specs()
-    ctx['roll_attrs'] = {r['roll_no']: (db.one("""SELECT i.xray, i.mesh, rl.mesh rmesh FROM rolls rl
-                                                  LEFT JOIN items i ON i.item_code=rl.item_code
-                                                  WHERE rl.roll_no=?""", (r['roll_no'],)) or {})
-                         for r in ctx['rolls']}
-    ctx['slit_edge_each'] = num(db.setting('slitter_edge_trim_each_cm','1'), 1) or 1
-    ctx['slit_warning_limit'] = num(db.setting('slitter_warning_limit_cm',
-                                    db.setting('slitter_max_trim_cm','4')), 4) or 4
-    return render_template('slit_plan.html', nav='slit', **ctx)
-
-@app.route('/slit/<path:bn>/review')
-def slit_review(bn):
-    """الخطوة 3 — المطابقة والبطاقات"""
-    b = forms.batch(bn)
-    if not b:
-        flash('رقم التشغيلة غير موجود', 'bad'); return redirect(url_for('slit'))
-    ctx = _slit_ctx(bn)
-    return render_template('slit_review.html', nav='slit', **ctx)
-
-@app.route('/tags')
-def tags():
-    bn = (request.args.get('b') or '').strip()
-    return render_template('tags.html', bn=bn, b=forms.batch(bn) if bn else None,
-        subs=db.q('SELECT * FROM subrolls WHERE batch_no=? ORDER BY tag_no', (bn,)) if bn else [])
 
 # ---------------------------------------------------------------- مراحل ما بعد الأسليتر
 def prod_batch_or_none(bn):
@@ -954,134 +562,6 @@ def qc_gate(area, bn, line):
     flash('تنبيه: ' + msg, 'warn')
     return False
 
-
-@app.route('/fold', methods=['GET','POST'])
-def fold():
-    if request.method == 'POST':
-        auth.need('enter')
-    bn = (request.args.get('b') or request.form.get('batch_no') or '').strip()
-    b = prod_batch_or_none(bn)
-    if bn and not b:
-        flash('رقم التشغيلة غير موجود أو أنه أمر تقطيع — الطي يعمل برقم أمر الإنتاج', 'bad')
-        return redirect(url_for('fold'))
-    if request.method == 'POST':
-        auth.need('enter')
-        act = request.form.get('act'); f = request.form
-        if act == 'in':
-            miss = require_fields(f, 'fdate', 'shift', 'operator')
-            tags = [t for t in f.getlist('tag_no') if t]
-            if miss:
-                flash('حقول إلزامية ناقصة: ' + '، '.join(FIELD_AR[m] for m in miss), 'bad')
-                return redirect(url_for('fold', b=bn))
-            if not tags:
-                flash('اختر سب رول واحدًا على الأقل من المخزون', 'bad')
-                return redirect(url_for('fold', b=bn))
-            rows, one_tag = [], len(tags) == 1
-            for tag in tags:
-                sr = db.one('SELECT * FROM subrolls WHERE tag_no=?', (tag,))
-                if not sr:
-                    flash(f'رقم البطاقة {tag} غير موجود — سجّل السب رول في الأسليتر أولًا', 'bad')
-                    return redirect(url_for('fold', b=bn))
-                if sr['stock_status'] != 'متاح' or db.one('SELECT 1 FROM folding_in WHERE tag_no=?', (tag,)):
-                    flash(f'البطاقة {tag} مستهلكة مسبقًا', 'bad')
-                    return redirect(url_for('fold', b=bn))
-                ok, why = forms.sr_matches(b, sr)
-                if not ok:
-                    flash(why, 'bad')
-                    return redirect(url_for('fold', b=bn))
-                rows.append(sr)
-            if qc_gate('folding', bn, b.get('fold_machine')):
-                return redirect(url_for('fold', b=bn))
-            fdate = s(f.get('fdate'))
-            scope, fmt = doc_scope('FD', fdate)
-            with db.tx() as con:
-                doc_no = db.use_number(con, s(f.get('doc_no')), scope, fmt)
-                for sr in rows:
-                    L = (num(f.get('length_used_m'), sr['length_m']) if one_tag else sr['length_m'])
-                    con.execute("""INSERT INTO folding_in(doc_no,fdate,shift,machine_code,size,operator,emp_id,
-                              wo_no,batch_no,tag_no,roll_no,sr_code,xray_grade,length_used_m,width_cm,
-                              area_used_cm2,fully_used,returned_m,notes,sr_source_batch)
-                              VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                           (doc_no, fdate, s(f.get('shift')), sr['dest_machine'], sr['target_size'],
-                            s(f.get('operator')), s(f.get('emp_id')), b.get('wo_no'), bn, sr['tag_no'],
-                            sr['roll_no'], sr['sr_code'], sr['xray_grade'], L, sr['width_cm'],
-                            forms.area(L, sr['width_cm']),
-                            (s(f.get('fully_used')) or 'نعم') if one_tag else 'نعم',
-                            (num(f.get('returned_m')) if one_tag else 0), s(f.get('notes')),
-                            sr.get('slit_batch') or sr.get('batch_no')))
-                    con.execute("UPDATE subrolls SET stock_status='مستهلك', consumed_by_batch=?, consumed_date=? "
-                                "WHERE tag_no=? AND stock_status<>'مستهلك'", (bn, fdate, sr['tag_no']))
-                con.execute("UPDATE work_orders SET status='قيد التنفيذ' WHERE batch_no=? AND status='صادر'", (bn,))
-            db.log('create', 'folding_in', doc_no, f'{bn}; {len(rows)} sub-rolls')
-            flash(f'سُجّل استهلاك {len(rows)} سب رول على {b.get("fold_machine")} بسند {doc_no}', 'ok')
-        elif act == 'out':
-            miss = require_fields(f, 'fdate', 'shift', 'operator', 'qty_good')
-            if miss:
-                flash('حقول إلزامية ناقصة: ' + '، '.join(FIELD_AR[m] for m in miss), 'bad')
-                return redirect(url_for('fold', b=bn))
-            qty, per = num(f.get('qty_good')), num(f.get('qty_per_carton'))
-            scrap = num(f.get('scrap'), 0) or 0
-            if qty is None or qty < 0 or scrap < 0 or (per is not None and per <= 0):
-                flash('الكميات يجب ألا تكون سالبة، وعدد القطع في الكرتونة أكبر من صفر', 'bad')
-                return redirect(url_for('fold', b=bn))
-            # الصنف والماكينة والمقاس والطبقات والمسار تأتي من أمر الإنتاج — لا تُدخَل ولا تُعدَّل
-            mc, sz, ply = b.get('fold_machine'), b.get('size'), b.get('ply')
-            chk = forms.machine_size_check(mc, sz)
-            pa = forms.piece_area_cm2(mc, b.get('std_width_cm'))
-            import math
-            cartons_calc = math.ceil(qty / per) if qty and per else None
-            cyc = ((num(f.get('counter_after')) or 0) - (num(f.get('counter_before')) or 0)
-                   if f.get('counter_after') else None)
-            fdate, cc_in = s(f.get('fdate')), (s(f.get('carton_code')) or '').upper() or None
-            if cc_in:
-                ex = db.one('SELECT batch_no FROM cartons WHERE carton_code=?', (cc_in,))
-                if ex and ex['batch_no'] != bn:
-                    flash(f'كود الكرتونة {cc_in} مستخدم في تشغيلة أخرى ({ex["batch_no"]})', 'bad')
-                    return redirect(url_for('fold', b=bn))
-            if qc_gate('folding', bn, mc):
-                return redirect(url_for('fold', b=bn))
-            scope, fmt = doc_scope('FD', fdate)
-            cscope, cfmt = doc_scope('CT', fdate)
-            with db.tx() as con:
-                doc_no = db.use_number(con, s(f.get('doc_no')), scope, fmt)
-                cc = db.use_number(con, cc_in, cscope, cfmt) if (qty or cc_in) else None
-                con.execute("""INSERT INTO folding_out(doc_no,fdate,shift,machine_code,batch_no,route,
-                          item_code,ply,size,piece_area_cm2,carton_code,qty_good,qty_per_carton,
-                          cartons,scrap,scrap_weight,piece_weight,counter_before,counter_after,cycles,
-                          machine_size_check,notes) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                       (doc_no, fdate, s(f.get('shift')), mc, bn, b.get('route'), b.get('item_code'),
-                        ply, sz, pa, cc, qty, per, cartons_calc, scrap, num(f.get('scrap_weight')),
-                        num(f.get('piece_weight')), num(f.get('counter_before')),
-                        num(f.get('counter_after')), cyc, chk, s(f.get('notes'))))
-                if cc and qty:
-                    exists = con.execute('SELECT qty FROM cartons WHERE carton_code=?', (cc,)).fetchone()
-                    if exists:
-                        con.execute("""UPDATE cartons SET qty=COALESCE(qty,0)+?, cdate=?, shift=?,
-                                       operator=? WHERE carton_code=?""",
-                                    (qty, fdate, s(f.get('shift')), s(f.get('operator')), cc))
-                    else:
-                        con.execute("""INSERT INTO cartons(carton_code,cdate,shift,source,source_ref,
-                                  batch_no,item_code,size,ply,xray,mesh,qty,operator,status)
-                                  VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                               (cc, fdate, s(f.get('shift')), 'ماكينة طي', mc, bn, b.get('item_code'),
-                                sz, ply, b.get('xray'), b.get('mesh'), qty, s(f.get('operator')), 'متاحة'))
-                con.execute("UPDATE work_orders SET status='قيد التنفيذ' WHERE batch_no=? AND status='صادر'", (bn,))
-            db.log('create', 'folding_out', doc_no, f'{bn}; carton={cc}; good={qty}')
-            if chk and chk != 'مطابق':
-                flash(chk, 'bad')
-            else:
-                flash(f'سُجّل ناتج الطي بسند {doc_no}' + (f' — الكرتونة {cc}' if cc else ''), 'ok')
-        return redirect(url_for('fold', b=bn))
-    today_iso = datetime.date.today().isoformat()
-    return render_template('fold.html', nav='fold', bn=bn, b=b,
-        batches=forms.batches(kind='إنتاج'),
-        avail=forms.sr_for_batch(b) if b else [],
-        fin=db.q('SELECT * FROM folding_in WHERE batch_no=? ORDER BY id', (bn,)) if bn else [],
-        fout=db.q('SELECT * FROM folding_out WHERE batch_no=? ORDER BY id', (bn,)) if bn else [],
-        recon=forms.fold_recon(bn) if bn else None,
-        piece_area=forms.piece_area_cm2(b.get('fold_machine'), b.get('std_width_cm')) if b else None,
-        default_doc=default_sheet_doc('FD', bn, today_iso,
-                                      [('folding_in', 'fdate'), ('folding_out', 'fdate')]) if b else '')
 
 # ---------------------------------------------------------------- الفرز
 @app.route('/sorting', methods=['GET','POST'])
@@ -1803,9 +1283,9 @@ def backup_admin():
 
 
 # ---------------------------------------------------------------- الجودة ولوحة المدير والتقارير
-import quality, manager, ncr, logistics, lines, genealogy, master
+import quality, manager, ncr, logistics, lines, genealogy, master, prod, qa, settings_page
 import sp as sp_mod, bandage as bandage_mod
-for _m in (lines, genealogy, master, sp_mod, bandage_mod):
+for _m in (lines, genealogy, master, sp_mod, bandage_mod, prod, qa, settings_page):
     _m.register(app)
 logistics.register(app)
 ncr.register(app)

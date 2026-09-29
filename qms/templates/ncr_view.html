@@ -1,5 +1,4 @@
 {% extends "base.html" %}{% block title %}{{ d.dev_no }}{% endblock %}{% block body %}
-<div class="crumb"><a href="{{ url_for('ncr_list') }}">عدم المطابقة</a><span class="sep">›</span><span class="here">{{ d.dev_no }}</span></div>
 <h1>{{ d.dev_no }} <span class="pill {{ 'ok' if d.status=='مغلق' else ('warn' if d.status=='قيد المعالجة' else 'bad') }}">{{ d.status }}</span></h1>
 <div class="card"><div class="kv">
 <div class="row"><div class="k">التاريخ</div><div class="v">{{ d.ddate }}</div></div>

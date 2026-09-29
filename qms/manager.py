@@ -117,39 +117,6 @@ def register(app):
             return fn
         return deco
 
-    @route('/manager', 'manager_home')
-    @auth.require('reports')
-    def manager_home():
-        today = datetime.date.today().isoformat()
-        open_orders = db.q("""SELECT * FROM work_orders WHERE COALESCE(order_type,'إنتاج')='إنتاج'
-                              AND status IN ('صادر','قيد التنفيذ') ORDER BY due_date IS NULL, due_date,
-                              batch_start_date""")
-        for w in open_orders:
-            w['prog'] = forms.batch_progress(w['batch_no'])
-            w['rp'] = mfg.progress(w['batch_no'])
-            w['late'] = bool(w.get('due_date') and w['due_date'] < today)
-        open_sl = db.q("""SELECT w.*, (SELECT COUNT(*) FROM subrolls x WHERE x.slit_batch=w.batch_no OR x.batch_no=w.batch_no) subs
-                          FROM work_orders w WHERE COALESCE(order_type,'إنتاج')='تقطيع'
-                          AND status IN ('صادر','قيد التنفيذ') ORDER BY batch_start_date DESC""")
-        due = [x for x in quality.due_items() if x['due']]
-        week = (datetime.date.today() - datetime.timedelta(days=7)).isoformat()
-        bad = db.q("""SELECT r.*, t.title FROM qc_records r JOIN qc_templates t ON t.code=r.template_code
-                      WHERE r.result='غير مطابق' AND r.rec_date>=? ORDER BY r.id DESC LIMIT 8""", (week,))
-        k = dict(
-            open_orders=len(open_orders),
-            late=sum(1 for w in open_orders if w['late']),
-            sr_stock=db.one("SELECT COUNT(*) n FROM subrolls WHERE stock_status='متاح'")['n'],
-            wait_release=db.one("SELECT COUNT(*) n FROM post_ster_receipts WHERE final_status='بانتظار الإفراج'")['n'],
-            wait_bi=db.one("""SELECT COUNT(*) n FROM cycles WHERE IFNULL(bi_result,'')<>'سالب — مطابق'
-                              AND status<>'مرفوضة'""")['n'],
-            rolls_hold=db.one("SELECT COUNT(*) n FROM rolls WHERE stock_status='حجر'")['n'],
-            qc_due=len(due), qc_bad=len(bad),
-            ncr_open=db.one("SELECT COUNT(*) n FROM deviations WHERE status<>'مغلق'")['n'])
-        import lines
-        cards = [lines.line_stats(r['code']) for r in lines.visible_routes()]
-        return render_template('manager_home.html', nav='mgr', k=k, open_orders=open_orders,
-                               open_sl=open_sl, due=due[:8], bad=bad, cards=cards)
-
     @route('/reports', 'reports')
     @auth.require('reports')
     def reports():

@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% block title %}بانتظار الاعتماد{% endblock %}{% block body %}
+<h1>بانتظار موافقة الجودة</h1>
+<div class="sub">دفعات أنهى الإنتاج تصنيعها — افتح الدفعة ثم اعتمد للتخزين أو ارفض أو علّق</div>
+{% if rows %}<div class="tablewrap"><table>
+<tr><th>أمر الإنتاج</th><th>المنتج</th><th>المطلوب</th><th>المنتج فعليًا</th><th>التشغيلة</th><th>أنهاها</th><th></th></tr>
+{% for w in rows %}<tr><td>{{ w.wo_no }}</td><td>{{ w.item_code }}</td><td>{{ fmt(w.qty_required) }} {{ w.uom }}</td>
+<td><b>{{ fmt(w.produced_qty) }}</b></td><td>{{ w.batch_no }}</td><td>{{ w.finished_by or '—' }}<div class="mini">{{ w.finished_at or '' }}</div></td>
+<td><a class="btn sm" href="{{ url_for('quality_review', bn=w.batch_no) }}">فتح ومراجعة</a></td></tr>{% endfor %}</table></div>
+{% else %}<div class="empty">لا توجد دفعات بانتظار الاعتماد.</div>{% endif %}
+
+{% if raw %}<h2>خام وارد بانتظار الفحص</h2>
+<div class="tablewrap"><table><tr><th>الاستلام</th><th>الصنف</th><th>لوط المورد</th><th>الكمية</th><th>التاريخ</th><th></th></tr>
+{% for r in raw %}<tr><td>{{ r.grn_no }}</td><td>{{ r.item_code }}<div class="mini">{{ r.description }}</div></td><td>{{ r.supplier_lot }}</td><td>{{ fmt(r.qty) }} {{ r.uom }}</td><td>{{ r.receipt_date }}</td>
+<td><a class="btn sm back" href="{{ url_for('receipt_view', grn_no=r.grn_no) }}">فحص</a></td></tr>{% endfor %}</table></div>{% endif %}
+{% endblock %}

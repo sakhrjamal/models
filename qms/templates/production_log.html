@@ -1,0 +1,8 @@
+{% extends "base.html" %}{% block title %}سجل الإنتاج{% endblock %}{% block body %}
+<h1>سجل الإنتاج</h1>
+<div class="sub">كل عملية إنشاء/تعديل/حذف على أوامر الإنتاج والقص والطي — بالمستخدم والوقت</div>
+{% if rows %}<div class="tablewrap"><table class="audit-t"><tr><th>الوقت</th><th>المستخدم</th><th>العملية</th><th>النوع</th><th>المرجع</th><th>التفاصيل</th></tr>
+{% for r in rows %}<tr class="{{ 'inactive' if False }}"><td class="c">{{ r.ts }}</td><td>{{ r.username }}</td>
+<td><span class="pill {{ 'bad' if r.bad else 'ok' }}">{{ r.action_ar }}</span></td><td>{{ r.table_ar }}</td><td class="c">{{ r.record_key }}</td><td style="max-width:380px;overflow-wrap:anywhere">{{ (r.details or '')[:160] }}</td></tr>{% endfor %}</table></div>
+{% else %}<div class="empty">لا توجد عمليات.</div>{% endif %}
+{% endblock %}

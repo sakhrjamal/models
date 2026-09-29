@@ -7,7 +7,7 @@ v11:
     عبر جدول ‎counters‎ و ‎BEGIN IMMEDIATE‎.
   • ‎log()‎ ينسب الحدث للمستخدم الحالي (من ‎flask.g‎) لا إلى «system».
 """
-import sqlite3, os, sys, re, contextlib, logging
+import sqlite3, os, sys, re, contextlib, logging, threading
 
 log_ = logging.getLogger('qms')
 
@@ -23,14 +23,51 @@ def base_dir():
 DB_PATH = os.environ.get('QMS_DB') or os.path.join(base_dir(), 'data', 'qms.db')
 
 
-def get():
+_WAL_DONE = set()
+_tl = threading.local()
+
+
+class _Shared:
+    """اتصال مشترك داخل reuse(): close() لا يغلقه، والباقي يُفوَّض للاتصال الحقيقي."""
+    def __init__(self, con):
+        self._c = con
+
+    def __getattr__(self, name):
+        return getattr(self._c, name)
+
+    def close(self):
+        pass
+
+
+def _open():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    con = sqlite3.connect(DB_PATH, timeout=30)
+    con = sqlite3.connect(DB_PATH, timeout=30)      # timeout = busy_timeout
     con.row_factory = sqlite3.Row
     con.execute('PRAGMA foreign_keys=ON')
-    con.execute('PRAGMA journal_mode=WAL')   # قراءة متزامنة أثناء الكتابة
-    con.execute('PRAGMA busy_timeout=30000')
+    if DB_PATH not in _WAL_DONE:                     # وضع WAL محفوظ في الملف نفسه: يكفي ضبطه مرة لكل تشغيل
+        con.execute('PRAGMA journal_mode=WAL')       # قراءة متزامنة أثناء الكتابة
+        _WAL_DONE.add(DB_PATH)
     return con
+
+
+def get():
+    shared = getattr(_tl, 'con', None)
+    return shared if shared is not None else _open()
+
+
+@contextlib.contextmanager
+def reuse():
+    """داخل هذا السياق تشترك q/one في اتصال واحد — لقوائم تحسب حالة عشرات الأوامر (قراءة فقط)."""
+    if getattr(_tl, 'con', None) is not None:
+        yield
+        return
+    con = _open()
+    _tl.con = _Shared(con)
+    try:
+        yield
+    finally:
+        _tl.con = None
+        con.close()
 
 
 def q(sql, args=()):
@@ -94,7 +131,7 @@ def alloc(con, scope, fmt):
     con.execute('INSERT OR IGNORE INTO counters(scope, n) VALUES(?, 0)', (scope,))
     con.execute('UPDATE counters SET n = n + 1 WHERE scope = ?', (scope,))
     n = con.execute('SELECT n FROM counters WHERE scope = ?', (scope,)).fetchone()[0]
-    return fmt.format(n=n, n3=f'{n:03d}')
+    return fmt.format(n=n, n3=f'{n:03d}', n4=f'{n:04d}', n6=f'{n:06d}')
 
 
 def use_number(con, manual, scope, fmt):
@@ -119,7 +156,7 @@ def peek_number(scope, fmt):
     """الرقم المتوقّع التالي دون حجزه — للعرض في النماذج فقط."""
     r = one('SELECT n FROM counters WHERE scope = ?', (scope,))
     n = (r['n'] if r else 0) + 1
-    return fmt.format(n=n, n3=f'{n:03d}')
+    return fmt.format(n=n, n3=f'{n:03d}', n4=f'{n:04d}', n6=f'{n:06d}')
 
 
 def seed_counter(scope, at_least):

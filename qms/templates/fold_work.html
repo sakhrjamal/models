@@ -1,0 +1,44 @@
+{% extends "base.html" %}{% block title %}الطي — {{ w.batch_no }}{% endblock %}{% block body %}
+<div class="autofill" style="margin-bottom:14px"><h4>بيانات السند (تلقائية — للقراءة فقط)</h4><div class="kv">
+  <div class="row"><span class="k">المنتج</span><span class="v">{{ w.item_code }}</span></div>
+  <div class="row"><span class="k">المقاس</span><span class="v">{{ card.size }}</span></div>
+  <div class="row"><span class="k">عرض السب رول</span><span class="v">{{ fmt(w.std_width_cm) }} سم</span></div>
+  <div class="row"><span class="k">ماكينة الطي</span><span class="v">{{ card.machine_name or w.fold_machine }}</span></div>
+  <div class="row"><span class="k">المسار</span><span class="v">{{ card.route_name }}</span></div>
+  <div class="row"><span class="k">وحدة الإخراج</span><span class="v">{{ st.unit }}</span></div>
+  <div class="row"><span class="k">أمر الإنتاج</span><span class="v">{{ w.wo_no }}</span></div>
+  <div class="row"><span class="k">رقم التشغيلة</span><span class="v">{{ w.batch_no }}</span></div>
+  <div class="row"><span class="k">رقم السند</span><span class="v">{{ next_doc }} <span class="mini">(تلقائي)</span></span></div>
+  <div class="row"><span class="k">المشغّل</span><span class="v">{{ me.full_name }} <span class="mini">(المستخدم الحالي)</span></span></div>
+</div></div>
+
+<div class="stat">
+  <div><b>{{ fmt(st.required) }}</b><span>المطلوب</span></div>
+  <div><b>{{ fmt(st.produced) }}</b><span>المنتج (Produced)</span></div>
+  <div><b>{{ fmt(st.remaining) }}</b><span>المتبقي (Remaining)</span></div>
+  <div><b>{{ subs|length }}</b><span>سب رول متاح</span></div>
+</div>
+
+{% if editable and can('enter') and not w.final_status %}
+{% if subs %}
+<form method="post" class="card" style="margin-top:14px">
+  <input type="hidden" name="t0" value="{{ t0 }}">
+  <label>السب رول *</label>
+  <div class="subrolls">{% for s_ in subs %}<label><input type="radio" name="tag_no" value="{{ s_.tag_no }}" required {{ 'checked' if loop.first }}> {{ s_.tag_no }}<span class="mini">{{ fmt(s_.width_cm) }} سم · {{ s_.roll_no }}</span></label>{% endfor %}</div>
+  <div style="margin-top:14px"><label>الكمية الفعلية المنتجة * ({{ st.unit }})</label>
+    <input type="number" name="qty_good" class="qtyinput" min="0" step="any" required autofocus placeholder="{{ fmt(w.pieces_per_sr) }}"></div>
+  <div style="margin-top:12px"><label>ملاحظات <span class="mini">(اختياري)</span></label><input name="notes"></div>
+  <div class="wizard-actions"><div class="l"><a class="btn back" href="{{ url_for('order_view', bn=w.batch_no) }}">أمر الإنتاج</a></div>
+    <button class="btn big ok">حفظ السند</button></div>
+</form>
+{% else %}<div class="hint">لا يوجد سب رول متاح للطي.
+  {% if st.sr_executed < (st.sr_needed or 0) %}<a href="{{ url_for('slit_work', bn=w.batch_no) }}">استكمل القص من السليتر</a>{% endif %}</div>{% endif %}
+{% elif w.final_status %}<div class="hint">الأمر بحالة «{{ mfg.FS_AR.get(w.final_status) }}» — لا تُسجَّل سندات جديدة.</div>{% endif %}
+
+<h2>سندات هذا الأمر</h2>
+{% if docs %}<div class="tablewrap"><table><tr><th>السند</th><th>السب رول</th><th>الكمية</th><th>المشغّل</th><th>الوقت</th>{% if editable and can('enter') %}<th></th>{% endif %}</tr>
+{% for d in docs %}<tr><td>{{ d.doc_no }}</td><td>{{ d.tag_no or '—' }}</td><td><b>{{ fmt(d.qty_good) }}</b> {{ d.unit or '' }}</td><td>{{ d.operator or '—' }}</td><td>{{ d.fdate }} {{ d.end_time or '' }}</td>
+{% if editable and can('enter') %}<td>{% if d.tag_no %}<a class="btn sm back" href="{{ url_for('fold_edit', doc_no=d.doc_no) }}">تعديل</a>
+<form class="inline" method="post" action="{{ url_for('fold_delete', doc_no=d.doc_no) }}" onsubmit="return confirm('حذف السند {{ d.doc_no }}؟ سيعود السب رول {{ d.tag_no }} متاحًا وتُخصم الكمية من الإنتاج.')"><button class="btn sm bad">حذف</button></form>{% endif %}</td>{% endif %}</tr>{% endfor %}</table></div>
+{% else %}<div class="empty">لا توجد سندات بعد.</div>{% endif %}
+{% endblock %}

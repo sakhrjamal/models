@@ -1,0 +1,47 @@
+{% extends "base.html" %}{% block title %}السليتر — {{ w.batch_no }}{% endblock %}{% block body %}
+<div class="batchbanner">
+  <div class="it"><span>رقم التشغيلة</span><div class="no">{{ w.batch_no }}</div></div>
+  <div class="it"><b>{{ w.item_code }}</b><span>المنتج</span></div>
+  <div class="it"><b>{{ fmt(st.required) }} {{ st.unit }}</b><span>الكمية المطلوبة</span></div>
+  <div class="it"><b>{{ fmt(req.sr_width) }} سم</b><span>عرض السب رول (من بيانات المنتج)</span></div>
+</div>
+
+<h2 style="margin-top:0">احتياج الخامة (Material Requirement)</h2>
+<div class="stat">
+  <div><b>{{ (req.jumbo_needed or 0)|int or '—' }}</b><span>جامبو رول مطلوب</span></div>
+  <div><b>{{ (req.sr_needed or 0)|int or '—' }}</b><span>سب رول مطلوب</span></div>
+  <div><b>{{ req.per_jumbo }}</b><span>سب رول لكل جامبو</span></div>
+  <div><b>{{ planned_sr }}</b><span>سب رول مخطط/مقصوص</span></div>
+</div>
+<div class="mini">العرض المفيد = {{ fmt(req.jumbo_width) }} − {{ fmt(req.edge_each) }} − {{ fmt(req.edge_each) }} = {{ fmt(req.usable_width) }} سم{% if req.raw_item %} · الخامة (BOM): {{ req.raw_item }}{% endif %}</div>
+
+{% if editable and can('enter') %}
+<h2>اختر الجامبو رول</h2>
+{% if jumbos %}<div class="tablewrap"><table>
+<tr><th>الجامبو</th><th>الصنف</th><th>لوط المورد</th><th>العرض (سم)</th><th>الطول (م)</th><th>سب رول ناتج</th><th></th></tr>
+{% for j in jumbos %}{% set per = ((j.jw - 2*req.edge_each) // req.sr_width)|int %}<tr>
+<td><b>{{ j.roll_no }}</b></td><td>{{ j.item_code }}</td><td>{{ j.slot or j.supplier_lot or '—' }}</td>
+<td>{{ fmt(j.jw) }}{% if j.jw_default %} <span class="mini">(افتراضي)</span>{% endif %}</td><td>{{ fmt(j.length_m) if j.length_m else '—' }}</td><td><b>{{ per }}</b> × {{ fmt(req.sr_width) }} سم</td>
+<td><form method="post" class="inline"><input type="hidden" name="roll_no" value="{{ j.roll_no }}">
+<button class="btn sm ok" name="mode" value="run" onclick="return confirm('قص {{ j.roll_no }} الآن وإنشاء {{ per }} سب رول؟')">تنفيذ القص</button>
+<button class="btn sm back" name="mode" value="plan">حفظ كخطة</button></form></td></tr>{% endfor %}</table></div>
+{% else %}<div class="empty">لا يوجد جامبو مفرج عنه ومتاح{% if req.raw_item %} من الخامة {{ req.raw_item }}{% endif %} — يُستلم ويُفحص من «استلام الخام».</div>{% endif %}
+{% endif %}
+
+<h2>خطط القص</h2>
+{% if plans %}{% for p in plans %}
+<div class="card">
+<div class="actions" style="justify-content:space-between"><div><b>{{ p.plan_no }}</b> — جامبو <b>{{ p.roll_no }}</b> <span class="pill {{ 'ok' if p.status=='منفّذ' else 'info' }}">الجامبو: {{ p.jumbo_status }}</span>
+ <span class="pill {{ 'ok' if p.status=='منفّذ' else 'warn' }}">الخطة: {{ p.status }}</span>
+ <div class="mini">جامبو {{ fmt(p.jumbo_width) }} سم · مفيد {{ fmt(p.usable_width) }} · {{ p.n_sub }} سب رول × {{ fmt(p.sr_width) }} سم{% if p.executed_by %} · نفّذ: {{ p.executed_by }}{% endif %}</div></div>
+{% if editable and can('enter') %}<div class="actions">
+ {% if p.status != 'منفّذ' %}<form class="inline" method="post" action="{{ url_for('slit_confirm', plan_no=p.plan_no) }}"><button class="btn sm ok">تأكيد تنفيذ القص</button></form>{% endif %}
+ {% if not p.used and (p.status != 'منفّذ' or can_delete_done) %}<form class="inline" method="post" action="{{ url_for('slit_plan_delete', plan_no=p.plan_no) }}" onsubmit="return confirm('حذف الخطة {{ p.plan_no }} وإرجاع الجامبو {{ p.roll_no }} متاحًا؟')"><button class="btn sm bad">حذف الخطة</button></form>{% endif %}</div>{% endif %}</div>
+<div class="subrolls" style="margin-top:8px">{% for s_ in p.subs %}<span class="chip {{ 'ok' if s_.stock_status=='متاح' else ('bad' if s_.stock_status=='مستهلك' else '') }}"><bdi>{{ s_.tag_no }}</bdi> · {{ fmt(s_.width_cm) }} سم <i>{{ s_.stock_status }}{% if s_.used_doc %} · <bdi>{{ s_.used_doc }}</bdi>{% endif %}</i></span>{% endfor %}</div>
+</div>{% endfor %}
+{% else %}<div class="empty">لم تُنشأ خطة قص بعد.</div>{% endif %}
+
+<div class="wizard-actions noprint"><div class="l"><a class="btn back" href="{{ url_for('order_view', bn=w.batch_no) }}">أمر الإنتاج</a>
+<a class="btn back" href="{{ url_for('tags', b=w.batch_no) }}">بطاقات السب رول</a></div>
+{% if st.sr_executed %}<a class="btn" href="{{ url_for('fold_work', bn=w.batch_no) }}">الانتقال إلى ماكينة الطي ◀</a>{% endif %}</div>
+{% endblock %}
