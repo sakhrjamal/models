@@ -1,4 +1,5 @@
 {% extends "base.html" %}{% from "_macros.html" import op_select with context %}{% block title %}الطي — {{ w.batch_no }}{% endblock %}{% block body %}
+{% if machine_down(w.fold_machine) %}<div class="msg bad">تنبيه صيانة: {{ machine_down(w.fold_machine).name_ar }} عليها بلاغ عطل طارئ مفتوح ({{ machine_down(w.fold_machine).order_no }}) منذ {{ machine_down(w.fold_machine).reported_at }}.</div>{% endif %}
 <div class="autofill" style="margin-bottom:14px"><h4>بيانات السند (تلقائية — للقراءة فقط)</h4><div class="kv">
   <div class="row"><span class="k">أمر الإنتاج</span><span class="v">{{ w.wo_no }}</span></div>
   <div class="row"><span class="k">رقم التشغيلة</span><span class="v">{{ w.batch_no }}</span></div>

@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% block title %}أوامر الصيانة{% endblock %}{% block body %}
+<h1>أوامر الصيانة</h1><div class="sub">وقائية وطارئة — سجل الصيانة</div>
+<form class="filters" method="get"><select name="kind"><option value="">الكل</option><option value="PM" {{ 'selected' if a.kind=='PM' }}>وقائية</option><option value="EM" {{ 'selected' if a.kind=='EM' }}>طارئة</option></select>
+<select name="status"><option value="">كل الحالات</option><option value="open" {{ 'selected' if a.status=='open' }}>المفتوحة</option>{% for k,v in st_ar.items() %}<option value="{{ k }}" {{ 'selected' if a.status==k }}>{{ v }}</option>{% endfor %}</select>
+<select name="eq"><option value="">كل الآلات</option>{% for e in equip %}<option value="{{ e.id }}" {{ 'selected' if a.eq==(e.id|string) }}>{{ e.name_ar }}</option>{% endfor %}</select>
+<input type="date" name="dfrom" value="{{ a.dfrom or '' }}"><input type="date" name="dto" value="{{ a.dto or '' }}"><button class="btn">تصفية</button></form>
+{% if rows %}<div class="tablewrap"><table><tr><th>الأمر</th><th>النوع</th><th>الآلة</th><th>الموعد / البلاغ</th><th>المنفِّذ</th><th>توقف (س)</th><th>الحالة</th><th></th></tr>
+{% for o in rows %}<tr><td><b>{{ o.order_no }}</b></td><td>{{ kind_ar[o.kind] }}</td><td>{{ o.name_ar }} <span class="mini">#{{ o.eq_no }}</span></td><td>{{ o.planned_date or o.reported_at }}{% if o.kind=='PM' and o.status in ('Planned','In Progress') and o.planned_date < t %} <span class="pill bad">متأخر</span>{% endif %}</td>
+<td>{{ o.done_by or o.assigned_to or '—' }}</td><td>{{ o.downtime_h if o.downtime_h is not none else '—' }}</td><td><span class="pill {{ st_cls.get(o.status,'') }}">{{ st_ar.get(o.status) }}</span></td>
+<td class="noprint"><a href="{{ url_for('maint_order', no=o.order_no) }}">فتح</a> · <a href="{{ url_for('print_doc', kind='maint', key=o.order_no) }}" target="_blank">طباعة</a></td></tr>{% endfor %}</table></div>
+{% else %}<div class="empty">لا توجد أوامر.</div>{% endif %}{% endblock %}

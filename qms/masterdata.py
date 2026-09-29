@@ -263,7 +263,8 @@ def register(app):
                 'enter': 'تسجيل وتعديل سندات الإنتاج', 'wo_issue': 'إصدار أوامر الإنتاج', 'wo_close': 'إغلاق الأوامر وإبطال الشحن',
                 'reports': 'التقارير', 'audit': 'سجل التدقيق', 'qc_record': 'فحص الخام وسجلات المتابعة', 'qc_sign': 'قرارات الإفراج',
                 'qc_template': 'تعديل قوالب الجودة', 'ncr': 'عدم المطابقة', 'admin': 'المستخدمون والنسخ والإعدادات',
-                'receive': 'استلام الخام', 'warehouse': 'المخزن والشحن', 'route_override': 'استثناء المسار', 'master': 'البيانات الرئيسية'}
+                'receive': 'استلام الخام', 'warehouse': 'المخزن والشحن', 'route_override': 'استثناء المسار', 'master': 'البيانات الرئيسية',
+                'maint_view': 'عرض شاشات الصيانة', 'maint': 'تنفيذ الصيانة الوقائية والطارئة', 'maint_report': 'رفع بلاغ عطل طارئ', 'maint_verify': 'اعتماد أوامر الصيانة'}
         return render_template('roles_admin.html', nav='admin', perms=perms, desc=desc, roles=constants.ROLE_AR, P=constants.PERMS)
 
     @route('/admin/data-alerts', 'data_alerts')

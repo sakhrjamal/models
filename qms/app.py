@@ -1317,9 +1317,9 @@ def backup_admin():
 
 
 # ---------------------------------------------------------------- الجودة ولوحة المدير والتقارير
-import quality, manager, ncr, logistics, lines, genealogy, master, prod, qa, settings_page, proc, printing, masterdata, monitor, importer, tracecenter
+import quality, manager, ncr, logistics, lines, genealogy, master, prod, qa, settings_page, proc, printing, masterdata, monitor, importer, tracecenter, maintenance
 import sp as sp_mod, bandage as bandage_mod
-for _m in (lines, genealogy, master, sp_mod, bandage_mod, prod, qa, settings_page, proc, printing, masterdata, monitor, importer, tracecenter):
+for _m in (lines, genealogy, master, sp_mod, bandage_mod, prod, qa, settings_page, proc, printing, masterdata, monitor, importer, tracecenter, maintenance):
     _m.register(app)
 logistics.register(app)
 ncr.register(app)

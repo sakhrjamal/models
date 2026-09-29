@@ -1,7 +1,7 @@
 <!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>{{ d.title }} {{ d.no }}</title>
 <style>
-@page{size:A4;margin:{{ m.top }}mm {{ m.side }}mm {{ m.bottom }}mm {{ m.side }}mm;{% if lh %}background:url('{{ url_for('letterhead') }}') no-repeat -{{ m.side }}mm -{{ m.top }}mm/210mm 297mm;{% endif %}
-  @{{ "top-center" if lh else "bottom-center" }}{vertical-align:{{ "bottom" if lh else "top" }};padding-{{ "bottom" if lh else "top" }}:2mm;content:"Page " counter(page) " / " counter(pages);font:12pt "Times New Roman","Liberation Serif",serif;color:#333}}
+@page{size:A4{{ ' landscape' if d.landscape }};margin:{{ m.top }}mm {{ m.side }}mm {{ m.bottom }}mm {{ m.side }}mm;{% if lh and not d.landscape %}background:url('{{ url_for('letterhead') }}') no-repeat -{{ m.side }}mm -{{ m.top }}mm/210mm 297mm;{% endif %}
+  @{{ "top-center" if (lh and not d.landscape) else "bottom-center" }}{vertical-align:{{ "bottom" if (lh and not d.landscape) else "top" }};padding-{{ "bottom" if (lh and not d.landscape) else "top" }}:2mm;content:"Page " counter(page) " / " counter(pages);font:12pt "Times New Roman","Liberation Serif",serif;color:#333}}
 *{box-sizing:border-box}
 body{font-family:"Times New Roman","Liberation Serif",Times,serif;font-size:12pt;color:#111;margin:0;background:#e5e7eb}
 .page{width:210mm;min-height:297mm;margin:10px auto;background:#fff;padding:0 {{ m.side }}mm;position:relative;box-shadow:0 2px 12px #0003}

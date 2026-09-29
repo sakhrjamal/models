@@ -48,6 +48,8 @@ EXACT = {
     'roles_admin': ('admin',), 'data_alerts': ADMIN, 'master_rename': ADMIN, 'import_center': ADMIN,
     'inv_cards': ('view',), 'inv_card': ('view',), 'inv_card_new': ADMIN, 'inv_raw': ('warehouse', 'prod_view', 'qual_view'),
     'inv_moves': ('warehouse', 'prod_view', 'qual_view'), 'subroll_list': PROD, 'inter_list': PROD, 'ns_list': PROD,
+    'maint_home': ('maint_view',), 'maint_plan': ('maint_view',), 'maint_orders': ('maint_view',), 'maint_order': ('maint_view',),
+    'maint_generate': ('maint',), 'maint_report': ('maint_report',), 'maint_equipment': ADMIN, 'maint_checklist': ADMIN,
     'trace_center': ('view',), 'trace_api': ('view',), 'scan': ('view',), 'letterhead': ('view',),
 }
 

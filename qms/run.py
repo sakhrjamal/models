@@ -21,6 +21,7 @@ import migrate_v12
 import migrate_v13
 import migrate_v14
 import migrate_v15
+import migrate_v16
 import backup
 import auth
 from app import app
@@ -87,6 +88,7 @@ def main():
     migrate_v13.run(verbose=True)
     migrate_v14.run(verbose=True)
     migrate_v15.run(verbose=True)
+    migrate_v16.run(verbose=True)
     db.apply_migrations()
     creds = auth.ensure_admin()
     backup.schedule()

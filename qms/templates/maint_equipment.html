@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% block title %}معدات الصيانة{% endblock %}{% block body %}
+<h1>المعدات وبنود الفحص</h1><div class="sub">الآلات كما في نموذج جدول الصيانة الوقائية. المدة بين الصيانتين بالأيام.</div>
+<div class="tablewrap"><table><tr><th>#</th><th>رقم الآلة</th><th>الاسم (عربي)</th><th>Name (EN)</th><th>الموقع</th><th>ماكينة الإنتاج</th><th>المدة (يوم)</th><th>الاستحقاق التالي</th><th>فعّالة</th><th>بنود</th><th></th></tr>
+{% for e in rows %}<tr>
+<td>{{ e.sr }}<form id="f{{ e.id }}" method="post"><input type="hidden" name="act" value="save"><input type="hidden" name="id" value="{{ e.id }}"></form></td><td><input form="f{{ e.id }}" name="no" value="{{ e.no }}" style="width:60px"></td><td><input form="f{{ e.id }}" name="name_ar" value="{{ e.name_ar }}"></td><td><input form="f{{ e.id }}" name="name_en" value="{{ e.name_en or '' }}" style="direction:ltr"></td>
+<td><input form="f{{ e.id }}" name="location" value="{{ e.location or '' }}" style="width:110px"></td>
+<td><select form="f{{ e.id }}" name="machine_code"><option value="">—</option>{% for m in machines %}<option value="{{ m.machine_code }}" {{ 'selected' if e.machine_code==m.machine_code }}>{{ m.machine_code }}</option>{% endfor %}</select></td>
+<td><input form="f{{ e.id }}" name="freq_days" type="number" min="1" value="{{ e.freq_days }}" style="width:70px"></td><td><input form="f{{ e.id }}" type="date" name="next_due" value="{{ e.next_due or '' }}"></td>
+<td><input form="f{{ e.id }}" type="checkbox" name="active" style="width:auto" {{ 'checked' if e.active }}></td><td><a href="{{ url_for('maint_checklist', eid=e.id) }}">{{ n_items.get(e.id,0) }} ✎</a></td><td><button form="f{{ e.id }}" class="btn sm">حفظ</button></td></tr>{% endfor %}</table></div>
+<h2>إضافة آلة</h2>
+<form method="post" class="card"><input type="hidden" name="act" value="add"><div class="grid"><div><label>رقم الآلة *</label><input name="no" required></div><div><label>الاسم (عربي) *</label><input name="name_ar" required></div>
+<div><label>Name (EN)</label><input name="name_en" style="direction:ltr"></div><div><label>الموقع</label><input name="location"></div>
+<div><label>ماكينة الإنتاج المرتبطة</label><select name="machine_code"><option value="">—</option>{% for m in machines %}<option value="{{ m.machine_code }}">{{ m.machine_code }} — {{ m.name }}</option>{% endfor %}</select></div>
+<div><label>المدة (يوم)</label><input name="freq_days" type="number" value="30" min="1"></div><div><label>أول استحقاق</label><input type="date" name="next_due"></div></div><div class="actions"><button class="btn">إضافة</button></div></form>
+<h2>أرقام نماذج الآيزو</h2>
+<form method="post" class="card"><input type="hidden" name="act" value="forms"><div class="grid">
+<div><label>جدول الصيانة الوقائية</label><input name="maint_form_pm" value="{{ forms.pm }}" style="direction:ltr"></div>
+<div><label>بلاغ/أمر الصيانة الطارئة <span class="mini">(لم يصل النموذج)</span></label><input name="maint_form_em" value="{{ forms.em }}" style="direction:ltr"></div>
+<div><label>سجل فحص الصيانة الوقائية <span class="mini">(لم يصل النموذج)</span></label><input name="maint_form_wo" value="{{ forms.wo }}" style="direction:ltr"></div></div><div class="actions"><button class="btn">حفظ</button></div></form>
+{% endblock %}

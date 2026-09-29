@@ -12,13 +12,14 @@ import re
 #   الإنتاج  : prod_view + enter (لا يرى شيئًا من الجودة)
 #   الجودة   : qual_view + qc_* (لا يرى ولا يُدخل أي تشغيل إنتاج)
 #   الأدمن/المدير: كل الصلاحيات
-ROLES = {'viewer': 0, 'operator': 1, 'store': 2, 'qc': 3, 'qa': 4, 'manager': 5, 'admin': 6}
+ROLES = {'viewer': 0, 'operator': 1, 'store': 2, 'qc': 3, 'qa': 4, 'maint': 2, 'manager': 5, 'admin': 6}
 ROLE_AR = {
     'viewer':   'عرض فقط',
     'operator': 'مستخدم إنتاج',
     'store':    'أمين مخزن',
     'qc':       'مستخدم جودة',
     'qa':       'مستخدم جودة (QA)',
+    'maint':    'فني صيانة',
     'manager':  'مدير المصنع (كل الصلاحيات)',
     'admin':    'مدير النظام',
 }
@@ -30,16 +31,17 @@ PERMS = {
     # wo_issue    إصدار أوامر الإنتاج | reports التقارير | audit سجل التدقيق | admin المستخدمون والنسخ
     # master      بيانات المنتجات | route_override تغيير المسار استثنائيًا | qc_template/ncr إعدادات الجودة (أدمن)
     'viewer':   {'view', 'prod_view', 'qual_view'},
-    'operator': {'view', 'prod_view', 'enter'},
+    'operator': {'view', 'prod_view', 'enter', 'maint_report'},
     'store':    {'view', 'receive', 'warehouse'},
     'qc':       {'view', 'qual_view', 'qc_record', 'qc_sign', 'ncr'},
     'qa':       {'view', 'qual_view', 'qc_record', 'qc_sign', 'ncr'},
+    'maint':    {'view', 'maint_view', 'maint', 'maint_report'},
     'manager':  None,
     'admin':    None,
 }
 ALL_PERMS = {'view', 'prod_view', 'qual_view', 'enter', 'wo_issue', 'wo_close', 'reports', 'audit',
              'qc_record', 'qc_sign', 'qc_template', 'ncr', 'admin', 'receive', 'warehouse',
-             'route_override', 'master'}
+             'route_override', 'master', 'maint_view', 'maint', 'maint_report', 'maint_verify'}
 PERMS['manager'] = set(ALL_PERMS)
 PERMS['admin'] = set(ALL_PERMS)
 

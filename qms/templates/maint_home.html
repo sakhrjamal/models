@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% block title %}الصيانة{% endblock %}{% block body %}
+<div class="pagehead"><div><h1>لوحة الصيانة</h1><div class="sub">الوقائية والطارئة — {{ year }}</div></div>
+<div class="actions">{% if can('maint_report') %}<a class="btn bad" href="{{ url_for('maint_report') }}">⚠ بلاغ عطل طارئ</a>{% endif %}<a class="btn back" href="{{ url_for('maint_plan') }}">الجدول السنوي</a></div></div>
+<div class="stat">
+<div><b>{{ k.pm_open }}</b><span>وقائية مفتوحة</span></div>
+<div><b style="color:{{ 'var(--bad,#c0392b)' if k.overdue else 'inherit' }}">{{ k.overdue }}</b><span>وقائية متأخرة</span></div>
+<div><b>{{ k.em_open }}</b><span>بلاغات طارئة مفتوحة</span></div>
+<div><b>{{ k.compliance ~ '%' if k.compliance is not none else '—' }}</b><span>الالتزام بالخطة ({{ k.done }}/{{ k.planned }})</span></div>
+<div><b>{{ k.downtime }}</b><span>ساعات التوقف {{ year }}</span></div></div>
+<h2>بلاغات طارئة مفتوحة</h2>
+{% if open_em %}<div class="tablewrap"><table><tr><th>البلاغ</th><th>الآلة</th><th>الخطورة</th><th>الإنتاج</th><th>وُقّع</th><th>الحالة</th><th></th></tr>
+{% for o in open_em %}<tr><td><b>{{ o.order_no }}</b></td><td>{{ o.name_ar }} <span class="mini">#{{ o.eq_no }}</span></td><td>{{ o.severity }}</td><td>{{ 'متوقف' if o.production_stopped else '—' }}</td><td>{{ o.reported_at }} · {{ o.reported_by }}</td>
+<td><span class="pill {{ st_cls.get(o.status,'') }}">{{ st_ar.get(o.status) }}</span></td><td><a class="btn sm" href="{{ url_for('maint_order', no=o.order_no) }}">فتح</a></td></tr>{% endfor %}</table></div>{% else %}<div class="empty">لا توجد بلاغات مفتوحة.</div>{% endif %}
+<h2>الصيانة الوقائية المفتوحة</h2>
+{% if open_pm %}<div class="tablewrap"><table><tr><th>الأمر</th><th>الآلة</th><th>الموعد</th><th>الحالة</th><th></th></tr>
+{% for o in open_pm %}<tr><td><b>{{ o.order_no }}</b></td><td>{{ o.name_ar }} <span class="mini">#{{ o.eq_no }}</span></td><td>{{ o.planned_date }}{% if o.planned_date < t %} <span class="pill bad">متأخر</span>{% endif %}</td>
+<td><span class="pill {{ st_cls.get(o.status,'') }}">{{ st_ar.get(o.status) }}</span></td><td><a class="btn sm" href="{{ url_for('maint_order', no=o.order_no) }}">{{ 'متابعة' if o.status=='In Progress' else 'فتح' }}</a></td></tr>{% endfor %}</table></div>{% else %}<div class="empty">لا توجد أوامر وقائية مفتوحة.</div>{% endif %}
+{% if down %}<h2>الأعطال وساعات التوقف حسب الآلة ({{ year }})</h2><div class="tablewrap"><table><tr><th>الآلة</th><th>عدد الأعطال</th><th>ساعات التوقف</th></tr>
+{% for d in down %}<tr><td>{{ d.name_ar }} <span class="mini">#{{ d.no }}</span></td><td>{{ d.n }}</td><td>{{ fmt(d.h) }}</td></tr>{% endfor %}</table></div>{% endif %}
+{% endblock %}

@@ -11,12 +11,12 @@ sys.path.insert(0, os.path.dirname(HERE))
 _tmp = tempfile.mkdtemp(prefix='qms-test-')
 os.environ['QMS_DB'] = os.path.join(_tmp, 'qms.db')
 
-import seed, migrate_v11, migrate_v12, migrate_v13, migrate_v14, migrate_v15, db, auth   # noqa: E402
+import seed, migrate_v11, migrate_v12, migrate_v13, migrate_v14, migrate_v15, migrate_v16, db, auth   # noqa: E402
 seed.main()
-migrate_v11.run(); migrate_v12.run(); migrate_v13.run(); migrate_v14.run(); migrate_v15.run(); db.apply_migrations()
+migrate_v11.run(); migrate_v12.run(); migrate_v13.run(); migrate_v14.run(); migrate_v15.run(); migrate_v16.run(); db.apply_migrations()
 auth.ensure_admin()
 db.run('UPDATE users SET must_change_pw=0')
-for un, role in (('mgr', 'manager'), ('op', 'operator'), ('qc', 'qc'), ('qa', 'qa'), ('view', 'viewer'), ('store', 'store')):
+for un, role in (('mgr', 'manager'), ('op', 'operator'), ('qc', 'qc'), ('qa', 'qa'), ('view', 'viewer'), ('store', 'store'), ('tech', 'maint')):
     db.run("INSERT INTO users(username,full_name,pw_hash,role,active,must_change_pw) VALUES(?,?,?,?,1,0)",
            (un, f'مستخدم {un}', auth.hash_pw('pass123'), role))
 from app import app                                     # noqa: E402
@@ -570,7 +570,7 @@ class V15(unittest.TestCase):
     # ================================================================== 15. الترحيل آمن على التكرار ومن قاعدة v14
     def test_15_migration_idempotent(self):
         n = db.one('SELECT COUNT(*) n FROM operators')['n']
-        migrate_v15.run(); migrate_v15.run()
+        migrate_v16.run(); migrate_v16.run()
         self.assertEqual(db.one('SELECT COUNT(*) n FROM operators')['n'], n)
         self.assertEqual(db.one("SELECT COUNT(DISTINCT uid) n FROM items")['n'], db.one('SELECT COUNT(*) n FROM items')['n'])
         with db.tx() as con:
@@ -723,6 +723,87 @@ class V15(unittest.TestCase):
         self.assertEqual(c.post('/login', data={'username': 'admin', 'password': 'wrong'}).status_code, 400)   # CSRF كما هو
         r = c.post('/login', data={'username': 'mgr', 'password': 'pass123', '_csrf': tok}, follow_redirects=False)
         self.assertEqual(r.status_code, 302)
+
+    # ================================================================== 22. الصيانة الوقائية والطارئة
+    def test_22_maintenance(self):
+        tech = Client('tech')
+        eq = {r['no']: r for r in db.q('SELECT * FROM maint_equipment')}
+        self.assertEqual({k: v['name_en'] for k, v in eq.items()},
+                         {'1': 'Machine (Sliter)', '5': 'Machine 10', '4': 'Machine 7.5', '3': 'Machine 5', '6': 'Packing M/C', '2': 'PPT M/C', '7': 'Sterilization'})
+        self.assertTrue(all(v['freq_days'] == 30 for v in eq.values()))
+        self.assertEqual(db.setting('maint_form_pm'), 'XXXQP-12.F02')
+        # الصلاحيات
+        self.assertEqual(self.op.get('/maintenance').status_code, 403)
+        self.assertEqual(self.op.get('/maintenance/report').status_code, 200)         # الإنتاج يبلّغ فقط
+        self.assertEqual(self.qc.get('/maintenance/report').status_code, 403)
+        self.assertEqual(tech.get('/maintenance').status_code, 200)
+        self.assertEqual(tech.get('/maintenance/equipment').status_code, 403)
+        self.assertEqual(tech.get('/slitter').status_code, 403)                        # فني الصيانة لا يرى الإنتاج
+        L = set(re.findall(r'href="([^"]+)"', body(tech.get('/')).split('<aside')[-1].split('</aside>')[0]))
+        self.assertIn('/maintenance', L); self.assertNotIn('/slitter', L); self.assertNotIn('/quality/pending', L)
+        Lo = set(re.findall(r'href="([^"]+)"', body(self.op.get('/')).split('<aside')[-1].split('</aside>')[0]))
+        self.assertIn('/maintenance/report', Lo); self.assertNotIn('/maintenance', Lo)
+        # الجدول: أوامر الشهر تُولَّد تلقائيًا (7 آلات)
+        page = body(tech.get('/maintenance'))
+        n = db.one("SELECT COUNT(*) n FROM maint_orders WHERE kind='PM'")['n']
+        self.assertEqual(n, 7)
+        self.assertIn('XXXQP-12.F02', body(tech.get('/maintenance/plan')))
+        tech.get('/maintenance')                                                        # لا تكرار
+        self.assertEqual(db.one("SELECT COUNT(*) n FROM maint_orders WHERE kind='PM'")['n'], 7)
+        # صيانة وقائية: تنفيذ ببنود
+        pm = db.one("SELECT o.order_no FROM maint_orders o JOIN maint_equipment e ON e.id=o.equip_id WHERE e.no='5' AND o.kind='PM'")['order_no']
+        self.assertEqual(self.op.get(f'/maintenance/order/{pm}').status_code, 403)
+        tech.post(f'/maintenance/order/{pm}', {'act': 'start'})
+        res = db.q('SELECT * FROM maint_results WHERE order_id=(SELECT id FROM maint_orders WHERE order_no=?)', (pm,))
+        self.assertGreaterEqual(len(res), 8)
+        tech.post(f'/maintenance/order/{pm}', {'act': 'complete'})                     # بنود بلا إجابة
+        self.assertEqual(db.one('SELECT status s FROM maint_orders WHERE order_no=?', (pm,))['s'], 'In Progress')
+        d = {'act': 'complete'}
+        for i, r in enumerate(res):
+            d[f'r{r["id"]}'] = 'غير مطابق' if i == 0 else 'مطابق'
+        tech.post(f'/maintenance/order/{pm}', d)                                         # غير مطابق بلا ملاحظة
+        self.assertEqual(db.one('SELECT status s FROM maint_orders WHERE order_no=?', (pm,))['s'], 'In Progress')
+        d[f'n{res[0]["id"]}'] = 'الحزام متآكل'
+        tech.post(f'/maintenance/order/{pm}', d)
+        o = db.one('SELECT * FROM maint_orders WHERE order_no=?', (pm,))
+        self.assertEqual((o['status'], o['result'], o['done_by']), ('Completed', 'به ملاحظات', 'مستخدم tech'))
+        e5 = db.one("SELECT * FROM maint_equipment WHERE no='5'")
+        self.assertEqual(e5['next_due'], (datetime.date.today() + datetime.timedelta(days=30)).isoformat())
+        self.assertEqual(tech.post(f'/maintenance/order/{pm}', {'act': 'verify'}, follow=False).status_code, 403)   # الاعتماد للمدير
+        self.mgr.post(f'/maintenance/order/{pm}', {'act': 'verify'})
+        self.assertEqual(db.one('SELECT status s FROM maint_orders WHERE order_no=?', (pm,))['s'], 'Verified')
+        r = tech.post(f'/maintenance/order/{pm}', {'act': 'raise_em'})                   # بلاغ من بند غير مطابق
+        em0 = db.one("SELECT * FROM maint_orders WHERE kind='EM' AND parent_order=?", (pm,))
+        self.assertIsNotNone(em0); self.assertIn('الحزام متآكل', em0['problem'])
+        # صيانة طارئة: بلاغ من الإنتاج ← إشعار ← تحذير على شاشة الطي ← إصلاح ← اعتماد
+        n0 = db.one("SELECT COUNT(*) n FROM notifications WHERE kind='em_reported'")['n']
+        self.op.post('/maintenance/report', {'equip_id': str(e5['id']), 'problem': 'الماكينة تصدر صوتًا وتتوقف', 'severity': 'عالية', 'stopped': '1'})
+        em = db.one("SELECT * FROM maint_orders WHERE kind='EM' AND reported_by='مستخدم op'")
+        self.assertRegex(em['order_no'], r'^EM-\d{4}-\d{6}$')
+        self.assertEqual((em['status'], em['production_stopped']), ('Reported', 1))
+        self.assertEqual(db.one("SELECT COUNT(*) n FROM notifications WHERE kind='em_reported'")['n'], n0 + 1)
+        self.assertIn('الماكينة تصدر صوتًا', txt(tech.get('/notifications')) + txt(tech.get('/maintenance')))
+        w = db.one("SELECT batch_no FROM work_orders WHERE fold_machine='FD-10' LIMIT 1")
+        self.assertIn('تنبيه صيانة', body(self.op.get(f'/folding/{w["batch_no"]}')))   # تحذير لا منع
+        tech.post(f'/maintenance/order/{em["order_no"]}', {'act': 'start'})
+        tech.post(f'/maintenance/order/{em["order_no"]}', {'act': 'complete'})           # بلا سبب/إجراء
+        self.assertEqual(db.one('SELECT status s FROM maint_orders WHERE order_no=?', (em['order_no'],))['s'], 'In Progress')
+        tech.post(f'/maintenance/order/{em["order_no"]}', {'act': 'complete', 'cause': 'تآكل حزام', 'action_taken': 'استبدال الحزام', 'parts_used': 'حزام 1'})
+        em2 = db.one('SELECT * FROM maint_orders WHERE order_no=?', (em['order_no'],))
+        self.assertEqual(em2['status'], 'Completed'); self.assertIsNotNone(em2['downtime_h'])
+        self.assertNotIn('تنبيه صيانة', body(self.op.get(f'/folding/{w["batch_no"]}')))  # زال التحذير
+        self.mgr.post(f'/maintenance/order/{em["order_no"]}', {'act': 'verify'})
+        # الطباعة والقوائم والتقرير
+        for u in (f'/print/pm_schedule/{datetime.date.today().year}', f'/print/maint/{pm}', f'/print/maint/{em["order_no"]}',
+                  '/maintenance/orders?kind=EM', '/maintenance/plan', f'/maintenance/equipment/{e5["id"]}/checklist'):
+            self.assertEqual(self.adm.get(u).status_code, 200, u)
+        self.assertIn('landscape', body(self.adm.get(f'/print/pm_schedule/{datetime.date.today().year}')))
+        # تعديل بنود الفحص من الإدارة (يلغي علامة «مقترح»)
+        it = db.one('SELECT * FROM maint_checklist WHERE equip_id=? ORDER BY seq', (e5['id'],))
+        self.adm.post(f'/maintenance/equipment/{e5["id"]}/checklist', {'act': 'save', f's{it["id"]}': '1', f'a{it["id"]}': 'بند معدَّل', f'k{it["id"]}': 'on'})
+        self.assertEqual(db.one('SELECT item_ar a, proposed p FROM maint_checklist WHERE id=?', (it['id'],)), {'a': 'بند معدَّل', 'p': 0})
+        # إعادة بناء المستخدمين لم تُفقد أحدًا
+        self.assertEqual(db.one("SELECT COUNT(*) n FROM users WHERE username IN ('admin','mgr','op','qc','tech')")['n'], 5)
 
     # ================================================================== 11. كل الصفحات تعمل
     def test_11_all_pages_render(self):

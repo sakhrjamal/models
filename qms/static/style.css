@@ -363,3 +363,6 @@ input:focus,select:focus{outline-color:#14b8a6}
 
 .chain .card{display:block;width:100%;margin-bottom:14px}
 .chain .card h3{margin:0 0 8px;font-size:15px;color:var(--brand)}
+
+.side details.c-orange{--gc:#fb923c}
+.rowbad td{background:rgba(198,30,30,.07)}

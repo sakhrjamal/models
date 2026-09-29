@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% block title %}بلاغ عطل طارئ{% endblock %}{% block body %}
+<h1>بلاغ عطل طارئ</h1><div class="sub">يصل فورًا إلى فريق الصيانة كإشعار. الوقت والمُبلِّغ تلقائيان.</div>
+<form method="post" class="card"><div class="grid">
+<div><label>الآلة *</label><select name="equip_id" required><option value="">— اختر —</option>{% for e in equip %}<option value="{{ e.id }}" {{ 'selected' if pre==(e.id|string) }}>{{ e.name_ar }} (رقم {{ e.no }})</option>{% endfor %}</select></div>
+<div><label>الخطورة</label><select name="severity">{% for v in sev %}<option {{ 'selected' if v=='متوسطة' }}>{{ v }}</option>{% endfor %}</select></div>
+<div style="grid-column:1/-1"><label>وصف العطل *</label><textarea name="problem" rows="3" required></textarea></div>
+<div><label><input type="checkbox" name="stopped" style="width:auto"> الإنتاج متوقف بسبب العطل</label></div></div>
+<div class="actions"><button class="btn bad">إرسال البلاغ</button></div></form>
+{% if mine %}<h2>بلاغاتي</h2><div class="tablewrap"><table><tr><th>البلاغ</th><th>الآلة</th><th>الوقت</th><th>الحالة</th></tr>
+{% for o in mine %}<tr><td>{% if can('maint_view') %}<a href="{{ url_for('maint_order', no=o.order_no) }}">{{ o.order_no }}</a>{% else %}{{ o.order_no }}{% endif %}</td><td>{{ o.name_ar }}</td><td>{{ o.reported_at }}</td><td><span class="pill {{ st_cls.get(o.status,'') }}">{{ st_ar.get(o.status) }}</span></td></tr>{% endfor %}</table></div>{% endif %}
+{% endblock %}

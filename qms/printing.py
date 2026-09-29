@@ -179,6 +179,43 @@ def doc_data(kind, key):
         return dict(title='حركة مخزون', no=key, meta=_kv(('المستند', key)), sections=[_table('القيود', ['الوقت', 'المالك', 'المرحلة', 'الكمية', 'الوحدة', 'ملاحظة'],
                     [[r['ts'], r['owner'], (__import__('inventory').STAGES.get(r['stage']) or (r['stage'],))[0], fmt_qty(r['qty']), r['unit'], r['note'] or '—'] for r in rows])],
                     sign=['أمين المخزن'])
+    if kind == 'pm_schedule':
+        import maintenance
+        y = int(key)
+        rows = []
+        for r in maintenance._grid(y):
+            rows.append([r['e']['sr'], f"{r['e']['name_en'] or ''} {r['e']['name_ar']}".strip(), r['e']['no'], r['e']['location'] or '—', f"{r['e']['freq_days']} يوم"]
+                        + [c['txt'] for c in r['cells']])
+        return dict(title='جدول الصيانة الوقائية — Preventive Maintenance Schedule', no=f"{y}", landscape=True,
+                    meta=_kv(('رقم النموذج', db.setting('maint_form_pm', '') or '—'), ('السنة', y)),
+                    sections=[_table('الجدول السنوي (✔ = أُنجزت · الرقم = موعد مخطط · ⚠ = متأخرة)',
+                                     ['#', 'الآلة / Equipment', 'رقم الآلة', 'الموقع', 'المدة'] + maintenance.MONTHS_EN, rows)],
+                    sign=['Prepared By / أعدّه', 'Approved By / اعتمده'])
+    if kind == 'maint':
+        import maintenance
+        o = db.one('SELECT o.*, e.no eq_no, e.name_ar, e.name_en, e.location, e.freq_days FROM maint_orders o JOIN maint_equipment e ON e.id=o.equip_id WHERE o.order_no=?', (key,))
+        if not o:
+            return None
+        meta = [('رقم الأمر', o['order_no']), ('النوع', 'صيانة وقائية' if o['kind'] == 'PM' else 'صيانة طارئة'),
+                ('رقم النموذج', maintenance.form_no(o['kind']) or '—'), ('الحالة', maintenance.ST_AR.get(o['status'])),
+                ('الآلة', f"{o['name_ar']} {o['name_en'] or ''}"), ('رقم الآلة', o['eq_no'])]
+        if o['kind'] == 'PM':
+            meta += [('الموعد المخطط', o['planned_date']), ('المدة بين الصيانتين', f"{o['freq_days']} يوم")]
+        else:
+            meta += [('أبلغ', f"{o['reported_by']} — {o['reported_at']}"), ('الخطورة', o['severity']),
+                     ('الإنتاج', 'متوقف' if o['production_stopped'] else 'يعمل'), ('زمن التوقف (ساعة)', o['downtime_h'] if o['downtime_h'] is not None else '—')]
+        meta += [('المنفِّذ', o['done_by'] or o['assigned_to'] or '—'), ('بدأ / انتهى', f"{o['start_at'] or '—'} / {o['end_at'] or '—'}")]
+        secs = []
+        if o['kind'] == 'PM':
+            res = db.q('SELECT * FROM maint_results WHERE order_id=? ORDER BY seq', (o['id'],))
+            secs.append(_table('بنود الفحص', ['#', 'البند', 'النتيجة', 'ملاحظة'], [[i, r['item_ar'], r['result'] or '—', r['note'] or ''] for i, r in enumerate(res, 1)]))
+        else:
+            secs.append(_table('العطل والإصلاح', ['البند', 'التفاصيل'], [['وصف العطل', o['problem']], ['سبب العطل', o['cause'] or '—'],
+                                                                     ['الإجراء المنفَّذ', o['action_taken'] or '—'], ['قطع الغيار', o['parts_used'] or '—']]))
+        if o['notes']:
+            secs.append(_table('ملاحظات', ['ملاحظات'], [[o['notes']]]))
+        return dict(title='أمر صيانة وقائية' if o['kind'] == 'PM' else 'أمر صيانة طارئة', no=o['order_no'], meta=meta, sections=secs,
+                    sign=['فني الصيانة', 'مسؤول الإنتاج' if o['kind'] == 'EM' else 'مسؤول الصيانة', 'المعتمِد' + (f": {o['verified_by']}" if o['verified_by'] else '')])
     if kind == 'monitor':
         import json
         r = db.one('SELECT r.*, t.title, t.form_no, t.revision, t.effective_date FROM qc_records r JOIN qc_templates t ON t.code=r.template_code WHERE r.id=?', (key,))

@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block title %}بنود فحص {{ e.name_ar }}{% endblock %}{% block body %}
+<h1>بنود الفحص — {{ e.name_ar }} (رقم {{ e.no }})</h1>
+<div class="msg warn">البنود المعلَّمة «مقترح» وُضعت افتراضيًا لعدم وصول نموذج فحص رسمي؛ عدّلها أو استبدلها ببنود نموذج الآيزو. أي تعديل على نص البند يلغي علامة «مقترح». إيقاف بند يخفيه من الأوامر الجديدة فقط.</div>
+<form method="post" class="card"><input type="hidden" name="act" value="save"><div class="tablewrap"><table><tr><th>الترتيب</th><th>البند (عربي)</th><th>Item (EN)</th><th>فعّال</th><th></th></tr>
+{% for i in items %}<tr><td><input name="s{{ i.id }}" type="number" value="{{ i.seq }}" style="width:65px"></td><td><input name="a{{ i.id }}" value="{{ i.item_ar }}"></td><td><input name="e{{ i.id }}" value="{{ i.item_en or '' }}" style="direction:ltr"></td>
+<td><input type="checkbox" name="k{{ i.id }}" style="width:auto" {{ 'checked' if i.active }}></td><td>{% if i.proposed %}<span class="pill warn">مقترح</span>{% endif %}</td></tr>{% endfor %}</table></div>
+<div class="actions"><button class="btn ok">حفظ التعديلات</button><a class="btn back" href="{{ url_for('maint_equipment') }}">رجوع</a></div></form>
+<form method="post" class="card"><input type="hidden" name="act" value="add"><div class="grid"><div><label>بند جديد (عربي)</label><input name="item_ar" required></div><div><label>Item (EN)</label><input name="item_en" style="direction:ltr"></div></div><div class="actions"><button class="btn">إضافة بند</button></div></form>
+{% endblock %}

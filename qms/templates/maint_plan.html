@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% block title %}جدول الصيانة الوقائية{% endblock %}{% block body %}
+<div class="pagehead"><div><h1>جدول الصيانة الوقائية <span class="mini" style="direction:ltr;display:inline-block">Preventive Maintenance Schedule</span></h1>
+<div class="sub">رقم النموذج: {{ form or '—' }} · {{ year }}</div></div>
+<div class="actions noprint"><a class="btn back" href="{{ url_for('maint_plan', y=year-1) }}">◀ {{ year-1 }}</a><a class="btn back" href="{{ url_for('maint_plan', y=year+1) }}">{{ year+1 }} ▶</a>
+<a class="btn back" href="{{ url_for('print_doc', kind='pm_schedule', key=year) }}" target="_blank">🖨 طباعة</a></div></div>
+<div class="tablewrap"><table class="mgrid"><tr><th>#</th><th>الآلة / Equipment</th><th>رقم الآلة</th><th>الموقع</th><th>المدة</th>{% for m in months %}<th>{{ m }}</th>{% endfor %}</tr>
+{% for r in grid %}<tr><td>{{ r.e.sr }}</td><td style="text-align:right">{{ r.e.name_ar }}<div class="mini" style="direction:ltr;text-align:left">{{ r.e.name_en }}</div></td><td>{{ r.e.no }}</td><td>{{ r.e.location or '—' }}</td><td>{{ r.e.freq_days }} يوم</td>
+{% for c in r.cells %}<td class="mc {{ c.cls }}">{% if c.order %}<a href="{{ url_for('maint_order', no=c.order) }}">{{ c.txt }}</a>{% else %}{{ c.txt }}{% endif %}</td>{% endfor %}</tr>{% endfor %}</table></div>
+<div class="mini" style="margin-top:8px">✔ = أُنجزت (اليوم من الشهر) · رقم = موعد مخطط · ⚠ = متأخرة · — = لا موعد في هذا الشهر (بحسب المدة)</div>
+{% if can('maint') %}<form method="post" action="{{ url_for('maint_generate') }}" class="card noprint" style="margin-top:14px"><div class="grid">
+<div><label>توليد أوامر شهر</label><select name="m">{% for i in range(1,13) %}<option value="{{ i }}" {{ 'selected' if i==cur_month }}>{{ months_ar[i-1] }}</option>{% endfor %}</select></div>
+<div><label>السنة</label><input type="number" name="y" value="{{ year }}"></div></div>
+<div class="mini">يُولَّد شهر الحالي تلقائيًا عند فتح لوحة الصيانة؛ هذا الزر لتوليد شهر آخر مسبقًا.</div>
+<div class="actions"><button class="btn">توليد أوامر الشهر</button></div></form>{% endif %}
+<style>.mgrid td.mc{text-align:center;font-size:13px;white-space:nowrap}.mgrid td.ok{background:rgba(75,114,89,.16);color:#2f6b45;font-weight:700}.mgrid td.late{background:rgba(198,30,30,.12);color:#b3261e;font-weight:700}
+.mgrid td.plan{background:rgba(86,90,152,.10)}.mgrid td.none{color:#aaa}.mgrid th{font-size:12px}</style>
+{% endblock %}

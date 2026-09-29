@@ -40,6 +40,7 @@ ICONS = {
     'excel': 'M6 3h9l4 4v14H6V3zM9 11l5 6M14 11l-5 6',
     'code': 'M8 8l-4 4 4 4M16 8l4 4-4 4M14 5l-4 14',
     'alert': 'M12 3l10 18H2L12 3zM12 10v5M12 18h.01',
+    'wrench': 'M14.7 6.3a4 4 0 0 0-5.4 5.1L3 17.7 6.3 21l6.3-6.3a4 4 0 0 0 5.1-5.4l-2.4 2.4-2.6-.6-.6-2.6 2.6-2.2z',
     'door': 'M5 21V3h9l5 3v15M5 21h14M12 12h.01',
 }
 
@@ -85,6 +86,13 @@ def _t():
             I('المنتجات النصف مصنعة', 'inter_list', 'sp', ('inter_list',)),
             I('المنتجات النهائية', 'fg', 'box', ('fg', 'shipping')),
             I('حركات المخزون', 'inv_moves', 'moves', perms=('warehouse', 'master')),
+        ]),
+        dict(key='maint', title='الصيانة', icon='wrench', color='orange', perms=('maint_view', 'maint_report'), children=[
+            I('لوحة الصيانة', 'maint_home', 'wrench', perms=('maint_view',)),
+            I('الصيانة الوقائية (الجدول السنوي)', 'maint_plan', 'clock', perms=('maint_view',)),
+            I('أوامر الصيانة', 'maint_orders', 'log', ('maint_orders', 'maint_order'), perms=('maint_view',)),
+            I('بلاغ عطل طارئ', 'maint_report', 'alert', perms=('maint_report',)),
+            I('المعدات وبنود الفحص', 'maint_equipment', 'form', ('maint_equipment', 'maint_checklist'), perms=('master',)),
         ]),
         dict(key='rep', title='التقارير', icon='chart', color='violet', perms=('reports',), children=[
             I('تقارير الإنتاج', 'reports', 'chart', ('reports', 'report_view'), group='production'),
@@ -163,6 +171,9 @@ PAGES = {
     'ster_cycle_new': ('دورة تعقيم جديدة', 'ster_cycles'), 'ster_cycle': ('الدورة {cycle_no}', 'ster_cycles'),
     'completed_list': ('المنتجات المكتملة', None), 'production_log': ('سجل الإنتاج', None),
     'tags': ('بطاقات Sub Roll', 'order_view'), 'print_doc': ('طباعة', None), 'print_label': ('طباعة بطاقات', None),
+    'maint_home': ('لوحة الصيانة', None), 'maint_plan': ('الجدول السنوي للصيانة الوقائية', 'maint_home'), 'maint_orders': ('أوامر الصيانة', 'maint_home'),
+    'maint_order': ('أمر الصيانة {no}', 'maint_orders'), 'maint_report': ('بلاغ عطل طارئ', None), 'maint_equipment': ('المعدات وبنود الفحص', 'maint_home'),
+    'maint_checklist': ('بنود الفحص', 'maint_equipment'),
     'sp_supply': ('SP وارد', 'order_view'), 'sp_home': ('خط SP الخارجي', None), 'sp_alloc': ('تخصيص الخام', 'sp_home'), 'sp_pack': ('التعبئة', 'sp_home'),
     'sp_lots': ('LOTs SP', 'sp_home'), 'sp_receive': ('استلام خام SP', 'receipts'),
     'bandage_home': ('خط الأربطة', None), 'bandage_alloc': ('تخصيص الجامبو', 'bandage_home'),

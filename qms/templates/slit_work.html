@@ -1,4 +1,5 @@
 {% extends "base.html" %}{% block title %}السليتر — {{ w.batch_no }}{% endblock %}{% block body %}
+{% if machine_down("SL-01") %}<div class="msg bad">تنبيه صيانة: السيلتر عليه بلاغ عطل طارئ مفتوح ({{ machine_down("SL-01").order_no }}) منذ {{ machine_down("SL-01").reported_at }}.</div>{% endif %}
 <div class="batchbanner">
   <div class="it"><span>رقم التشغيلة</span><div class="no">{{ w.batch_no }}</div></div>
   <div class="it"><b>{{ w.item_code }}</b><span>المنتج</span></div>

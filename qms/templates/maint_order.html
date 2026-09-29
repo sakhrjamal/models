@@ -1,0 +1,43 @@
+{% extends "base.html" %}{% block title %}{{ o.order_no }}{% endblock %}{% block body %}
+<div class="pagehead"><div><h1>{{ 'صيانة وقائية' if o.kind=='PM' else 'صيانة طارئة' }} — {{ o.order_no }}</h1>
+<div class="sub">{{ o.name_ar }} <span style="direction:ltr;display:inline-block">{{ o.name_en or '' }}</span> · رقم الآلة {{ o.eq_no }} · <span class="pill {{ st_cls.get(o.status,'') }}">{{ st_ar.get(o.status) }}</span> · النموذج {{ form or '—' }}</div></div>
+<div class="actions noprint"><a class="btn back" href="{{ url_for('print_doc', kind='maint', key=o.order_no) }}" target="_blank">🖨 طباعة</a><a class="btn back" href="{{ url_for('maint_orders') }}">رجوع للقائمة</a></div></div>
+<div class="autofill"><div class="kv">
+{% if o.kind=='PM' %}<div class="row"><span class="k">الموعد المخطط</span><span class="v">{{ o.planned_date }}{% if o.status in ('Planned','In Progress') and o.planned_date < t %} <span class="pill bad">متأخر</span>{% endif %}</span></div>
+<div class="row"><span class="k">المدة بين الصيانتين</span><span class="v">{{ o.freq_days }} يوم</span></div>
+{% else %}<div class="row"><span class="k">أبلغ</span><span class="v">{{ o.reported_by }} — {{ o.reported_at }}</span></div>
+<div class="row"><span class="k">الخطورة / الإنتاج</span><span class="v">{{ o.severity }} · {{ 'الإنتاج متوقف' if o.production_stopped else 'الإنتاج يعمل' }}</span></div>
+<div class="row"><span class="k">وصف العطل</span><span class="v">{{ o.problem }}</span></div>{% endif %}
+{% if o.parent_order %}<div class="row"><span class="k">ناتج عن</span><span class="v"><a href="{{ url_for('maint_order', no=o.parent_order) }}">{{ o.parent_order }}</a></span></div>{% endif %}
+{% if o.assigned_to %}<div class="row"><span class="k">المنفِّذ</span><span class="v">{{ o.assigned_to }} — بدأ {{ o.start_at }}</span></div>{% endif %}
+{% if o.end_at %}<div class="row"><span class="k">انتهى</span><span class="v">{{ o.end_at }}{% if o.downtime_h is not none %} · زمن التوقف {{ o.downtime_h }} ساعة{% endif %}</span></div>{% endif %}
+{% if o.verified_by %}<div class="row"><span class="k">اعتمده</span><span class="v">{{ o.verified_by }} — {{ o.verified_at }}</span></div>{% endif %}
+</div></div>
+{% if child %}<div class="hint">بلاغات طارئة ناتجة عن هذا الأمر: {% for c in child %}<a href="{{ url_for('maint_order', no=c.order_no) }}">{{ c.order_no }}</a> {% endfor %}</div>{% endif %}
+
+{% if o.status in ('Planned','Reported') and can('maint') %}<form method="post" class="card noprint"><input type="hidden" name="act" value="start"><button class="btn ok big">{{ 'بدء الصيانة' if o.kind=='PM' else 'استلام البلاغ وبدء الإصلاح' }}</button></form>
+<form method="post" class="noprint" onsubmit="return confirm('إلغاء الأمر؟')"><input type="hidden" name="act" value="cancel"><button class="btn back">إلغاء الأمر</button></form>{% endif %}
+
+{% if o.kind=='PM' and results %}
+<form method="post" class="card" style="margin-top:12px"><h3>بنود الفحص {% if o.status=='In Progress' %}<span class="mini">(بنود مقترحة — يعدّلها مدير النظام من «المعدات وبنود الفحص»)</span>{% endif %}</h3>
+<div class="tablewrap"><table><tr><th>#</th><th>البند</th><th>النتيجة</th><th>ملاحظة</th></tr>
+{% for r in results %}<tr class="{{ 'rowbad' if r.result=='غير مطابق' }}"><td>{{ loop.index }}</td><td style="text-align:right">{{ r.item_ar }}</td>
+<td style="white-space:nowrap">{% if o.status=='In Progress' and can('maint') %}{% for v in res %}<label style="display:inline-flex;gap:3px;margin-inline-end:8px"><input type="radio" name="r{{ r.id }}" value="{{ v }}" {{ 'checked' if r.result==v }} style="width:auto">{{ v }}</label>{% endfor %}{% else %}{{ r.result or '—' }}{% endif %}</td>
+<td>{% if o.status=='In Progress' and can('maint') %}<input name="n{{ r.id }}" value="{{ r.note or '' }}">{% else %}{{ r.note or '' }}{% endif %}</td></tr>{% endfor %}</table></div>
+{% if o.status=='In Progress' and can('maint') %}<label style="margin-top:8px">ملاحظات عامة</label><input name="notes" value="{{ o.notes or '' }}">
+<div class="actions"><button class="btn back" name="act" value="save">حفظ</button><button class="btn ok" name="act" value="complete" onclick="return confirm('إتمام الصيانة الوقائية؟')">إتمام الصيانة</button></div>
+{% elif o.notes %}<div class="mini">ملاحظات: {{ o.notes }}</div>{% endif %}</form>
+{% if o.status in ('Completed','Verified') and results|selectattr('result','equalto','غير مطابق')|list and can('maint_report') %}
+<form method="post" class="noprint"><input type="hidden" name="act" value="raise_em"><button class="btn bad">فتح بلاغ صيانة طارئة للبنود غير المطابقة</button></form>{% endif %}
+{% endif %}
+
+{% if o.kind=='EM' and o.status in ('In Progress','Completed','Verified') %}
+<form method="post" class="card" style="margin-top:12px"><h3>الإصلاح</h3><div class="grid">
+<div><label>سبب العطل *</label>{% if o.status=='In Progress' and can('maint') %}<input name="cause" value="{{ o.cause or '' }}">{% else %}<div>{{ o.cause or '—' }}</div>{% endif %}</div>
+<div><label>الإجراء المنفَّذ *</label>{% if o.status=='In Progress' and can('maint') %}<input name="action_taken" value="{{ o.action_taken or '' }}">{% else %}<div>{{ o.action_taken or '—' }}</div>{% endif %}</div>
+<div><label>قطع الغيار المستخدمة</label>{% if o.status=='In Progress' and can('maint') %}<input name="parts_used" value="{{ o.parts_used or '' }}">{% else %}<div>{{ o.parts_used or '—' }}</div>{% endif %}</div>
+<div><label>ملاحظات</label>{% if o.status=='In Progress' and can('maint') %}<input name="notes" value="{{ o.notes or '' }}">{% else %}<div>{{ o.notes or '—' }}</div>{% endif %}</div></div>
+{% if o.status=='In Progress' and can('maint') %}<div class="actions"><button class="btn back" name="act" value="save">حفظ</button><button class="btn ok" name="act" value="complete" onclick="return confirm('إتمام الإصلاح؟ سيُحسب زمن التوقف تلقائيًا.')">إتمام الإصلاح</button></div>{% endif %}</form>{% endif %}
+
+{% if o.status=='Completed' and can('maint_verify') %}<form method="post" class="card noprint"><input type="hidden" name="act" value="verify"><button class="btn ok">اعتماد الأمر</button></form>{% endif %}
+{% endblock %}
