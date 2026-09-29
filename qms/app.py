@@ -1286,6 +1286,17 @@ def audit_view():
 @app.route('/admin/backup', methods=['GET', 'POST'])
 @auth.require('admin')
 def backup_admin():
+    if request.method == 'POST' and request.form.get('act') == 'extra':
+        path = (request.form.get('extra_dir') or '').strip()
+        if path:
+            ok, msg = backup.check_extra(path)
+            if not ok:
+                flash(f'المسار غير صالح للكتابة: {msg}', 'bad')
+                return redirect(url_for('backup_admin'))
+        db.run("INSERT INTO settings(key,value,note) VALUES('backup_extra_dir',?,'مجلد النسخ الاحتياطي الثاني') ON CONFLICT(key) DO UPDATE SET value=excluded.value", (path,))
+        db.log('update', 'settings', 'backup_extra_dir', path)
+        flash('حُفظ مكان النسخ الثاني — ستُنسخ إليه كل نسخة جديدة' if path else 'أُلغي المكان الثاني للنسخ', 'ok')
+        return redirect(url_for('backup_admin'))
     if request.method == 'POST':
         try:
             dest = backup.make_backup('manual')
@@ -1296,8 +1307,9 @@ def backup_admin():
             logging.getLogger('qms').exception('manual backup failed')
             flash(f'فشل إنشاء النسخة: {e}', 'bad')
         return redirect(url_for('backup_admin'))
-    return render_template('backup.html', nav='admin', backups=backup.last_backups(30),
-                           folder=backup.backup_dir())
+    return render_template('backup.html', nav='admin', backups=backup.last_backups(30), folder=backup.backup_dir(),
+                           extra=backup.extra_dir(), extra_last=db.setting('backup_extra_last', ''),
+                           verify_last=db.setting('backup_verify_last', ''), data_dir=os.path.dirname(db.DB_PATH))
 
 
 # ---------------------------------------------------------------- الجودة ولوحة المدير والتقارير

@@ -3,13 +3,23 @@
 <div class="sub">نسخة تلقائية متسقة كل بضع ساعات + نسخة عند بدء التشغيل. تُحفظ في:</div>
 <div class="hint" style="direction:ltr;text-align:left">{{ folder }}</div>
 
+<div class="hint">مجلد البيانات: <span style="direction:ltr;display:inline-block">{{ data_dir }}</span>{% if verify_last %}<br>آخر فحص سلامة للنسخة: <b>{{ verify_last }}</b>{% endif %}</div>
+
+<h2>مكان ثانٍ للنسخ (قرص خارجي / جهاز اخر / مجلد شبكة)</h2>
+<form method="post" class="card"><input type="hidden" name="act" value="extra">
+  <label>المسار <span class="mini">مثال: <span style="direction:ltr;display:inline-block">E:\QMS_Backup</span> أو <span style="direction:ltr;display:inline-block">\\PC02\QMS_Backup</span> — اتركه فارغًا لإلغائه</span></label>
+  <input name="extra_dir" value="{{ extra }}" style="direction:ltr;text-align:left" placeholder="E:\QMS_Backup">
+  {% if extra %}<div class="mini" style="margin-top:6px">آخر نسخ إلى هذا المكان: <b>{{ extra_last or 'لم يتم بعد' }}</b></div>{% endif %}
+  <div class="actions"><button class="btn">حفظ واختبار المسار</button></div>
+</form>
+
 <form method="post" class="card">
   <p>ينشئ هذا الزر نسخة فورية الآن (بطريقة <code>VACUUM INTO</code> فتكون سليمة حتى أثناء العمل).</p>
   <button class="btn">إنشاء نسخة احتياطية الآن</button>
 </form>
 
 <div class="hint">
-  <b>استرجاع نسخة:</b> أغلق النظام، انسخ ملف النسخة إلى <code>data\qms.db</code> (استبدل الحالي)،
+  <b>استرجاع نسخة:</b> أغلق النظام، انسخ ملف النسخة إلى <code>qms.db</code> داخل مجلد البيانات أعلاه (استبدل الحالي)،
   ثم احذف أي ملفات <code>qms.db-wal</code> و <code>qms.db-shm</code> بجانبه، وشغّل النظام.
   خذ نسخة خارج المصنع أسبوعيًا أيضًا.
 </div>

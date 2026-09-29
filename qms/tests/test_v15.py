@@ -680,6 +680,35 @@ class V15(unittest.TestCase):
         self.assertEqual(out[1], os.path.join(d, 'backups'))
         self.assertEqual(out[2], os.path.join(d, 'qms.db'))          # seed.py لا يكتب في مجلد البرنامج
 
+    # ================================================================== 20. النسخ الاحتياطي إلى مكان ثانٍ + فحص السلامة + وضع الخدمة
+    def test_20_backup_extra_and_service_mode(self):
+        import backup, glob
+        extra = os.path.join(tempfile.mkdtemp(), 'ExtBackup')
+        self.assertEqual(self.op.get('/admin/backup').status_code, 403)
+        bad = os.path.join(tempfile.mkdtemp(), 'afile'); open(bad, 'w').close()
+        r = self.adm.post('/admin/backup', {'act': 'extra', 'extra_dir': os.path.join(bad, 'sub')})    # مسار غير صالح للكتابة
+        self.assertIn('غير صالح', ' '.join(flashes(r)))
+        self.assertEqual(backup.extra_dir(), '')
+        self.adm.post('/admin/backup', {'act': 'extra', 'extra_dir': extra})
+        self.assertEqual(backup.extra_dir(), extra)
+        self.adm.post('/admin/backup', {})                                    # نسخة فورية
+        files = glob.glob(os.path.join(extra, 'qms-*.db'))
+        self.assertEqual(len(files), 1)
+        self.assertTrue(backup.verify(files[0])[0])                          # النسخة سليمة وقابلة للفتح
+        page = txt(self.adm.get('/admin/backup'))
+        self.assertIn('نجحت', page); self.assertIn('سليمة', page)
+        # فشل المكان الثاني لا يُفشل النسخة الأساسية ويظهر للمدير
+        db.run("UPDATE settings SET value=? WHERE key='backup_extra_dir'", (os.path.join(bad, 'x'),))
+        self.adm.post('/admin/backup', {})
+        self.assertIn('فشلت', txt(self.adm.get('/admin/backup')))
+        self.adm.post('/admin/backup', {'act': 'extra', 'extra_dir': ''})
+        # وضع الخدمة: منفذ ثابت من البيئة
+        import subprocess
+        env = {k: v for k, v in os.environ.items()}; env.update(QMS_PORT='5099', QMS_SERVICE='1')
+        out = subprocess.run([sys.executable, '-c', 'import run;print(run.free_port(), run.SERVICE)'], cwd=os.path.dirname(HERE),
+                             env=env, capture_output=True, text=True).stdout.split()
+        self.assertEqual(out, ['5099', 'True'])
+
     # ================================================================== 11. كل الصفحات تعمل
     def test_11_all_pages_render(self):
         bad = []

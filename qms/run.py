@@ -54,7 +54,13 @@ def ensure_db():
     return True
 
 
-def free_port(p=5000):
+SERVICE = os.environ.get('QMS_SERVICE') == '1'          # يعمل كخدمة: بلا متصفح وبلا انتظار ضغط مفتاح
+
+
+def free_port(p=None):
+    p = p or int(os.environ.get('QMS_PORT') or 5000)
+    if os.environ.get('QMS_PORT'):                       # منفذ ثابت مطلوب (الخدمة): لا يُغيَّر تلقائيًا
+        return p
     for i in range(p, p + 30):
         with socket.socket() as s:
             if s.connect_ex(('127.0.0.1', i)) != 0:
@@ -74,7 +80,7 @@ def lan_ip():
 def main():
     setup_logging()
     if not ensure_db():
-        print('تعذّر تجهيز قاعدة البيانات.'); input('اضغط Enter…'); sys.exit(1)
+        print('تعذّر تجهيز قاعدة البيانات.'); (SERVICE or input('اضغط Enter…')); sys.exit(1)
 
     migrate_v11.run(verbose=True)
     migrate_v12.run(verbose=True)
@@ -102,7 +108,8 @@ def main():
     print('   لإيقاف النظام: أغلق هذه النافذة')
     print(bar)
 
-    threading.Timer(1.5, lambda: webbrowser.open(f'http://127.0.0.1:{port}')).start()
+    if not SERVICE:
+        threading.Timer(1.5, lambda: webbrowser.open(f'http://127.0.0.1:{port}')).start()
     try:
         from waitress import serve
         serve(app, host='0.0.0.0', port=port, threads=8, ident='QMS')
