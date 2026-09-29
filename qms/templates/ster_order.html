@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% block title %}معقم — {{ w.batch_no }}{% endblock %}{% block body %}
+<h1>{{ w.batch_no }} — {{ w.item_code }} (معقم)</h1>
+<div class="stat"><div><b>{{ fmt(st.required) }}</b><span>المطلوب ({{ st.unit }})</span></div><div><b>{{ fmt(st.produced) }}</b><span>المنتج</span></div><div><b>{{ inter|length }}</b><span>كراتين SP</span></div><div><b>{{ avail|length }}</b><span>مُفرجة وجاهزة للفرز</span></div></div>
+<div class="autofill"><div class="kv"><div class="row"><span class="k">مسحات/مغلف</span><span class="v">{{ fmt(ps.swabs_per_envelope) if ps.swabs_per_envelope else 'غير معرَّف' }}</span></div>
+<div class="row"><span class="k">مسحات/بوكس</span><span class="v">{{ fmt(ps.swabs_per_box) if ps.swabs_per_box else 'غير معرَّف' }}</span></div>
+<div class="row"><span class="k">بوكسات/كرتون</span><span class="v">{{ fmt(ps.boxes_per_carton) if ps.boxes_per_carton else 'غير معرَّف' }}</span></div>
+<div class="row"><span class="k">كود SP</span><span class="v">{{ it.sp_item or 'غير محدد' }}</span></div></div></div>
+{% if avail and can('enter') and not w.final_status %}<form method="post" action="{{ url_for('ster_new') }}" class="card"><h3>فتح سجل فرز وعد</h3>
+<div class="subrolls">{% for x in avail %}<label><input type="checkbox" name="barcode" value="{{ x.barcode }}" checked> {{ x.barcode }}<span class="mini">{{ fmt(x.qty) }} مسحة · {{ x.fold_doc }}</span></label>{% endfor %}</div>
+<div class="actions"><button class="btn ok">فتح السجل بالكراتين المحددة</button></div></form>{% endif %}
+<h2>الكراتين الوسيطة</h2>{% if inter %}<div class="tablewrap"><table><tr><th>الباركود</th><th>كود SP</th><th>المسحات</th><th>الحالة</th><th>السجل</th><th></th></tr>
+{% for x in inter %}<tr><td>{{ x.barcode }}</td><td>{{ x.sp_code or '—' }}</td><td>{{ fmt(x.qty) }}</td><td>{{ inter_ar.get(x.status, x.status) }}</td><td>{% if x.rec_no %}<a href="{{ url_for('ster_record', rec_no=x.rec_no) }}">{{ x.rec_no }}</a>{% else %}—{% endif %}</td>
+<td class="noprint"><a href="{{ url_for('print_label', kind='intermediate', key=x.barcode) }}" target="_blank">بطاقة</a></td></tr>{% endfor %}</table></div>{% else %}<div class="empty">لا كراتين بعد — أنتجها من «ماكينة الطي».</div>{% endif %}
+<h2>سجلات الفرز والتغليف</h2>{% if recs %}<div class="tablewrap"><table><tr><th>السجل</th><th>الحالة</th><th>مستلم</th><th>مغلفات</th><th>بوكسات</th><th>الدورة</th></tr>
+{% for r in recs %}<tr><td><a href="{{ url_for('ster_record', rec_no=r.rec_no) }}">{{ r.rec_no }}</a></td><td>{{ rec_ar.get(r.status, r.status) }}</td><td>{{ fmt(r.received_qty) }}</td><td>{{ fmt(r.env_actual) if r.env_actual is not none else '—' }}</td><td>{{ fmt(r.boxes_actual) if r.boxes_actual is not none else '—' }}</td><td>{{ r.cycle_no or '—' }}</td></tr>{% endfor %}</table></div>{% else %}<div class="empty">—</div>{% endif %}
+{% endblock %}

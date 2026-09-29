@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% block title %}المهام المنتظرة{% endblock %}{% block body %}
+<h1>المهام المنتظرة للجودة</h1><div class="sub">إفراجات تنتظر قرارًا، وسجلات متابعة مستحقة (المتابعة لا توقف الإنتاج)</div>
+<h2>إفراجات بانتظار القرار ({{ tasks|length }})</h2>
+{% if tasks %}<div class="pick-list">{% for t in tasks %}<a class="pick" href="{{ t.url }}"><div class="info"><b>{{ t.kind }} — {{ t.ref }}</b><span>{{ t.sub }}</span></div><div class="go">◀</div></a>{% endfor %}</div>
+{% else %}<div class="empty">لا توجد إفراجات منتظرة.</div>{% endif %}
+<h2>سجلات متابعة مستحقة ({{ due|length }})</h2>
+{% if due %}<div class="tablewrap"><table><tr><th>النموذج</th><th>الخط</th><th>الحالة</th><th></th></tr>
+{% for d in due %}<tr><td>{{ d.tpl.title }}<div class="mini">{{ d.tpl.form_no or d.tpl.code }}</div></td><td>{{ d.line.name or d.line.machine_code or '—' }}</td><td><span class="pill warn">{{ d.state }}</span></td>
+<td><a class="btn" href="{{ url_for('quality_new', code=d.tpl.code, line=d.line.machine_code or '') }}">تسجيل</a></td></tr>{% endfor %}</table></div>{% else %}<div class="empty">لا شيء مستحق.</div>{% endif %}
+{% endblock %}

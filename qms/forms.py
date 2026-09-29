@@ -282,7 +282,7 @@ def fold_recon(batch_no):
     pa = o['pa'] or 0
     theo = int(ai['a'] // pa) if pa else 0
     loss = theo - o['g'] - o['s'] if theo else 0
-    lim  = float(db.setting('scrap_limit', 0.05))
+    lim  = float(db.setting('scrap_limit', 0.03))
     if not theo:                res = '—'
     elif loss < 0:              res = 'انحراف — الإنتاج يفوق المعياري'
     elif loss / theo <= lim:    res = 'ضمن الحد'

@@ -1,0 +1,36 @@
+{% extends "base.html" %}{% from "_macros.html" import op_select with context %}{% block title %}{{ r.rec_no }}{% endblock %}{% block body %}
+<div class="pagehead"><div><h1>سجل الفرز والعد والتغليف — {{ r.rec_no }}</h1><div class="sub">{{ r.batch_no }} — {{ r.item_code }} · كود SP {{ r.sp_code or '—' }} · <span class="pill">{{ rec_ar.get(r.status, r.status) }}</span></div></div>
+<div class="actions noprint"><a class="btn back" href="{{ url_for('print_doc', kind='ster_record', key=r.rec_no) }}" target="_blank">🖨 طباعة السجل</a>
+{% if r.boxes_actual %}<a class="btn back" href="{{ url_for('print_label', kind='box', key=r.rec_no) }}" target="_blank">🏷 بطاقات البوكس</a><a class="btn back" href="{{ url_for('print_label', kind='envelope', key=r.rec_no) }}" target="_blank">🏷 بطاقة المغلف</a><a class="btn back" href="{{ url_for('print_label', kind='carton', key=r.rec_no) }}" target="_blank">🏷 بطاقة الكرتون</a>{% endif %}
+<a class="btn back" href="{{ url_for('ster_order', bn=r.batch_no) }}">رجوع</a></div></div>
+{% if need_confirm %}<div class="msg warn">هذا التعديل يُلغي قرار الإفراج قبل التعقيم. اضغط «تأكيد» بالأسفل للمتابعة.</div>{% endif %}
+<div class="autofill"><h4>بيانات تلقائية</h4><div class="kv">
+<div class="row"><span class="k">لوط الإنتاج (يُطبع على المغلف/البوكس)</span><span class="v">{{ r.batch_no }}</span></div>
+<div class="row"><span class="k">رقم دورة التعقيم (يُطبع تلقائيًا)</span><span class="v">{{ r.cycle_no or 'يُحدَّد عند إدراجه في دورة' }}</span></div>
+<div class="row"><span class="k">الكراتين الوسيطة</span><span class="v">{% for i in ins %}{{ i.barcode }} ({{ fmt(i.qty) }}){{ '، ' if not loop.last }}{% endfor %}</span></div>
+<div class="row"><span class="k">المستلم (مسحات)</span><span class="v">{{ fmt(r.received_qty) }}</span></div>
+<div class="row"><span class="k">مسحات/مغلف · مسحات/بوكس · بوكس/كرتون</span><span class="v">{{ fmt(ps.swabs_per_envelope) if ps.swabs_per_envelope else '—' }} · {{ fmt(ps.swabs_per_box) if ps.swabs_per_box else '—' }} · {{ fmt(ps.boxes_per_carton) if ps.boxes_per_carton else '—' }}</span></div></div></div>
+
+{% macro form(act, title, btn, body) %}{% if editable and can('enter') %}<form method="post" class="card" style="margin-bottom:14px"><h3>{{ title }}</h3><input type="hidden" name="act" value="{{ act }}">
+{% if need_confirm and post.get('act')==act %}<input type="hidden" name="confirm" value="1">{% endif %}{{ body }}<div class="actions"><button class="btn ok">{{ 'تأكيد — ' if need_confirm and post.get('act')==act }}{{ btn }}</button></div></form>{% endif %}{% endmacro %}
+
+<h2>1 · الفرز والعد</h2>
+{% if r.sort_accepted is not none %}<div class="stat"><div><b>{{ fmt(r.sort_accepted) }}</b><span>مقبول</span></div><div><b>{{ fmt(r.sort_rejected) }}</b><span>مرفوض</span></div><div><b>{{ r.sort_operator }}</b><span>المشغّل</span></div></div>{% endif %}
+{{ form('sort', 'تسجيل الفرز والعد' if r.sort_accepted is none else 'تعديل الفرز والعد', 'حفظ الفرز والعد',
+ '<div class="grid"><div><label>مسحات مقبولة *</label><input type="number" name="accepted" min="0" step="any" required value="' ~ (post.get('accepted') or (r.sort_accepted if r.sort_accepted is not none else r.received_qty)) ~ '"></div><div><label>مرفوضة</label><input type="number" name="rejected" min="0" step="any" value="' ~ (post.get('rejected') or r.sort_rejected or 0) ~ '"></div><div><label>المشغّل *</label>' ~ op_select('production', post.get('operator') or r.sort_operator) ~ '</div></div>')|safe }}
+
+{% if r.sort_accepted is not none %}<h2>2 · التغليف (المغلفات المعقمة)</h2>
+{% if r.env_actual is not none %}<div class="stat"><div><b>{{ fmt(r.ppe) }}</b><span>مسحات/مغلف</span></div><div><b>{{ fmt(r.env_expected) }}</b><span>مغلفات متوقعة</span></div><div><b>{{ fmt(r.env_actual) }}</b><span>فعلية</span></div><div><b>{{ fmt(r.env_rejected) }}</b><span>مرفوضة</span></div></div>{% endif %}
+{% if ps.swabs_per_envelope %}{{ form('pack', 'تسجيل التغليف' if r.env_actual is none else 'تعديل التغليف', 'حفظ التغليف',
+ '<div class="mini">المتوقع: ' ~ (r.sort_accepted / ps.swabs_per_envelope)|round(2) ~ ' مغلف (' ~ fmt(ps.swabs_per_envelope) ~ ' مسحة/مغلف)</div><div class="grid"><div><label>مغلفات فعلية *</label><input type="number" name="env_actual" min="1" step="any" required value="' ~ (post.get('env_actual') or (r.env_actual if r.env_actual is not none else ((r.sort_accepted / ps.swabs_per_envelope)|int))) ~ '"></div><div><label>مغلفات مرفوضة</label><input type="number" name="env_rejected" min="0" step="any" value="' ~ (post.get('env_rejected') or r.env_rejected or 0) ~ '"></div><div><label>المشغّل *</label>' ~ op_select('production', post.get('operator') or r.pack_operator) ~ '</div></div>')|safe }}
+{% else %}<div class="msg bad">عدد المسحات في المغلف (5 أو 10) غير معرَّف — يُكمله مدير النظام من «تكوين التعبئة».</div>{% endif %}{% endif %}
+
+{% if r.env_actual is not none %}<h2>3 · البوكسات والكراتين</h2>
+{% if r.boxes_actual is not none %}<div class="stat"><div><b>{{ fmt(r.env_per_box) }}</b><span>مغلفات/بوكس</span></div><div><b>{{ fmt(r.boxes_expected) }}</b><span>بوكسات متوقعة</span></div><div><b>{{ fmt(r.boxes_actual) }}</b><span>فعلية</span></div><div><b>{{ fmt(r.box_diff) }}</b><span>الفارق</span></div><div><b>{{ fmt(r.cartons) if r.cartons is not none else '—' }}</b><span>كراتين</span></div></div>{% endif %}
+{% if ps.swabs_per_box %}{{ form('box', 'تسجيل البوكسات' if r.boxes_actual is none else 'تعديل البوكسات', 'حفظ البوكسات',
+ '<div class="grid"><div><label>بوكسات فعلية <span class="mini">(يُحسب تلقائيًا عند تركه فارغًا)</span></label><input type="number" name="boxes_actual" min="1" step="any" value="' ~ (post.get('boxes_actual') or (r.boxes_actual if r.boxes_actual is not none else '')) ~ '"></div><div><label>عدد الكراتين <span class="mini">(يدوي)</span></label><input type="number" name="cartons_actual" min="0" step="any" value="' ~ (post.get('cartons_actual') or (r.cartons if r.cartons is not none else '')) ~ '"></div><div><label>المشغّل *</label>' ~ op_select('production', post.get('operator') or r.box_operator) ~ '</div></div>')|safe }}
+{% else %}<div class="msg bad">عدد المسحات في البوكس غير معرَّف في Packaging Configuration.</div>{% endif %}{% endif %}
+
+{% if r.status=='Ready for Pre-Sterilization QC' %}<div class="hint">اكتمل السجل — بانتظار الإفراج قبل التعقيم من الجودة.</div>{% endif %}
+{% if editable and can('enter') and not r.cycle_no %}<form method="post" action="{{ url_for('ster_record_delete', rec_no=r.rec_no) }}" onsubmit="return confirm('حذف السجل؟ تعود الكراتين الوسيطة «مُفرج للفرز».')"><button class="btn bad">حذف السجل</button></form>{% endif %}
+{% endblock %}

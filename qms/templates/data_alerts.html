@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block title %}تنبيهات البيانات{% endblock %}{% block body %}
+<h1>تنبيهات البيانات لمدير النظام</h1><div class="sub">تعارضات ونواقص في Master Data — لم تُفترض لها قيم؛ عالجها من الصفحة المرتبطة</div>
+{% if not alerts %}<div class="msg ok">لا توجد تنبيهات.</div>{% endif %}
+{% for a in alerts %}<div class="card" style="border-right:5px solid var(--{{ {'bad':'bad','warn':'warn','info':'accent'}.get(a.level,'warn') }},#d97706);margin-bottom:12px">
+<h3 style="margin:0 0 6px">{{ a.title }} <span class="pill {{ a.level if a.level!='info' else '' }}">{{ a.rows|length }}</span></h3>
+{% if a.detail %}<p>{{ a.detail }}</p>{% endif %}
+{% if a.rows %}<div class="mini" style="max-height:120px;overflow:auto">{{ a.rows|join(' · ') }}</div>{% endif %}
+{% if a.link %}<div style="margin-top:8px"><a class="btn" href="{{ a.link }}">معالجة</a></div>{% endif %}</div>{% endfor %}
+{% endblock %}

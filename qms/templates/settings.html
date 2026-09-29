@@ -4,13 +4,18 @@
 <form method="post" class="card grid">
 {% for key, label, hint, kind in fields %}<div><label>{{ label }}</label><input name="{{ key }}" value="{{ vals[key] }}" {{ 'type=number step=any min=0' if kind=='num' }}><div class="mini">{{ hint }}</div></div>{% endfor %}
 <div class="full wizard-actions"><div class="l"></div><button class="btn big">حفظ</button></div></form>
+<h2>الورق الرسمي (Letterhead)</h2>
+<form method="post" action="{{ url_for('letterhead_upload') }}" enctype="multipart/form-data" class="card">
+{% if lh %}<div class="msg ok">الورق الرسمي مرفوع ويُستخدم خلفية لكل السندات والتقارير. <a href="{{ url_for('letterhead') }}" target="_blank">عرض</a></div>{% else %}<div class="msg warn">لم يُرفع الورق الرسمي بعد.</div>{% endif %}
+<label>ملف الورق الرسمي (صورة بحجم A4: PNG / JPG / SVG / WEBP)</label><input type="file" name="file" accept=".png,.jpg,.jpeg,.svg,.webp">
+<div class="actions"><button class="btn">رفع</button>{% if lh %}<button class="btn bad" name="act" value="delete" onclick="return confirm('حذف الورق الرسمي؟')">حذف</button>{% endif %}</div></form>
 <h2>أدوات متقدمة</h2>
 <div class="tiles">
 <a class="tile" href="{{ url_for('audit_view') }}"><b>سجل التدقيق</b><span>كل العمليات بالمستخدم والوقت</span></a>
 <a class="tile" href="{{ url_for('backup_admin') }}"><b>النسخ الاحتياطي</b><span>نسخ يدوي وتلقائي</span></a>
 <a class="tile" href="{{ url_for('ncr_list') }}"><b>عدم المطابقة NCR</b><span>الحالات المفتوحة والمغلقة</span></a>
 <a class="tile" href="{{ url_for('master_routes') }}"><b>مسارات التصنيع</b><span>خطوات كل مسار</span></a>
-<a class="tile" href="{{ url_for('quality_templates') }}"><b>قوالب الجودة (متقدم)</b><span>نماذج الفحص القديمة — غير مطلوبة لسير الإنتاج</span></a>
+<a class="tile" href="{{ url_for('quality_templates') }}"><b>قوالب المتابعة (تحرير)</b><span>رقم النموذج والإصدار وبنود الفحص</span></a>
 <a class="tile" href="{{ url_for('shipping') }}"><b>الشحن</b><span>صرف المنتج التام للعملاء</span></a>
 </div>
 {% endblock %}

@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% block title %}تكوين التعبئة {{ it.item_code }}{% endblock %}{% block body %}
+<h1>تكوين التعبئة — {{ it.item_code }}</h1><div class="sub">{{ it.description }} · {{ 'معقم' if ster else 'غير معقم' }}</div>
+<form method="post" class="card"><div class="grid">
+{% if not ster %}
+<div><label>عدد المسحات في الباكت</label><input name="swabs_per_pack" type="number" step="any" value="{{ ps.swabs_per_pack or '' }}"></div>
+<div><label>عدد الباكتات في الكرتون <span class="mini">(اختياري — وإلا يُدخل الكراتين يدويًا)</span></label><input name="packs_per_carton" type="number" step="any" value="{{ ps.packs_per_carton or '' }}"></div>
+<div><label>كود الباكت</label><input name="pack_code" value="{{ ps.pack_code or '' }}"></div>
+<div><label>كود الكرتون</label><input name="carton_code" value="{{ ps.carton_code or '' }}"></div>
+{% else %}
+<div><label>مسحات في المغلف (5 أو 10)</label><input name="swabs_per_envelope" type="number" step="any" value="{{ ps.swabs_per_envelope or '' }}"></div>
+<div><label>مسحات في البوكس</label><input name="swabs_per_box" type="number" step="any" value="{{ ps.swabs_per_box or '' }}"></div>
+<div><label>مغلفات في البوكس (تلقائي)</label><input value="{{ fmt(epb) if epb else '—' }}" disabled></div>
+<div><label>بوكسات في الكرتون <span class="mini">(اختياري — وإلا يدويًا)</span></label><input name="boxes_per_carton" type="number" step="any" value="{{ ps.boxes_per_carton or '' }}"></div>
+<div><label>كود المغلف</label><input name="env_code" value="{{ ps.env_code or '' }}"></div>
+<div><label>كود البوكس</label><input name="box_code" value="{{ ps.box_code or '' }}"></div>
+<div><label>كود الكرتون</label><input name="carton_code" value="{{ ps.carton_code or '' }}"></div>
+{% endif %}</div>
+<div class="actions"><button class="btn ok">حفظ</button><a class="btn back" href="{{ url_for('pack_config_list') }}">رجوع للقائمة</a></div></form>{% endblock %}

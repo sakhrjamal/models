@@ -38,7 +38,9 @@
 {% elif f.type=='textarea' %}<textarea name="f_{{ f.id }}" rows="2" {{ 'required' if f.required }}></textarea>
 {% else %}<input name="f_{{ f.id }}" {{ 'required' if f.required }}>{% endif %}
 </div></div>{% endfor %}
-<div style="margin-top:14px"><label>ملاحظات عامة</label><textarea name="notes" rows="2"></textarea></div>
+<div class="grid" style="margin-top:14px"><div><label>ملاحظات (Observations)</label><textarea name="notes" rows="2"></textarea></div>
+<div><label>الإجراء التصحيحي (إن وُجد)</label><textarea name="corrective" rows="2"></textarea></div>
+<div><label>الاعتماد / التوقيع (اسم المعتمد)</label><input name="approved_by"></div></div>
 {% if is_release %}<h2>قرار الإفراج</h2>
 <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:13px">
 <div><label>القرار *</label><select name="decision" required><option value="">— اختر —</option><option>مفرج</option><option>غير مفرج</option></select></div>

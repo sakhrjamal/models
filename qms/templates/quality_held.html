@@ -8,4 +8,6 @@
 <td><a class="btn sm" href="{{ url_for('quality_review', bn=w.batch_no) }}">{{ 'اتخاذ قرار' if w.final_status=='HOLD' else 'عرض' }}</a>
 {% if can('ncr') %}<a class="btn sm back" href="{{ url_for('ncr_new', b=w.batch_no) }}">عدم مطابقة</a>{% endif %}</td></tr>{% endfor %}</table></div>
 {% else %}<div class="empty">لا توجد دفعات مرفوضة أو معلّقة.</div>{% endif %}
+{% if sp_hold %}<h2>SP معلّق / مرفوض</h2><div class="tablewrap"><table><tr><th>التشغيلة</th><th>الحالة</th><th>كراتين</th><th>مسحات</th><th></th></tr>{% for x in sp_hold %}<tr><td>{{ x.batch_no }}</td><td>{{ x.status }}</td><td>{{ x.n }}</td><td>{{ fmt(x.qty) }}</td><td><a class="btn sm" href="{{ url_for('quality_sp_review', bn=x.batch_no) }}">عرض</a></td></tr>{% endfor %}</table></div>{% endif %}
+{% if pre_hold %}<h2>قبل التعقيم — معلّق / مرفوض</h2><div class="tablewrap"><table><tr><th>السجل</th><th>التشغيلة</th><th>الحالة</th><th></th></tr>{% for x in pre_hold %}<tr><td>{{ x.rec_no }}</td><td>{{ x.batch_no }}</td><td>{{ x.status }}</td><td><a class="btn sm" href="{{ url_for('quality_pre_review', rec_no=x.rec_no) }}">عرض</a></td></tr>{% endfor %}</table></div>{% endif %}
 {% endblock %}

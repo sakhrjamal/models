@@ -4,6 +4,9 @@
 <div class="hint">معرّف البند لا يتغير بعد إنشائه (يربط القيم المسجّلة). السجلات القديمة تحتفظ بنسختها من القالب.</div>
 <form method="post" id="tplForm" class="card">
 <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:13px">
+<div><label>رقم النموذج (Form No.)</label><input name="form_no" value="{{ t.form_no or t.code }}"></div>
+<div><label>الإصدار (Revision)</label><input name="revision" value="{{ t.revision or '00' }}"></div>
+<div><label>تاريخ السريان (Effective Date)</label><input type="date" name="effective_date" value="{{ t.effective_date or '' }}"></div>
 <div class="full"><label>العنوان *</label><input name="title" required value="{{ t.title }}"></div>
 <div><label>فاصل الاستحقاق (ساعات) — للسجل اليومي/الدوري</label><input type="number" step="any" min="0.5" name="freq_hours" value="{{ t.freq_hours if t.freq_hours else '' }}"></div>
 <div><label>المنتج</label><select name="route">{% for k,v in ROUTE_AR.items() %}<option value="{{ k }}" {{ 'selected' if t.route==k }}>{{ v }}</option>{% endfor %}</select></div>

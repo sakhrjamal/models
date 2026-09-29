@@ -24,6 +24,8 @@ STAGES = {
     'CT_OUT':  ('منتج نهائي (كراتين) — بانتظار الفحص النهائي', 'WIP'),
     'SPK_OUT': ('شاش SP معبّأ — بانتظار الفحص النهائي',        'WIP'),
     'PROD_OUT': ('منتج تام من الإنتاج — بانتظار موافقة الجودة/التخزين', 'WIP'),
+    'NSP_OUT': ('باكتات معبأة (غير معقم) — بانتظار الإفراج/التخزين', 'WIP'),
+    'STR_OUT': ('بوكسات معقمة — بانتظار التعقيم/الإفراج النهائي', 'WIP'),
     'SORTED':  ('مفروز — بانتظار التغليف',                     'WIP'),
     'PACKED':  ('مغلَّف (معقم) — بانتظار التعقيم والفحص',        'WIP'),
     'USED':    ('خام مستهلك في التصنيع',                       'USED'),
@@ -105,3 +107,22 @@ def total(batch_no, stage, unit=None):
     if unit:
         sql += ' AND unit=?'; args.append(unit)
     return float(db.one(sql, tuple(args))['n'])
+
+
+def reverse(con, ref_doc, why):
+    """يعكس قيود سند بقيود سالبة (لا حذف من الدفتر) — ولا يعكس القيد الواحد مرتين. يعيد عدد القيود المعكوسة."""
+    done = set()
+    for r in con.execute("SELECT move_id FROM stock_tx WHERE ref_type='reverse' AND move_id LIKE 'rev-%'").fetchall():
+        mv = str(r['move_id'])[4:]
+        if mv.isdigit():
+            done.add(int(mv))
+    n = 0
+    for r in con.execute("SELECT * FROM stock_tx WHERE ref_doc=? AND ref_type<>'reverse' ORDER BY id", (ref_doc,)).fetchall():
+        if r['id'] in done:
+            continue
+        con.execute("""INSERT INTO stock_tx(owner,stage,qty,unit,batch_no,route_code,location,ref_type,ref_doc,move_id,note,created_by)
+                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (r['owner'], r['stage'], -r['qty'], r['unit'], r['batch_no'], r['route_code'], r['location'],
+                     'reverse', ref_doc, f"rev-{r['id']}", why, _actor()))
+        n += 1
+    return n

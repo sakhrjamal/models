@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% block title %}المنتج النصف مصنع SP{% endblock %}{% block body %}
+<h1>المنتج النصف مصنع (SP) — كراتين وسيطة</h1><div class="sub">ناتج الطي للمنتج المعقم: كرتون وسيط لكل سند طي، يُفرج عنه الجودة قبل الفرز والعد</div>
+<div class="tabs"><a href="{{ url_for('inter_list') }}" class="{{ 'on' if not st }}">الكل</a>
+{% for k,v in inter_ar.items() %}<a href="{{ url_for('inter_list', st=k) }}" class="{{ 'on' if st==k }}">{{ v }}</a>{% endfor %}</div>
+{% if rows %}<div class="tablewrap"><table><tr><th>الباركود</th><th>التشغيلة</th><th>المنتج</th><th>كود SP</th><th>المصدر</th><th>سند الطي</th><th>المسحات</th><th>الحالة</th><th></th></tr>
+{% for r in rows %}<tr><td><b>{{ r.barcode }}</b></td><td><a href="{{ url_for('order_view', bn=r.batch_no) }}">{{ r.batch_no }}</a></td><td>{{ r.item_code }}</td>
+<td>{{ r.sp_code or '—' }}</td><td>{{ 'إنتاج داخلي' if r.sp_source=='INTERNAL_PRODUCTION' else 'استلام مورّد' }}</td><td>{{ r.fold_doc }}</td><td>{{ fmt(r.qty) }}</td>
+<td><span class="pill">{{ inter_ar.get(r.status, r.status) }}</span></td>
+<td class="noprint"><a href="{{ url_for('print_label', kind='intermediate', key=r.barcode) }}" target="_blank">بطاقة</a>{% if r.rec_no %} · <a href="{{ url_for('ster_record', rec_no=r.rec_no) }}">{{ r.rec_no }}</a>{% endif %}</td></tr>{% endfor %}</table></div>
+{% else %}<div class="empty">لا توجد كراتين وسيطة.</div>{% endif %}{% endblock %}

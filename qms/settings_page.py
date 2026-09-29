@@ -10,6 +10,11 @@ EDITABLE = [
     ('slitter_edge_trim_each_cm', 'تنظيف كل طرف من الجامبو (سم)', 'العرض المفيد = عرض الجامبو − هذا × 2', 'num'),
     ('fg_location', 'موقع مخزن المنتج التام الافتراضي', 'يُقترح عند تخزين الدفعة المعتمدة', 'text'),
     ('session_hours', 'مدة الجلسة (ساعات)', '', 'num'),
+    ('factory_name', 'اسم المصنع (يظهر في تذييل المطبوعات)', '', 'text'),
+    ('print_margin_top_mm', 'هامش الطباعة العلوي (مم) — حسب ترويسة الورق الرسمي', 'يُضبط ليتجاوز شعار/ترويسة الورق الرسمي', 'num'),
+    ('print_margin_bottom_mm', 'هامش الطباعة السفلي (مم)', 'يتجاوز تذييل الورق الرسمي', 'num'),
+    ('print_margin_side_mm', 'هامش الطباعة الجانبي (مم)', '', 'num'),
+    ('aeration_min_h', 'أقل مدة للتهوية (ساعة)', 'تحذير عند إنهاء التهوية قبلها', 'num'),
 ]
 
 
@@ -36,4 +41,37 @@ def register(app):
             flash('حُفظت الإعدادات', 'ok')
             return redirect(url_for('settings_admin'))
         vals = {k: db.setting(k, '') for k, *_ in EDITABLE}
-        return render_template('settings.html', nav='settings', fields=EDITABLE, vals=vals)
+        import printing
+        return render_template('settings.html', nav='settings', fields=EDITABLE, vals=vals, lh=printing.letterhead_path())
+
+    @app.route('/admin/letterhead', endpoint='letterhead_upload', methods=['POST'])
+    @auth.require('admin')
+    def letterhead_upload():
+        import os, printing
+        d = os.path.dirname(db.DB_PATH)
+        if request.form.get('act') == 'delete':
+            for ext in printing.LH_EXT:
+                p = os.path.join(d, f'letterhead.{ext}')
+                if os.path.exists(p):
+                    os.remove(p)
+            db.log('delete', 'letterhead', 'letterhead', '')
+            flash('حُذف الورق الرسمي', 'ok')
+            return redirect(url_for('settings_admin'))
+        f = request.files.get('file')
+        ext = (f.filename.rsplit('.', 1)[-1].lower() if f and '.' in f.filename else '')
+        if not f or ext not in printing.LH_EXT:
+            flash('ارفع الورق الرسمي كصورة PNG أو JPG أو SVG أو WEBP بحجم A4', 'bad')
+            return redirect(url_for('settings_admin'))
+        data = f.read()
+        if len(data) > 8 * 1024 * 1024:
+            flash('حجم الملف أكبر من 8 ميغابايت', 'bad')
+            return redirect(url_for('settings_admin'))
+        for e in printing.LH_EXT:
+            p = os.path.join(d, f'letterhead.{e}')
+            if os.path.exists(p):
+                os.remove(p)
+        with open(os.path.join(d, f'letterhead.{ext}'), 'wb') as fh:
+            fh.write(data)
+        db.log('update', 'letterhead', 'letterhead', f'{ext}; {len(data)} bytes')
+        flash('حُفظ الورق الرسمي وسيُستخدم في كل المطبوعات', 'ok')
+        return redirect(url_for('settings_admin'))

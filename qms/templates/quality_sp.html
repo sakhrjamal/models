@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% block title %}إفراج SP — {{ w.batch_no }}{% endblock %}{% block body %}
+<h1>إفراج SP — {{ w.batch_no }}</h1><div class="sub">{{ w.item_code }} · كود SP (Master Data): {{ it.sp_item or 'غير محدد' }} · {{ it.size }} · {{ it.ply }} طبقة · {{ it.mesh or '' }} · {{ it.xray or '' }}</div>
+<div class="tablewrap"><table><tr><th>الباركود</th><th>كود SP</th><th>المصدر</th><th>سند الطي</th><th>المسحات</th><th>الحالة</th></tr>
+{% for c in cartons %}<tr><td>{{ c.barcode }}</td><td>{{ c.sp_code or '—' }}</td><td>{{ 'إنتاج داخلي' if c.sp_source=='INTERNAL_PRODUCTION' else 'استلام مورّد' }}</td><td>{{ c.fold_doc }}</td><td>{{ fmt(c.qty) }}</td><td>{{ inter_ar.get(c.status, c.status) }}</td></tr>{% endfor %}</table></div>
+{% if pend and can('qc_sign') %}<form method="post" action="{{ url_for('quality_sp_decide', bn=w.batch_no) }}" class="card" style="margin-top:14px">
+<label>ملاحظة <span class="mini">(إلزامية عند الرفض/التعليق)</span></label><textarea name="note" rows="2" id="note"></textarea>
+<div class="actions"><button class="btn ok big" name="decision" value="approve">إفراج للفرز والعد ({{ pend|length }} كرتون)</button>
+<button class="btn warnb" name="decision" value="hold" onclick="return nn()">تعليق</button><button class="btn bad" name="decision" value="reject" onclick="return nn()">رفض</button></div></form>
+<script>function nn(){var n=document.getElementById('note');if(!n.value.trim()){alert('اكتب السبب أولًا');n.focus();return false}return true}</script>
+{% elif not pend %}<div class="hint">لا كراتين بانتظار القرار.</div>{% endif %}
+{% if hist %}<h2>السجل</h2><table><tr><th>القرار</th><th>الكمية</th><th>بواسطة</th><th>الوقت</th><th>ملاحظة</th></tr>{% for h in hist %}<tr><td><span class="pill {{ dec_cls.get(h.decision,'') }}">{{ dec_ar.get(h.decision,h.decision) }}</span></td><td>{{ fmt(h.qty) }} {{ h.unit }}</td><td>{{ h.by_user }}</td><td>{{ h.ts }}</td><td>{{ h.note or '—' }}</td></tr>{% endfor %}</table>{% endif %}
+<div class="wizard-actions noprint"><div class="l"><a class="btn back" href="{{ url_for('quality_pending') }}">الإفراجات</a></div></div>{% endblock %}

@@ -40,7 +40,7 @@ def variant_of(sterile_text):
 
 
 def variant_for(w):
-    return variant_of((w or {}).get('route'))
+    return variant_of(dict(w or {}).get('route'))
 
 
 def route_of_wo(w):
@@ -98,10 +98,16 @@ def final_stage(w):
         return 'BW_OUT' if new else 'CT_OUT'
     if rc == SP:
         return 'SPK_OUT' if new or variant_for(w) == NON_STERILE else 'PACKED'
-    return 'PROD_OUT' if new else None   # الشاش الكامل: قيد PROD_OUT لكل سند طي (v14)
+    if is_v15(w):
+        return 'STR_OUT' if variant_for(w) == STERILE else 'NSP_OUT'
+    return 'PROD_OUT' if new else None
 
 
-# ------------------------------------------------------------------ المنتج التام / الإفراج
+def is_v15(w):
+    """أمر شاش بسير v15: المخرج مسحات ويُحسب المطلوب بالمسحات."""
+    return (w or {}).get('req_swabs') is not None
+
+
 def is_v14(w):
     """أمر يعمل بسير v14 (خطة قص/موافقة جودة) لا بالمراحل القديمة."""
     if (w or {}).get('final_status'):
@@ -140,7 +146,7 @@ def released_qty(bn):
         return 0.0, None, None
     w = db.one('SELECT * FROM work_orders WHERE batch_no=?', (bn,)) or {}
     if fr['kind'] == 'approval':
-        return float(w.get('approved_qty') or 0), production_unit(w), fr['ref']
+        return float(w.get('approved_qty') or 0), (w.get('uom') if is_v15(w) else production_unit(w)), fr['ref']
     rt = route(route_of_wo(w)) or {}
     var = variant_for(w)
     unit = rt.get('fg_unit_sterile' if var == STERILE else 'fg_unit_non_sterile') or 'بوكس'
@@ -212,7 +218,57 @@ def _slit(w, bn):
 
 @step('FOLD')
 def _fold(w, bn):
-    return _frac(_sum('SELECT SUM(qty_good) FROM folding_out WHERE batch_no=?', (bn,)), _req(w))
+    return _frac(_sum('SELECT SUM(qty_good) FROM folding_out WHERE batch_no=?', (bn,)), _req_swabs(w))
+
+
+def _req_swabs(w):
+    return _n(w.get('req_swabs')) if w.get('req_swabs') is not None else _req(w)
+
+
+@step('NSPACK')
+def _nspack(w, bn):
+    return _frac(_sum('SELECT SUM(swabs_in) FROM ns_packing WHERE batch_no=?', (bn,)), _req_swabs(w))
+
+
+@step('SPREL')
+def _sprel(w, bn):
+    tot = _sum('SELECT SUM(qty) FROM intermediates WHERE batch_no=?', (bn,))
+    ok = _sum("SELECT SUM(qty) FROM intermediates WHERE batch_no=? AND status IN ('Released for Sorting','Consumed')", (bn,))
+    return _frac(ok, tot) if tot else 0.0
+
+
+@step('STERPROC')
+def _sterproc(w, bn):
+    return _frac(_sum("""SELECT SUM(received_qty) FROM ster_records WHERE batch_no=? AND status NOT IN ('Sorting','Packaging','Boxing')""",
+                      (bn,)), _req_swabs(w))
+
+
+def _rec_frac(bn, statuses):
+    tot = _sum('SELECT COUNT(*) FROM ster_records WHERE batch_no=?', (bn,))
+    n = _sum(f"SELECT COUNT(*) FROM ster_records WHERE batch_no=? AND status IN ({','.join('?' * len(statuses))})",
+             (bn, *statuses))
+    return _frac(n, tot) if tot else 0.0
+
+
+ST_AFTER_PRE = ('Released for Sterilization', 'In Sterilization', 'Sterilization Completed', 'Transferred to Aeration',
+                'Aeration Completed', 'Pending Final QC Release')
+ST_AFTER_STER = ('Sterilization Completed', 'Transferred to Aeration', 'Aeration Completed', 'Pending Final QC Release')
+ST_AFTER_AER = ('Aeration Completed', 'Pending Final QC Release')
+
+
+@step('PRESTER')
+def _prester(w, bn):
+    return _rec_frac(bn, ST_AFTER_PRE)
+
+
+@step('STERIL')
+def _steril(w, bn):
+    return _rec_frac(bn, ST_AFTER_STER)
+
+
+@step('AERATION')
+def _aeration(w, bn):
+    return _rec_frac(bn, ST_AFTER_AER)
 
 
 @step('SORT')
@@ -313,6 +369,11 @@ def output(bn):
         rej = _proc_qty('SPK', bn, 'qty_reject')
         scrap = _proc_qty('SPK', bn, 'qty_scrap')
         unit = 'قطعة'
+    elif is_v15(w):
+        good = _sum('SELECT SUM(qty_good) FROM folding_out WHERE batch_no=?', (bn,))
+        rej = _sum('SELECT SUM(rejected_qty) FROM folding_out WHERE batch_no=?', (bn,))
+        scrap = _sum('SELECT SUM(waste_qty) FROM folding_out WHERE batch_no=?', (bn,))
+        unit = 'مسحة'
     else:
         good = _sum('SELECT SUM(env_good*per_envelope) FROM packaging WHERE batch_no=?', (bn,)) or \
             _sum('SELECT SUM(qty_good) FROM folding_out WHERE batch_no=?', (bn,))
@@ -323,7 +384,10 @@ def output(bn):
     return dict(good=good, reject=rej, scrap=scrap, unit=unit)
 
 
-# ------------------------------------------------------------------ v14: المنتج يقود كل شيء
+# ------------------------------------------------------------------ v15: المنتج يقود كل شيء (الوحدة الأساسية: المسحة)
+SWAB = 'مسحة'
+
+
 def _setting_f(key, default):
     try:
         return float(db.setting(key, str(default)))
@@ -335,59 +399,144 @@ def norm_unit(u):
     """توحيد اسم الوحدة: باك/باكت/pack ← pack."""
     u = (u or '').strip()
     return {'باك': 'pack', 'باكت': 'pack', 'pack': 'pack', 'بوكس': 'box', 'box': 'box', 'كرتون': 'carton',
-            'carton': 'carton'}.get(u, u)
+            'carton': 'carton', 'مسحة': 'swab', 'swab': 'swab', 'قطعة': 'swab', 'مغلف': 'envelope'}.get(u, u)
 
 
 def production_unit(w):
-    """وحدة إنتاج الأمر: من بيانات المنتج (باكت لـ GS310M) وإلا وحدة المسار الأساسية."""
+    """وحدة مخرج الإنتاج: المسحة لأوامر الشاش الكامل (v15)؛ وللخطوط الأخرى وحدة المسار."""
     w = w or {}
+    if route_of_wo(w) == FULL and is_v15(w):
+        return SWAB
     if w.get('uom'):
         return w['uom']
     it = db.one('SELECT uom FROM items WHERE item_code=?', (w.get('item_code'),)) or {}
     return it.get('uom') or (route(route_of_wo(w)) or {}).get('base_uom') or 'قطعة'
 
 
+def pack_spec(item_code):
+    return db.one('SELECT * FROM pack_spec WHERE item_code=?', (item_code,)) or {}
+
+
+def swabs_per_unit(item):
+    """(عدد المسحات في الوحدة التجارية, اسم الوحدة): غير معقم = باكت (100)، معقم = بوكس (100) من Packaging Configuration."""
+    ps = pack_spec(item['item_code'])
+    if variant_of(item.get('sterile')) == STERILE:
+        return ps.get('swabs_per_box'), 'بوكس'
+    return ps.get('swabs_per_pack'), 'باكت'
+
+
 def item_sr_width(item):
     """(عرض السب رول سم, المصدر) — من بيانات المنتج وإلا مصفوفة القص (ماكينة × طبقات)."""
     if item.get('sub_roll_width_cm'):
-        return float(item['sub_roll_width_cm']), 'بيانات المنتج'
+        w = float(item['sub_roll_width_cm'])
+        snap = _snap_to_master(item, w)
+        if snap is not None and snap != w:
+            return snap, f'Master Data (اعتُمد الأصغر: {snap:g} بدل {w:g})'
+        return w, 'بيانات المنتج'
     if item.get('machine_code') and item.get('ply'):
         m = db.one('SELECT std_width_cm FROM slit_matrix WHERE key=?', (f"{item['machine_code']}-{item['ply']}",))
         if m:
-            return float(m['std_width_cm']), 'مصفوفة القص'
+            w = float(m['std_width_cm'])
+            snap = _snap_to_master(item, w)
+            if snap is not None and snap != w:
+                return snap, f'Master Data (اعتُمد الأصغر: {snap:g} بدل {w:g} من مصفوفة القص)'
+            return w, 'مصفوفة القص'
     return None, None
 
 
-def item_yield(item):
-    """(إنتاجية السب رول بوحدة إنتاج الصنف, المصدر) — القيمة المعيارية أو حساب هندسي من الماكينة."""
+SNAP_TOL_CM = 2.0
+
+
+def _sr_master_width(r):
+    w = r.get('ref_width_cm')
+    if w is None:
+        import migrate_v15
+        w = migrate_v15.width_from_text(r.get('width_cm'), r.get('description'))
+    return float(w) if w is not None else None
+
+
+def _snap_to_master(item, w):
+    """عند اختلاف مصفوفة القص عن عرض Sub Roll في Excel: يُعتمد الرقم الأصغر الأقرب (≤ العرض وضمن السماحية) من Master Data."""
+    best = None
+    for r in db.q("SELECT * FROM items WHERE prefix='SR' AND status='نشط'"):
+        if (r.get('mesh') or None) != (item.get('mesh') or None) or (r.get('xray') or None) != (item.get('xray') or None):
+            continue
+        rw = _sr_master_width(r)
+        if rw is None:
+            continue
+        if abs(rw - w) < 0.01:
+            return w
+        if rw < w and w - rw <= SNAP_TOL_CM and (best is None or rw > best):
+            best = rw
+    return best
+
+
+def ref_length_of(item):
+    """الطول المرجعي للرول من Master Data (خامة المنتج) وإلا الإعداد الافتراضي."""
+    raw = db.one('SELECT length_m FROM items WHERE item_code=?', (item.get('raw_item'),)) if item.get('raw_item') else None
+    try:
+        v = float(str(raw['length_m']).lower().replace('m', '')) if raw and raw['length_m'] not in (None, '') else None
+    except ValueError:
+        v = None
+    return v or _setting_f('default_sr_length_m', 2000)
+
+
+def theoretical_swabs(machine, std_width, length_m, actual_width=None):
+    """الكمية النظرية من سب رول: مساحته الفعلية ÷ استهلاك المسحة القياسي (عرض السب رول القياسي × طول القطعة للماكينة)."""
+    import forms
+    cl = forms.cut_length(machine)
+    if not (cl and std_width and length_m):
+        return None
+    w = float(actual_width or std_width)
+    return int((w * float(length_m) * 100.0) / (float(std_width) * cl) + 1e-9)
+
+
+def item_yield(item, length_m=None):
+    """(إنتاجية السب رول بالمسحات, المصدر): تجاوز يدوي في Master Data وإلا نظري من الماكينة والطول."""
     if item.get('yield_per_sr'):
         return float(item['yield_per_sr']), 'بيانات المنتج'
-    if item.get('machine_code') and item.get('ply'):
-        import forms
-        y = forms.sr_yield(f"{item['machine_code']}-{item['ply']}", _setting_f('default_sr_length_m', 2000))
-        if y:
-            pm = pack_map(item['item_code'])
-            if norm_unit(item.get('uom')) == 'pack' and 'pack' in pm:
-                y = y / pm['pack']['per_parent']
-            return float(y), 'محسوب من الماكينة'
-    return None, None
+    srw, _ = item_sr_width(item)
+    y = theoretical_swabs(item.get('machine_code'), srw, length_m or ref_length_of(item))
+    return (float(y), 'محسوب من الماكينة وطول الرول') if y else (None, None)
 
 
-def requirements(item, qty, jumbo_width=None):
-    """احتياج الخامة: تلقائي 100% من بيانات المنتج والإعدادات — لا يُدخله المستخدم.
+def match_subrolls(item):
+    """أكواد Sub Roll المطابقة لمواصفات المنتج من Master Data (العرض + Plain/X-Ray + Mesh). بلا تخمين ولا توليد."""
+    srw, _ = item_sr_width(item)
+    if not srw:
+        return []
+    out = []
+    for r in db.q("SELECT * FROM items WHERE prefix='SR' AND status='نشط' ORDER BY item_code"):
+        w = r.get('ref_width_cm')
+        if w is None:
+            import migrate_v15
+            w = migrate_v15.width_from_text(r.get('width_cm'), r.get('description'))
+        if w is not None and abs(float(w) - srw) < 0.01 and (r.get('mesh') or None) == (item.get('mesh') or None) \
+                and (r.get('xray') or None) == (item.get('xray') or None):
+            out.append(r)
+    return out
 
-        العرض المفيد     = عرض الجامبو − تنظيف الطرف الأيسر − تنظيف الطرف الأيمن   (120 − 1 − 1 = 118)
-        سب رول لكل جامبو = ⌊العرض المفيد ÷ عرض السب رول⌋                           (⌊118 ÷ 23⌋ = 5)
-        سب رول مطلوب    = ⌈الكمية ÷ إنتاجية السب رول⌉                              (⌈25000 ÷ 5000⌉ = 5)
-        جامبو مطلوب     = ⌈السب رول المطلوب ÷ سب رول لكل جامبو⌉                     (⌈5 ÷ 5⌉ = 1)
+
+def requirements(item, qty, jumbo_width=None, jumbo_length=None):
+    """احتياج الخامة — تلقائي من بيانات المنتج (الكمية بالوحدة التجارية ← مسحات ← سب رول ← جامبو):
+
+        المسحات المطلوبة  = الكمية × مسحات الوحدة التجارية        (باكت أو بوكس = 100)
+        نظري/سب رول      = طول السب رول × عرضه ÷ استهلاك المسحة    (5,000 لسب رول 2000 م على ماكينة 10)
+        العرض المفيد     = عرض الجامبو − 2 × تنظيف الطرف           (120 − 1 − 1 = 118)
+        سب رول/جامبو     = ⌊العرض المفيد ÷ عرض السب رول⌋
+        سب رول مطلوب     = ⌈المسحات ÷ النظري⌉ ،  جامبو مطلوب = ⌈سب رول ÷ سب رول/جامبو⌉
     """
     miss = []
     srw, srw_src = item_sr_width(item)
-    yld, y_src = item_yield(item)
+    spu, cunit = swabs_per_unit(item)
+    length = float(jumbo_length) if jumbo_length else ref_length_of(item)
+    yld, y_src = item_yield(item, length)
     if not srw:
         miss.append('عرض السب رول')
     if not yld:
-        miss.append('إنتاجية السب رول')
+        miss.append('الكمية النظرية للسب رول (ماكينة الطي/الطول)')
+    if not spu:
+        miss.append(f'عدد المسحات في {cunit} (Packaging Configuration)')
     jw = float(jumbo_width) if jumbo_width else _setting_f('default_jumbo_width_cm', 120)
     edge = _setting_f('slitter_edge_trim_each_cm', 1)
     usable = round(max(jw - 2 * edge, 0), 2)
@@ -395,16 +544,52 @@ def requirements(item, qty, jumbo_width=None):
     if srw and per < 1:
         miss.append('عرض الجامبو لا يتسع لسب رول واحد')
     qty = float(qty or 0)
-    sr_need = math.ceil(qty / yld - 1e-9) if (yld and qty > 0) else None
+    swabs = qty * float(spu) if spu else None
+    sr_need = math.ceil(swabs / yld - 1e-9) if (yld and swabs) else None
     jumbo_need = math.ceil(sr_need / per) if (sr_need and per) else None
+    m = match_subrolls(item)
     return dict(ok=not miss, missing=miss, sr_width=srw, sr_width_src=srw_src, yield_per_sr=yld, yield_src=y_src,
                 jumbo_width=jw, edge_each=edge, usable_width=usable, per_jumbo=per, sr_needed=sr_need,
-                jumbo_needed=jumbo_need, raw_item=item.get('raw_item'), trim_waste=round(usable - per * srw, 2) if srw else None,
-                unit=item.get('uom') or 'قطعة')
+                jumbo_needed=jumbo_need, raw_item=item.get('raw_item'), swabs_needed=swabs, swabs_per_unit=spu,
+                commercial_unit=cunit, sr_matches=[r['item_code'] for r in m],
+                trim_waste=round(usable - per * srw, 2) if srw else None, unit=SWAB)
+
+
+def spec_lines(item):
+    """Packaging Configuration كنص مقروء للصنف (تحذير عند غياب قيمة)."""
+    ps = pack_spec(item['item_code'])
+    f = lambda v: (f'{v:g}' if v is not None else '—')                    # noqa: E731
+    if variant_of(item.get('sterile')) == STERILE:
+        ppe, spb = ps.get('swabs_per_envelope'), ps.get('swabs_per_box')
+        epb = (spb / ppe) if (ppe and spb) else None
+        return [f'{f(ppe)} مسحة = 1 مغلف', f'{f(spb)} مسحة = 1 بوكس ({f(epb)} مغلف)',
+                f'{f(ps.get("boxes_per_carton"))} بوكس = 1 كرتون']
+    return [f'{f(ps.get("swabs_per_pack"))} مسحة = 1 باكت', f'{f(ps.get("packs_per_carton"))} باكت = 1 كرتون']
+
+
+def equiv_from_swabs(item, swabs):
+    """المكافئ التلقائي لعدد مسحات في وحدات التعبئة (يتخطى ما لم يُعرَّف)."""
+    ps = pack_spec(item['item_code'])
+    out = []
+    sw = float(swabs or 0)
+    if variant_of(item.get('sterile')) == STERILE:
+        if ps.get('swabs_per_envelope'):
+            out.append(dict(unit='مغلف', qty=round(sw / ps['swabs_per_envelope'], 2)))
+        if ps.get('swabs_per_box'):
+            boxes = sw / ps['swabs_per_box']
+            out.append(dict(unit='بوكس', qty=round(boxes, 2)))
+            if ps.get('boxes_per_carton'):
+                out.append(dict(unit='كرتون', qty=round(boxes / ps['boxes_per_carton'], 2)))
+    elif ps.get('swabs_per_pack'):
+        packs = sw / ps['swabs_per_pack']
+        out.append(dict(unit='باكت', qty=round(packs, 2)))
+        if ps.get('packs_per_carton'):
+            out.append(dict(unit='كرتون', qty=round(packs / ps['packs_per_carton'], 2)))
+    return out
 
 
 def pack_equiv(item_code, qty, unit):
-    """المكافئ التلقائي للكمية في وحدات التعبئة الأعلى (بوكس / كرتون) من تكوين تعبئة الصنف."""
+    """المكافئ لخطوط SP والرباط من pack_config."""
     levels = pack_levels(item_code)
     start = 0
     for lv in levels:
@@ -419,7 +604,6 @@ def pack_equiv(item_code, qty, unit):
 
 
 def _pack_text(levels, rc):
-    """تكوين التعبئة كنص مقروء: «100 قطعة = 1 باكت · 20 باكت = 1 بوكس · 10 بوكس = 1 كرتون»."""
     lower = 'رول' if rc == BANDAGE else 'قطعة'
     out = []
     for x in levels:
@@ -431,37 +615,52 @@ def _pack_text(levels, rc):
 
 
 def product_card(item, qty=None, jumbo_width=None):
-    """كل ما يعرفه النظام عن المنتج تلقائيًا — تعرضه شاشة أمر الإنتاج فلا يدخله أحد."""
+    """كل ما يعرفه النظام عن المنتج تلقائيًا — تعرضه شاشات الأوامر فلا يدخله أحد."""
     rc = item.get('route_code')
     r = route(rc) or {}
     var = variant_of(item.get('sterile'))
     steps = [s['name_ar'] for s in steps_for(rc, var)] if rc else []
     pm = pack_levels(item['item_code'])
-    unit = item.get('uom') or r.get('base_uom') or 'قطعة'
+    ps = pack_spec(item['item_code'])
+    spu, cunit = swabs_per_unit(item) if rc == FULL else (None, item.get('uom'))
+    unit = cunit if rc == FULL else (item.get('uom') or r.get('base_uom') or 'قطعة')
     card = dict(item_code=item['item_code'], description=item.get('description'), size=item.get('size'),
                 ply=item.get('ply'), xray=item.get('xray'), mesh=item.get('mesh'), sterile=item.get('sterile'),
                 route_code=rc, route_name=r.get('name_ar'), route_en=r.get('name_en'), steps=steps, unit=unit,
                 machine=item.get('machine_code'),
                 machine_name=(db.one('SELECT name FROM machines WHERE machine_code=?', (item.get('machine_code'),)) or {}).get('name'),
-                pack_code=item.get('pack_code'), box_code=item.get('box_code'), carton_code=item.get('master_box'),
-                pack_config=_pack_text(pm, rc),
-                raw_item=item.get('raw_item'), variant=var)
+                pack_code=ps.get('pack_code') or item.get('pack_code'), box_code=ps.get('box_code') or item.get('box_code'),
+                env_code=ps.get('env_code'), carton_code=ps.get('carton_code') or item.get('master_box'),
+                pack_config=([dict(unit='', per=0, text=s_) for s_ in spec_lines(item)] if rc == FULL
+                             else _pack_text(pm, rc)),
+                raw_item=item.get('raw_item'), variant=var, sp_item=item.get('sp_item'))
     if rc == FULL:
         card['req'] = requirements(item, qty, jumbo_width)
-    if qty:
+        card['swab_unit'] = SWAB
+        if qty and spu:
+            card['equiv'] = equiv_from_swabs(item, float(qty) * spu)
+    elif qty:
         card['equiv'] = pack_equiv(item['item_code'], qty, unit)
     return card
 
 
 def produced(bn, w=None):
-    """(الكمية المنتجة الفعلية, وحدة الإنتاج) — تُحسب من السندات دائمًا ولا تُخزَّن يدويًا."""
+    """(الكمية المنتجة الفعلية بمخرج الإنتاج, وحدته) — مسحات للشاش الكامل."""
     w = w or db.one('SELECT * FROM work_orders WHERE batch_no=?', (bn,)) or {}
     return output(bn)['good'], production_unit(w)
 
 
+def fg_qty(w):
+    """(كمية المنتج النهائي بالوحدة التجارية, وحدتها): باكت لغير المعقم، بوكس للمعقم — من سندات التعبئة/التغليف الفعلية."""
+    bn = w['batch_no']
+    if variant_for(w) == STERILE:
+        return _sum('SELECT SUM(boxes_actual) FROM ster_records WHERE batch_no=?', (bn,)), 'بوكس'
+    return _sum('SELECT SUM(packs_actual) FROM ns_packing WHERE batch_no=?', (bn,)), 'باكت'
+
+
 def subroll_fits(w, sr):
     """(ok, سبب) — هل يصلح السب رول لأمر إنتاج؟ سب رول الأمر نفسه دائمًا؛ وغيره بشرط تطابق الماكينة والطبقات
-    والعرض (عرض السب رول = عرض المنتج) والكاشف والميش. يُستخدم في القائمة وفي التحقق عند الحفظ/التعديل."""
+    والعرض والكاشف والميش. يُستخدم في القائمة وفي التحقق عند الحفظ/التعديل."""
     import forms
     if sr.get('batch_no') == w['batch_no']:
         return True, ''
@@ -480,19 +679,33 @@ def avail_subrolls(w):
     return [r for r in rows if subroll_fits(w, r)[0]]
 
 
-# مراحل الأمر كما يراها المستخدم (لا مراحل إضافية للمعقم/غير المعقم — المسار وحده يحدد الخطوات)
+# مراحل الأمر كما يراها المستخدم (المسار والمعقم/غير المعقم يحددان الخطوات)
 STAGE_UI = {
     'new':             ('جديد', 'New', ''),
     'slitting':        ('في السليتر', 'In Slitting', 'info'),
     'ready_fold':      ('جاهز للطي', 'Ready for Folding', 'info'),
-    'production':      ('قيد الإنتاج', 'In Production', 'warn'),
-    'pending_quality': ('بانتظار الجودة', 'Pending Quality', 'warn'),
+    'production':      ('قيد الطي', 'In Folding', 'warn'),
+    'packing':         ('بانتظار التعبئة', 'Pending Packing', 'warn'),
+    'ready_finish':    ('جاهز للإنهاء', 'Ready to Finish', 'info'),
+    'sp_release':      ('بانتظار إفراج SP', 'Pending SP Release', 'warn'),
+    'processing':      ('فرز / عد / تغليف', 'Sorting & Packaging', 'info'),
+    'pre_ster_qc':     ('بانتظار إفراج قبل التعقيم', 'Pending Pre-Sterilization Release', 'warn'),
+    'ready_ster':      ('جاهز للتعقيم', 'Ready for Sterilization', 'info'),
+    'sterilizing':     ('في التعقيم', 'In Sterilization', 'info'),
+    'aeration':        ('في التهوية', 'In Aeration', 'info'),
+    'pending_quality': ('بانتظار الإفراج النهائي', 'Pending Final QC Release', 'warn'),
     'approved':        ('معتمد للتخزين', 'Approved for Storage', 'ok'),
     'stored':          ('مكتمل — مخزّن', 'Stored / Completed', 'ok'),
     'rejected':        ('مرفوض', 'Rejected', 'bad'),
     'hold':            ('معلّق', 'Hold', 'warn'),
     'closed':          ('مغلق', 'Closed', ''),
 }
+STER_RANK = ['sp_release', 'processing', 'pre_ster_qc', 'ready_ster', 'sterilizing', 'aeration', 'pending_quality']
+REC_STAGE = {'Sorting': 'processing', 'Packaging': 'processing', 'Boxing': 'processing',
+             'Ready for Pre-Sterilization QC': 'pre_ster_qc', 'Pre-Sterilization Hold': 'pre_ster_qc',
+             'Released for Sterilization': 'ready_ster', 'In Sterilization': 'sterilizing',
+             'Sterilization Completed': 'aeration', 'Transferred to Aeration': 'aeration',
+             'Aeration Completed': 'pending_quality', 'Pending Final QC Release': 'pending_quality'}
 
 
 def order_state(w):
@@ -500,56 +713,85 @@ def order_state(w):
     if isinstance(w, str):
         w = db.one('SELECT * FROM work_orders WHERE batch_no=?', (w,))
     bn, rc = w['batch_no'], route_of_wo(w)
-    req = _n(w.get('qty_required'))
+    v15 = rc == FULL and is_v15(w)
+    req = _req_swabs(w) if v15 else _n(w.get('qty_required'))
     prod, unit = produced(bn, w)
     fs = w.get('final_status')
     eps = 1e-6
     st = dict(batch_no=bn, route=rc, required=req, produced=prod, remaining=max(req - prod, 0), unit=unit,
-              final_status=fs, plans=0, sr_executed=0, sr_available=0, docs=0, next=None, can_finish=False)
+              final_status=fs, plans=0, sr_executed=0, sr_available=0, docs=0, next=None, can_finish=False,
+              fg_qty=0.0, fg_unit=w.get('uom'), v15=v15, sterile=variant_for(w) == STERILE, packed_swabs=0.0,
+              unpacked=0.0)
     docs = int(_sum('SELECT COUNT(*) FROM folding_out WHERE batch_no=?', (bn,)))
+    W = lambda label, ep, kind='work': dict(label=label, endpoint=ep, kind=kind)          # noqa: E731
     if rc == FULL:
         plans = db.q('SELECT status FROM cutting_plans WHERE batch_no=?', (bn,))
         ex = sr_executed(bn)
         avail = len(avail_subrolls(w)) if not fs else 0
         need = int(_n(w.get('sr_needed')))
         st.update(plans=len(plans), sr_executed=ex, sr_available=avail, docs=docs, sr_needed=need)
-        if docs:
+        fold_more = st['remaining'] > eps
+        if v15:
+            st['fg_qty'], st['fg_unit'] = fg_qty(w)
+        if not docs:
+            key = 'new' if not plans else ('ready_fold' if ex >= max(need, 1) else 'slitting')
+            nxt = W('ابدأ خطة القص', 'slit_work') if key == 'new' else (
+                W('استكمال القص', 'slit_work') if key == 'slitting' else W('ابدأ الطي', 'fold_work'))
+            can_finish = False
+        elif not v15:
             key = 'production'
-        elif not plans:
-            key = 'new'
-        elif ex >= max(need, 1):
-            key = 'ready_fold'
+            nxt = W('إنهاء الإنتاج وإرساله للجودة', 'order_view', 'finish') if not fold_more else (
+                W('تسجيل سند طي', 'fold_work') if avail else W('استكمال القص', 'slit_work'))
+            can_finish = docs > 0
+        elif not st['sterile']:
+            packed = _sum('SELECT SUM(swabs_in) FROM ns_packing WHERE batch_no=?', (bn,))
+            folded = prod
+            st.update(packed_swabs=packed, unpacked=max(folded - packed, 0))
+            more_sr = fold_more and (avail or ex < need)
+            if more_sr:
+                key = 'production'
+                nxt = W('تسجيل سند طي', 'fold_work') if avail else W('استكمال القص', 'slit_work')
+            elif st['unpacked'] > eps:
+                key, nxt = 'packing', W('تعبئة (باكت / كرتون)', 'ns_pack')
+            else:
+                key, nxt = 'ready_finish', W('إنهاء الإنتاج وإرساله للجودة', 'order_view', 'finish')
+            can_finish = st['fg_qty'] > eps
         else:
-            key = 'slitting'
-        if key == 'new':
-            nxt = dict(label='ابدأ خطة القص', endpoint='slit_work', kind='work')
-        elif key == 'slitting':
-            nxt = dict(label='استكمال القص', endpoint='slit_work', kind='work')
-        elif key == 'ready_fold':
-            nxt = dict(label='ابدأ الطي', endpoint='fold_work', kind='work')
-        elif st['remaining'] <= eps:
-            nxt = dict(label='إنهاء الإنتاج وإرساله للجودة', endpoint='order_view', kind='finish')
-        elif avail:
-            nxt = dict(label='تسجيل سند طي', endpoint='fold_work', kind='work')
-        elif ex < need:
-            nxt = dict(label='استكمال القص', endpoint='slit_work', kind='work')
-        else:
-            nxt = dict(label='إنهاء الإنتاج بالكمية الفعلية', endpoint='order_view', kind='finish')
-        can_finish = docs > 0
+            recs = db.q('SELECT status FROM ster_records WHERE batch_no=?', (bn,))
+            inter = db.q('SELECT status FROM intermediates WHERE batch_no=? AND rec_no IS NULL', (bn,))
+            inter_all = {r['status'] for r in inter}
+            stages = {REC_STAGE.get(r['status'], 'processing') for r in recs}
+            if 'Pending SP Release' in inter_all:
+                stages.add('sp_release')
+            if 'Released for Sorting' in inter_all:
+                stages.add('processing')
+            more_sr = fold_more and (avail or ex < need)
+            if more_sr:
+                key = 'production'
+                nxt = W('تسجيل سند طي', 'fold_work') if avail else W('استكمال القص', 'slit_work')
+            elif stages:
+                key = min(stages, key=lambda s: STER_RANK.index(s))
+                nxt = {'sp_release': dict(label='بانتظار إفراج SP من الجودة', endpoint=None, kind='wait'),
+                       'processing': W('الفرز والعد والتغليف', 'ster_order'),
+                       'pre_ster_qc': dict(label='بانتظار الإفراج قبل التعقيم', endpoint=None, kind='wait'),
+                       'ready_ster': W('إنشاء دورة تعقيم', 'ster_cycle_new'),
+                       'sterilizing': W('متابعة دورة التعقيم', 'ster_cycles'),
+                       'aeration': W('متابعة التهوية', 'ster_cycles'),
+                       'pending_quality': dict(label='بانتظار الإفراج النهائي', endpoint=None, kind='wait')}[key]
+            else:
+                key, nxt = 'production', W('تسجيل سند طي', 'fold_work')
+            can_finish = False
     else:
         p = progress(bn)
         ops = [x for x in p['steps'] if x['code'] not in ('FINALQC', 'WH')]
         first_open = next((x for x in ops if x['frac'] < 1), None)
         started = prod > 0 or any(x['frac'] > 0 for x in ops)
         key = 'production' if started else 'new'
-        if first_open:
-            nxt = dict(label=first_open['name'], endpoint=first_open['endpoint'], kind='work')
-        else:
-            nxt = dict(label='إنهاء الإنتاج وإرساله للجودة', endpoint='order_view', kind='finish')
+        nxt = W(first_open['name'], first_open['endpoint']) if first_open else W('إنهاء الإنتاج وإرساله للجودة', 'order_view', 'finish')
         can_finish = prod > eps
         st['docs'] = docs
     if fs == FS_PENDING:
-        key, nxt = 'pending_quality', dict(label='بانتظار موافقة الجودة', endpoint=None, kind='wait')
+        key, nxt = 'pending_quality', dict(label='بانتظار الإفراج النهائي', endpoint=None, kind='wait')
     elif fs == FS_APPROVED:
         key, nxt = 'approved', dict(label='بانتظار التخزين', endpoint='warehouse', kind='store')
     elif fs == FS_STORED:
@@ -561,6 +803,8 @@ def order_state(w):
     elif w.get('status') == 'مغلقة':
         key, nxt = 'closed', dict(label='الأمر مغلق', endpoint=None, kind='done')
     ar, en, cls = STAGE_UI[key]
+    if v15 and st['sterile'] and not fs:
+        can_finish = False                                   # المعقم: الإفراج النهائي يُطلب آليًا بعد التهوية
     st.update(stage=key, stage_ar=ar, stage_en=en, cls=cls, next=nxt, can_finish=can_finish and not fs)
     return st
 

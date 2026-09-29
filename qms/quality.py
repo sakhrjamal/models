@@ -294,7 +294,7 @@ def register(app):
         for w in db.q("""SELECT * FROM work_orders WHERE status IN ('صادر','قيد التنفيذ')
                          ORDER BY COALESCE(order_type,'إنتاج') DESC, batch_start_date DESC LIMIT 40"""):
             running.append(dict(w=w, checks=batch_checks(w)))
-        tpls = db.q("SELECT * FROM qc_templates WHERE active=1 ORDER BY area, dept, kind")
+        tpls = db.q("SELECT * FROM qc_templates WHERE active=1 AND kind<>'release' ORDER BY area, dept, kind")
         return render_template('quality_home.html', nav='quality', due=due, recent=recent, bad=bad,
                                running=running, tpls=tpls, KIND_AR=KIND_AR, AREA_AR=AREA_AR,
                                DEPT_AR=DEPT_AR, gate=db.setting('qc_gate_mode', 'warn'))
@@ -389,11 +389,11 @@ def register(app):
                 rec_no = db.alloc(con, scope, fmt)
                 cur = con.execute("""INSERT INTO qc_records(rec_no,template_code,template_version,spec_json,
                         rec_date,rec_time,shift,batch_no,line_code,item_code,values_json,result,fail_count,
-                        decision,inspector,notes,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        decision,inspector,notes,created_by,corrective,approved_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (rec_no, t['code'], t['version'], t['fields_json'], rec_date,
                      s(f.get('rec_time')) or datetime.datetime.now().strftime('%H:%M'), shift, batch, line,
                      item_code, json.dumps(stored, ensure_ascii=False), result, len(fails), decision,
-                     inspector, s(f.get('notes')), g.user['username']))
+                     inspector, s(f.get('notes')), g.user['username'], s(f.get('corrective')), s(f.get('approved_by'))))
                 if is_release:
                     con.execute(*auth.signature_row(SIG_QC_RECORD, 'qc_records', rec_no))
                 ncr_no = None
@@ -569,11 +569,13 @@ def register(app):
             req = [c for c in f.getlist('requires') if c in allc]
             db.run("""UPDATE qc_templates SET title=?, freq_hours=?, needs_batch=?, fields_json=?, active=?,
                       note=?, route=?, requires=?, mfg_routes=?, is_final=?, version=version+1, updated_by=?,
-                      updated_at=datetime('now','localtime') WHERE code=?""",
+                      updated_at=datetime('now','localtime'), form_no=?, revision=?, effective_date=? WHERE code=?""",
                    (title, freq, 1 if f.get('needs_batch') else 0,
                     json.dumps(fields, ensure_ascii=False), 1 if f.get('active') else 0,
                     s(f.get('note')), route_, json.dumps(req), json.dumps(mfg_sel),
-                    1 if (f.get('is_final') and t['kind'] == 'release') else 0, g.user['username'], code))
+                    1 if (f.get('is_final') and t['kind'] == 'release') else 0, g.user['username'],
+                    s(f.get('form_no')) or t.get('form_no') or code, s(f.get('revision')) or t.get('revision') or '00',
+                    s(f.get('effective_date')) or t.get('effective_date'), code))
             db.log('update', 'qc_templates', code, f'v{t["version"] + 1}; {len(fields)} fields')
             flash(f'حُفظ القالب {code} (الإصدار {t["version"] + 1}) — السجلات السابقة تحتفظ بنسختها', 'ok')
             return redirect(url_for('quality_templates'))

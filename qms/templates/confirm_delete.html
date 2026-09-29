@@ -1,0 +1,8 @@
+{% extends "base.html" %}{% block title %}تأكيد الحذف{% endblock %}{% block body %}
+<h1>تأكيد حذف سند الطي {{ fo.doc_no }}</h1>
+<div class="msg warn">الحذف يعكس السند بالكامل (السب رول يعود «متاح»، وتُلغى الكمية من تحت التشغيل). يترتب على ذلك:</div>
+<div class="card"><ul>{% for r in resets %}<li>{{ r }}</li>{% endfor %}</ul></div>
+<form method="post" class="actions" style="margin-top:12px"><input type="hidden" name="confirm" value="1">
+<button class="btn bad">أؤكد الحذف وعكس ما يلزم</button>
+<a class="btn back" href="{{ url_for('order_view', bn=w.batch_no) }}">إلغاء</a></form>
+{% endblock %}

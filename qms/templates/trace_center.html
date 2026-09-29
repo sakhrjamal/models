@@ -1,0 +1,36 @@
+{% extends "base.html" %}{% block title %}مركز التتبع{% endblock %}{% block body %}
+<h1>مركز التتبع</h1><div class="sub">ابحث بأي معرّف: باركود، لوط مورّد، جامبو، سب رول، تشغيل قص، سند طي، أمر، تشغيلة، كرتون SP، سجل، دورة تعقيم</div>
+<form method="get" class="card" style="display:flex;gap:8px"><input name="q" value="{{ q }}" placeholder="امسح الباركود أو اكتب المعرّف" autofocus style="flex:1;font-size:18px"><button class="btn">تتبّع</button></form>
+{% if q and not hits %}<div class="msg warn">لا يوجد ما يطابق «{{ q }}».</div>{% endif %}
+{% if hits|length > 1 or (hits and not sel) %}<h2>نتائج البحث</h2><div class="pick-list">
+{% for h in hits %}<div class="pick"><div class="info"><b>{{ h.kind }} — {{ h.label }}</b>
+<span>{% for b in h.batches %}<a href="{{ url_for('trace_center', q=q, b=b) }}">{{ b }}</a>{{ ' · ' if not loop.last }}{% else %}لا تشغيلات مرتبطة بعد{% endfor %}</span></div></div>{% endfor %}</div>{% endif %}
+{% if fwd %}<h2>التتبع الأمامي — أين استُخدم؟</h2><div class="tablewrap"><table><tr><th>المصدر</th><th>التشغيلة</th><th>سند الطي</th><th>سب رول</th><th>المنتج</th><th>الحالة</th></tr>
+{% for x in fwd %}<tr><td class="mini">{{ x.src }}</td><td><a href="{{ url_for('trace_center', q=q, b=x.batch_no) }}">{{ x.batch_no }}</a></td><td>{{ x.doc_no }}</td><td>{{ x.tag_no }}</td><td>{{ x.item_code }}</td><td>{{ x.final_status or 'قيد الإنتاج' }}</td></tr>{% endfor %}</table></div>{% endif %}
+{% if d %}{% set w = d.w %}
+<h2>السلسلة الخلفية — التشغيلة {{ sel }} <a class="btn back noprint" style="font-size:12px" href="{{ url_for('print_doc', kind='order', key=sel) }}" target="_blank">طباعة</a></h2>
+<div class="stat"><div><b>{{ w.item_code }}</b><span>المنتج</span></div><div><b>{{ w.wo_no }}</b><span>أمر الإنتاج</span></div><div><b>{{ w.final_status or 'قيد الإنتاج' }}</b><span>الحالة النهائية</span></div></div>
+<div class="chain">
+<div class="card"><h3>1 · الجامبو (المورد)</h3>{% if d.jumbos %}<div class="tablewrap"><table><tr><th>الجامبو</th><th>لوط المورد</th><th>رول المورد</th><th>المورد</th><th>الاستلام</th><th>سند القص</th><th>الحالة</th></tr>
+{% for j in d.jumbos %}<tr><td><b>{{ j.roll_no }}</b></td><td>{{ j.supplier_lot or '—' }}</td><td>{{ j.supplier_roll_no or '—' }}</td><td>{{ j.supplier or '—' }}</td><td>{{ j.grn_no or '—' }} {{ j.receipt_date or '' }}</td><td>{{ j.plan_no }} · {{ j.executed_by or '' }}</td><td>{{ j.plan_status }}</td></tr>{% endfor %}</table></div>{% else %}<div class="mini">لا جامبو مرتبط.</div>{% endif %}</div>
+<div class="card"><h3>2 · الرولات الفرعية ({{ d.subrolls|length }})</h3>{% if d.subrolls %}<div class="tablewrap"><table><tr><th>الباركود</th><th>كود Sub Roll</th><th>تشغيل القص</th><th>الجامبو</th><th>العرض</th><th>الطول</th><th>الحالة</th></tr>
+{% for s in d.subrolls %}<tr><td>{{ s.tag_no }}</td><td>{{ s.sr_code or '—' }}</td><td>{{ s.run_no or '—' }}</td><td>{{ s.roll_no }}</td><td>{{ fmt(s.width_cm) }}</td><td>{{ fmt(s.length_m) }}</td><td>{{ s.stock_status }}</td></tr>{% endfor %}</table></div>{% else %}<div class="mini">—</div>{% endif %}</div>
+<div class="card"><h3>3 · سندات الطي ({{ d.folds|length }})</h3>{% if d.folds %}<div class="tablewrap"><table><tr><th>السند</th><th>السب رول</th><th>الماكينة</th><th>مسحات سليمة</th><th>نظري</th><th>هالك</th><th>هالك %</th><th>المشغل</th></tr>
+{% for f in d.folds %}<tr><td>{{ f.doc_no }}</td><td>{{ f.tag_no or '—' }}</td><td>{{ f.machine_code }}</td><td>{{ fmt(f.qty_good) }}</td><td>{{ fmt(f.theoretical_qty) if f.theoretical_qty else '—' }}</td><td>{{ fmt(f.waste_qty) if f.waste_qty is not none else '—' }}</td><td>{{ fmt(f.waste_pct) if f.waste_pct is not none else '—' }}</td><td>{{ f.operator or '—' }}</td></tr>{% endfor %}</table></div>{% else %}<div class="mini">—</div>{% endif %}</div>
+{% if d.inters %}<div class="card"><h3>4 · كراتين SP الوسيطة ({{ d.inters|length }})</h3><div class="tablewrap"><table><tr><th>الباركود</th><th>كود SP</th><th>المصدر</th><th>المسحات</th><th>الحالة</th><th>السجل</th></tr>
+{% for i in d.inters %}<tr><td>{{ i.barcode }}</td><td>{{ i.sp_code or '—' }}</td><td>{{ i.sp_source }}</td><td>{{ fmt(i.qty) }}</td><td>{{ i.status }}</td><td>{{ i.rec_no or '—' }}</td></tr>{% endfor %}</table></div></div>{% endif %}
+{% if d.packs %}<div class="card"><h3>4 · تعبئة غير المعقم</h3><div class="tablewrap"><table><tr><th>السند</th><th>مسحات</th><th>باكتات</th><th>كراتين</th><th>المشغل</th></tr>
+{% for p in d.packs %}<tr><td>{{ p.doc_no }}</td><td>{{ fmt(p.swabs_in) }}</td><td>{{ fmt(p.packs_actual) }}</td><td>{{ fmt(p.cartons_actual) }}</td><td>{{ p.operator or '—' }}</td></tr>{% endfor %}</table></div></div>{% endif %}
+{% if d.recs %}<div class="card"><h3>5 · فرز وعد / تغليف / بوكسات</h3><div class="tablewrap"><table><tr><th>السجل</th><th>مستلم</th><th>مغلفات</th><th>بوكسات</th><th>كراتين</th><th>الدورة</th><th>الحالة</th></tr>
+{% for r in d.recs %}<tr><td>{{ r.rec_no }}</td><td>{{ fmt(r.received_qty) }}</td><td>{{ fmt(r.env_actual) }}</td><td>{{ fmt(r.boxes_actual) }}</td><td>{{ fmt(r.cartons) }}</td><td>{{ r.cycle_no or '—' }}</td><td>{{ r.status }}</td></tr>{% endfor %}</table></div></div>{% endif %}
+{% if d.cycles %}<div class="card"><h3>6 · دورات التعقيم</h3><div class="tablewrap"><table><tr><th>الدورة</th><th>السجل</th><th>بوكسات</th><th>بدء</th><th>انتهاء</th><th>المسؤول</th><th>الحالة</th></tr>
+{% for c in d.cycles %}<tr><td><a href="{{ url_for('ster_cycle', cycle_no=c.cycle_no) }}">{{ c.cycle_no }}</a></td><td>{{ c.rec_no or '—' }}</td><td>{{ fmt(c.boxes_in) }}</td><td>{{ c.start_at or '—' }}</td><td>{{ c.end_at or '—' }}</td><td>{{ c.operator or '—' }}</td><td>{{ c.status }}</td></tr>{% endfor %}</table></div></div>{% endif %}
+{% if d.allocs %}<div class="card"><h3>خامة مخصصة (SP / أربطة)</h3><div class="tablewrap"><table><tr><th>سند التخصيص</th><th>المصدر</th><th>لوط المورد</th><th>الاستلام</th><th>الكمية</th></tr>
+{% for a in d.allocs %}<tr><td>{{ a.doc_no }}</td><td>{{ a.source_ref }}</td><td>{{ a.supplier_lot or '—' }}</td><td>{{ a.grn_no or '—' }}</td><td>{{ fmt(a.qty) }} {{ a.unit }}</td></tr>{% endfor %}</table></div></div>{% endif %}
+{% if d.procs %}<div class="card"><h3>عمليات التشغيل</h3><div class="tablewrap"><table><tr><th>العملية</th><th>المرحلة</th><th>داخل</th><th>خارج</th><th>مرفوض</th><th>المشغل</th></tr>
+{% for p in d.procs %}<tr><td>{{ p.proc_no }}</td><td>{{ p.stage_code }}</td><td>{{ fmt(p.qty_in) }}</td><td>{{ fmt(p.qty_out) }}</td><td>{{ fmt(p.qty_reject) }}</td><td>{{ p.operator or '—' }}</td></tr>{% endfor %}</table></div></div>{% endif %}
+<div class="card"><h3>القرارات والإفراجات</h3>{% if d.approvals %}<div class="tablewrap"><table><tr><th>المرحلة</th><th>القرار</th><th>الكمية</th><th>بواسطة</th><th>الوقت</th></tr>
+{% for a in d.approvals %}<tr><td>{{ a.stage or 'نهائي' }}</td><td>{{ a.decision }}</td><td>{{ fmt(a.qty) }} {{ a.unit or '' }}</td><td>{{ a.by_user }}</td><td>{{ a.ts }}</td></tr>{% endfor %}</table></div>{% else %}<div class="mini">لا قرارات بعد.</div>{% endif %}</div>
+</div>
+<div class="actions noprint"><a class="btn back" href="{{ url_for('genealogy', bn=sel) }}">التقرير التفصيلي (الأصل والفرع)</a></div>
+{% endif %}{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% block title %}المشغلون{% endblock %}{% block body %}
+<h1>قائمة المشغلين</h1><div class="sub">تظهر كقائمة اختيار في السليتر والطي والتعبئة والتعقيم. الاسم الحر مسموح لمدير النظام هنا فقط.</div>
+<form method="post" class="card"><input type="hidden" name="act" value="add"><div class="grid">
+<div><label>الاسم</label><input name="name" required></div>
+<div><label>القسم</label><select name="dept"><option value="production">الإنتاج</option><option value="sterilization">التعقيم</option><option value="quality">الجودة</option><option value="warehouse">المخزن</option></select></div></div>
+<div class="actions"><button class="btn ok">إضافة</button></div></form>
+<div class="tablewrap"><table><tr><th>الاسم</th><th>القسم</th><th>الحالة</th><th></th></tr>
+{% for r in rows %}<tr><td><form method="post" class="actions" style="margin:0"><input type="hidden" name="id" value="{{ r.id }}"><input type="hidden" name="act" value="rename"><input name="name" value="{{ r.name }}" style="min-width:180px"><button class="btn back">حفظ الاسم</button></form></td>
+<td>{{ {'production':'الإنتاج','sterilization':'التعقيم','quality':'الجودة','warehouse':'المخزن'}.get(r.dept, r.dept) }}</td>
+<td><span class="pill {{ 'ok' if r.active else '' }}">{{ 'فعّال' if r.active else 'موقوف' }}</span></td>
+<td><form method="post" style="margin:0"><input type="hidden" name="id" value="{{ r.id }}"><input type="hidden" name="act" value="toggle"><button class="btn back">{{ 'إيقاف' if r.active else 'تفعيل' }}</button></form></td></tr>{% endfor %}</table></div>
+{% endblock %}

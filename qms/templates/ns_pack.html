@@ -1,0 +1,34 @@
+{% extends "base.html" %}{% from "_macros.html" import op_select with context %}{% block title %}تعبئة — {{ w.batch_no }}{% endblock %}{% block body %}
+<div class="autofill" style="margin-bottom:14px"><h4>بيانات التعبئة (تلقائية من Packaging Configuration)</h4><div class="kv">
+  <div class="row"><span class="k">التشغيلة / المنتج</span><span class="v">{{ w.batch_no }} — {{ w.item_code }}</span></div>
+  <div class="row"><span class="k">مسحات في الباكت</span><span class="v">{{ fmt(ps.swabs_per_pack) if ps.swabs_per_pack else 'غير معرَّف' }}</span></div>
+  <div class="row"><span class="k">باكتات في الكرتون</span><span class="v">{{ fmt(ps.packs_per_carton) if ps.packs_per_carton else 'غير معرَّف' }}</span></div>
+  <div class="row"><span class="k">رقم السند</span><span class="v">{{ next_doc }} <span class="mini">(تلقائي)</span></span></div></div></div>
+{% if not ps.swabs_per_pack %}<div class="msg bad">عدد المسحات في الباكت غير معرَّف — يُكمله مدير النظام من «تكوين التعبئة».</div>{% endif %}
+<div class="stat"><div><b>{{ fmt(folded) }}</b><span>مسحات سليمة من الطي</span></div><div><b>{{ fmt(folded-unpacked) }}</b><span>معبأة</span></div><div><b>{{ fmt(unpacked) }}</b><span>غير معبأة</span></div>
+{% if pre %}<div><b>{{ fmt(pre.packs) }}</b><span>باكت متوقع</span></div>{% endif %}</div>
+{% if can('enter') and not w.final_status and unpacked > 0 and ps.swabs_per_pack %}
+<form method="post" class="card" style="margin-top:14px">
+  <div class="grid">
+    <div><label>المسحات المراد تعبئتها *</label><input type="number" name="swabs_in" id="sw" class="qtyinput" min="1" step="any" value="{{ unpacked|int if unpacked==unpacked|int else unpacked }}" required></div>
+    <div><label>الباكتات الفعلية <span class="mini">(تلقائي؛ عدّل عند الفارق)</span></label><input type="number" name="packs_actual" id="pk" min="0" step="any"></div>
+    <div><label>الكراتين <span class="mini">{{ "(تلقائي؛ عدّل عند الفارق)" if ps.packs_per_carton else "(يدوي)" }}</span></label><input type="number" name="cartons_actual" id="ct" min="0" step="any"></div>
+    <div><label>المشغّل *</label>{{ op_select('production') }}</div></div>
+  <div class="livecalc" style="margin-top:10px"><div><span>باكت متوقع</span><b id="ep">—</b></div><div><span>كراتين متوقعة</span><b id="ec">—</b></div></div>
+  <div style="margin-top:12px"><label>ملاحظات</label><input name="notes"></div>
+  <div class="wizard-actions"><div class="l"><a class="btn back" href="{{ url_for('order_view', bn=w.batch_no) }}">أمر الإنتاج</a></div><button class="btn big ok">حفظ سند التعبئة</button></div>
+</form>
+<script>(function(){var spp={{ ps.swabs_per_pack or 0 }},ppc={{ ps.packs_per_carton or 0 }};var sw=document.getElementById('sw');
+function u(){var s=parseFloat(sw.value)||0,p=Math.floor(s/spp+1e-9);document.getElementById('ep').textContent=p;document.getElementById('ec').textContent=ppc?Math.floor(p/ppc+1e-9):'—';
+document.getElementById('pk').placeholder=p;document.getElementById('ct').placeholder=ppc?Math.floor(p/ppc+1e-9):''}sw.addEventListener('input',u);u()})();</script>
+{% elif w.final_status %}<div class="hint">الأمر بحالة «{{ mfg.FS_AR.get(w.final_status) }}» — لا سندات جديدة.</div>
+{% elif unpacked <= 0 %}<div class="hint">كل المسحات السليمة معبأة. {% if st.can_finish %}<a href="{{ url_for('order_view', bn=w.batch_no) }}#finish">إنهاء الإنتاج</a>{% endif %}</div>{% endif %}
+<h2>سندات التعبئة</h2>
+{% if rows %}<div class="tablewrap"><table><tr><th>السند</th><th>مسحات</th><th>باكتات</th><th>كراتين</th><th>المشغّل</th><th>الوقت</th><th></th></tr>
+{% for r in rows %}<tr><td>{{ r.doc_no }}</td><td>{{ fmt(r.swabs_in) }}</td><td><b>{{ fmt(r.packs_actual) }}</b></td><td>{{ fmt(r.cartons_actual) if r.cartons_actual is not none else '—' }}</td><td>{{ r.operator or '—' }}</td><td>{{ r.created_at }}</td>
+<td class="noprint"><a class="btn sm back" href="{{ url_for('print_doc', kind='ns_pack', key=r.doc_no) }}" target="_blank">طباعة</a>
+<a class="btn sm back" href="{{ url_for('print_label', kind='pack', key=r.doc_no) }}" target="_blank">بطاقة باكت</a>
+<a class="btn sm back" href="{{ url_for('print_label', kind='ns_carton', key=r.doc_no) }}" target="_blank">بطاقة كرتون</a>
+{% if can('enter') and gate %}<a class="btn sm back" href="{{ url_for('ns_pack_edit', doc_no=r.doc_no) }}">تعديل</a>
+<form class="inline" method="post" action="{{ url_for('ns_pack_delete', doc_no=r.doc_no) }}" onsubmit="return confirm('حذف سند التعبئة {{ r.doc_no }}؟ ستعود المسحات غير معبأة.')"><button class="btn sm bad">حذف</button></form>{% endif %}</td></tr>{% endfor %}</table></div>
+{% else %}<div class="empty">لا توجد سندات تعبئة بعد.</div>{% endif %}{% endblock %}

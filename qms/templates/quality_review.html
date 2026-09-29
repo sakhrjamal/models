@@ -17,6 +17,15 @@
   {% if equiv %}<div class="row"><span class="k">المكافئ التقريبي</span><span class="v">{% for e in equiv %}{{ fmt(e.qty) }} {{ e.unit }}{{ ' · ' if not loop.last }}{% endfor %}</span></div>{% endif %}
 </div></div>
 
+{% if recs %}<h2>سجلات المعالجة</h2><div class="tablewrap"><table><tr><th>السجل</th><th>بوكسات</th><th>كراتين</th><th>الدورة</th><th>الحالة</th></tr>{% for r in recs %}<tr><td>{{ r.rec_no }}</td><td>{{ fmt(r.boxes_actual) if r.boxes_actual is not none else '—' }}</td><td>{{ fmt(r.cartons) if r.cartons is not none else '—' }}</td><td>{{ r.cycle_no or '—' }}</td><td>{{ r.status }}</td></tr>{% endfor %}</table></div>{% endif %}
+{% if packs %}<h2>سندات التعبئة</h2><div class="tablewrap"><table><tr><th>السند</th><th>مسحات</th><th>باكتات</th><th>كراتين</th></tr>{% for p in packs %}<tr><td>{{ p.doc_no }}</td><td>{{ fmt(p.swabs_in) }}</td><td>{{ fmt(p.packs_actual) }}</td><td>{{ fmt(p.cartons_actual) if p.cartons_actual is not none else '—' }}</td></tr>{% endfor %}</table></div>{% endif %}
+{% if cycles %}<h2>دورات التعقيم وفعاليتها (شرط الإفراج النهائي)</h2>{% for c in cycles %}<form method="post" action="{{ url_for('quality_cycle_verify', cycle_no=c.cycle_no) }}" class="card" style="margin-bottom:10px">
+<input type="hidden" name="batch_no" value="{{ w.batch_no }}"><b>{{ c.cycle_no }}</b> — {{ c.status }} <span class="pill {{ 'ok' if c.ok else ('bad' if c.bad else 'warn') }}">{{ 'مطابقة' if c.ok else ('غير مطابقة' if c.bad else 'لم يُتحقق') }}</span>
+{% if can('qc_sign') %}<div class="grid" style="margin-top:8px"><div><label>CI خارجي</label><select name="ci_external">{% for o in ci_opts %}<option {{ 'selected' if c.ci_external==o }}>{{ o }}</option>{% endfor %}</select></div>
+<div><label>CI داخلي</label><select name="ci_internal">{% for o in ci_opts %}<option {{ 'selected' if c.ci_internal==o }}>{{ o }}</option>{% endfor %}</select></div>
+<div><label>المؤشر البيولوجي</label><select name="bi_result">{% for o in bi_opts %}<option {{ 'selected' if c.bi_result==o }}>{{ o }}</option>{% endfor %}</select></div></div>
+<div class="actions"><button class="btn back">حفظ التحقق</button></div>{% endif %}</form>{% endfor %}
+{% if blocked %}<div class="msg bad">{{ blocked }}</div>{% endif %}{% endif %}
 {% if decidable and can('qc_sign') %}
 <form method="post" action="{{ url_for('quality_decide', bn=w.batch_no) }}" class="card" style="margin-top:16px">
   <label>ملاحظة الجودة <span class="mini">(إلزامية عند الرفض أو التعليق)</span></label>

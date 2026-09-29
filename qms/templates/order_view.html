@@ -59,6 +59,7 @@
   <div><b>{{ fmt(card.req.usable_width) }}</b><span>العرض المفيد (سم)</span></div>
 </div>{% endif %}
 
+{% if can('enter') and st.v15 and not w.final_status %}<div class="hint noprint">مصدر بديل للمسحات: <a href="{{ url_for('sp_supply', bn=w.batch_no) }}">استخدام SP وارد من مورّد (نصف مصنع)</a></div>{% endif %}
 <h2 id="subs">السليتر — خطط القص والسب رول</h2>
 {% if plans %}{% for p in plans %}
 <div class="card"><div class="actions" style="justify-content:space-between"><div><b>{{ p.plan_no }}</b> — الجامبو <b>{{ p.roll_no }}</b>
@@ -68,11 +69,16 @@
 {% endfor %}{% else %}<div class="empty">لم تُنشأ خطة قص بعد.</div>{% endif %}
 
 <h2>سندات الطي</h2>
-{% if docs %}<div class="tablewrap"><table><tr><th>السند</th><th>السب رول</th><th>الكمية</th><th>المشغّل</th><th>التاريخ</th>{% if editable and can('enter') %}<th></th>{% endif %}</tr>
-{% for d in docs %}<tr><td>{{ d.doc_no }}</td><td>{{ d.tag_no or '—' }}</td><td><b>{{ fmt(d.qty_good) }}</b> {{ d.unit or '' }}</td><td>{{ d.operator or '—' }}</td><td>{{ d.fdate }}</td>
-{% if editable and can('enter') %}<td>{% if d.tag_no %}<a class="btn sm back" href="{{ url_for('fold_edit', doc_no=d.doc_no) }}">تعديل</a>
-<form class="inline" method="post" action="{{ url_for('fold_delete', doc_no=d.doc_no) }}" onsubmit="return confirm('حذف السند {{ d.doc_no }}؟ سيعود السب رول {{ d.tag_no }} متاحًا وتُخصم الكمية من الإنتاج.')"><button class="btn sm bad">حذف</button></form>{% endif %}</td>{% endif %}</tr>{% endfor %}</table></div>
+{% if docs %}<div class="tablewrap"><table><tr><th>السند</th><th>السب رول</th><th>مسحات سليمة</th><th>نظري</th><th>هدر %</th><th>المشغّل</th><th>التاريخ</th><th></th></tr>
+{% for d in docs %}<tr><td>{{ d.doc_no }}</td><td>{{ d.tag_no or '—' }}</td><td><b>{{ fmt(d.qty_good) }}</b> {{ d.unit or '' }}</td><td>{{ fmt(d.theoretical_qty) if d.theoretical_qty else '—' }}</td><td>{{ fmt(d.waste_pct) if d.waste_pct is not none else '—' }}</td><td>{{ d.operator or '—' }}</td><td>{{ d.fdate }}</td>
+<td><a class="btn sm back" href="{{ url_for('print_doc', kind='folding', key=d.doc_no) }}" target="_blank">طباعة</a>
+{% if editable and can('enter') %}{% if d.tag_no %}<a class="btn sm back" href="{{ url_for('fold_edit', doc_no=d.doc_no) }}">تعديل</a>
+<form class="inline" method="post" action="{{ url_for('fold_delete', doc_no=d.doc_no) }}" onsubmit="return confirm('حذف السند {{ d.doc_no }}؟ سيعود السب رول {{ d.tag_no }} متاحًا وتُخصم الكمية من الإنتاج.')"><button class="btn sm bad">حذف</button></form>{% endif %}{% endif %}</td></tr>{% endfor %}</table></div>
 {% else %}<div class="empty">لا توجد سندات طي.</div>{% endif %}
+{% if inters %}<h2>كراتين SP الوسيطة</h2><div class="tablewrap"><table><tr><th>الباركود</th><th>كود SP</th><th>مسحات</th><th>الحالة</th><th>السجل</th><th></th></tr>{% for x in inters %}<tr><td>{{ x.barcode }}</td><td>{{ x.sp_code or '—' }}</td><td>{{ fmt(x.qty) }}</td><td>{{ x.status }}</td><td>{% if x.rec_no %}<a href="{{ url_for('ster_record', rec_no=x.rec_no) }}">{{ x.rec_no }}</a>{% else %}—{% endif %}</td><td><a href="{{ url_for('print_label', kind='intermediate', key=x.barcode) }}" target="_blank">بطاقة</a></td></tr>{% endfor %}</table></div>{% endif %}
+{% if ns_docs %}<h2>سندات التعبئة</h2><div class="tablewrap"><table><tr><th>السند</th><th>مسحات</th><th>باكتات</th><th>كراتين</th><th></th></tr>{% for x in ns_docs %}<tr><td>{{ x.doc_no }}</td><td>{{ fmt(x.swabs_in) }}</td><td>{{ fmt(x.packs_actual) }}</td><td>{{ fmt(x.cartons_actual) if x.cartons_actual is not none else '—' }}</td><td><a href="{{ url_for('print_doc', kind='ns_pack', key=x.doc_no) }}" target="_blank">طباعة</a></td></tr>{% endfor %}</table></div>{% endif %}
+{% if recs %}<h2>سجلات الفرز والتغليف والبوكسات</h2><div class="tablewrap"><table><tr><th>السجل</th><th>الحالة</th><th>بوكسات</th><th>الدورة</th></tr>{% for x in recs %}<tr><td><a href="{{ url_for('ster_record', rec_no=x.rec_no) }}">{{ x.rec_no }}</a></td><td>{{ x.status }}</td><td>{{ fmt(x.boxes_actual) if x.boxes_actual is not none else '—' }}</td><td>{{ x.cycle_no or '—' }}</td></tr>{% endfor %}</table></div>{% endif %}
+{% if cycles %}<h2>دورات التعقيم</h2><div class="pick-list">{% for c in cycles %}<a class="pick" href="{{ url_for('ster_cycle', cycle_no=c.cycle_no) }}"><div class="info"><b>{{ c.cycle_no }}</b><span>{{ c.status }}</span></div><div class="go">◀</div></a>{% endfor %}</div>{% endif %}
 {% else %}
 <h2>خطوات المسار</h2>{% set progress = prog %}{% include "_stepbar.html" %}
 {% endif %}
@@ -82,6 +88,7 @@
  {{ approval.by_user }} — {{ approval.ts }}{% if approval.note %} · {{ approval.note }}{% endif %}</div>{% endif %}
 
 <div class="wizard-actions noprint"><div class="l"><a class="btn back" href="{{ url_for('wo_list') }}">قائمة الأوامر</a>
-<a class="btn back" href="{{ url_for('trace_view', b=w.batch_no) }}">تتبّع الدفعة</a></div>
+<a class="btn back" href="{{ url_for('trace_center', q=w.batch_no) }}">تتبّع الدفعة</a>
+<a class="btn back" href="{{ url_for('print_doc', kind='order', key=w.batch_no) }}" target="_blank">🖨 طباعة أمر الإنتاج</a></div>
 {% if can('wo_close') and not w.final_status %}<form method="post" action="{{ url_for('wo_close', batch_no=w.batch_no) }}"><button class="btn back">{{ 'إعادة فتح الأمر' if w.status=='مغلقة' else 'إغلاق الأمر' }}</button></form>{% endif %}</div>
 {% endblock %}

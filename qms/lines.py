@@ -96,9 +96,13 @@ def register(app):
             rel, unit, ref = mfg.released_qty(w['batch_no'])
             pending = rel - mfg.fg_received(w['batch_no']) if rel else 0
             if pending > 1e-6:
-                out.append(dict(w, released=rel, unit=unit, ref=ref, pending=pending,
-                                equiv=mfg.pack_equiv(w['item_code'], pending, unit),
-                                st=mfg.order_state(w)))
+                it_ = db.one('SELECT * FROM items WHERE item_code=?', (w['item_code'],)) or {}
+                if mfg.is_v15(w) and it_:
+                    spu = mfg.swabs_per_unit(it_)[0]
+                    eq = mfg.equiv_from_swabs(it_, pending * spu) if spu else []
+                else:
+                    eq = mfg.pack_equiv(w['item_code'], pending, unit)
+                out.append(dict(w, released=rel, unit=unit, ref=ref, pending=pending, equiv=eq, st=mfg.order_state(w)))
         lines = auth.user_lines()
         return [x for x in out if not lines or (x.get('route_code') or mfg.FULL) in lines]
 

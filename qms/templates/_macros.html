@@ -1,0 +1,11 @@
+{% macro op_select(dept='production', sel=None, name='operator') %}
+<select name="{{ name }}" required>{% set d = sel or op_default(dept) %}
+  <option value="">— اختر المشغّل —</option>
+  {% for o in operators(dept) %}<option value="{{ o.name }}" {{ 'selected' if o.name==d }}>{{ o.name }}</option>{% endfor %}
+</select>{% endmacro %}
+{% macro doc_buttons(print_url=None, label_url=None, back=None) %}
+<div class="actions noprint">
+  {% if print_url %}<a class="btn back" href="{{ print_url }}" target="_blank">🖨 طباعة</a>{% endif %}
+  {% if label_url %}<a class="btn back" href="{{ label_url }}" target="_blank">🏷 طباعة البطاقة</a>{% endif %}
+  {% if back %}<a class="btn back" href="{{ back }}">رجوع للقائمة</a>{% endif %}
+</div>{% endmacro %}

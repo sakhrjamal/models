@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block title %}بطاقات المواد{% endblock %}{% block body %}
+<div class="pagehead"><div><h1>بطاقات المواد</h1><div class="sub">خام · تعبئة وتغليف · نصف مصنع · منتج نهائي · قطع غيار</div></div>
+{% if can('master') %}<div class="actions"><a class="btn" href="{{ url_for('inv_card_new') }}">+ بطاقة مادة جديدة</a></div>{% endif %}</div>
+<form class="filters" method="get"><input name="q" value="{{ q or '' }}" placeholder="كود / اسم / وصف"><select name="cat"><option value="">كل الأنواع</option>
+{% for c in cats %}<option value="{{ c }}" {{ 'selected' if cat==c }}>{{ cat_ar[c] }}</option>{% endfor %}</select><button class="btn">بحث</button></form>
+<div class="tablewrap"><table><tr><th>الكود</th><th>الاسم / الوصف</th><th>النوع</th><th>الوحدة</th><th>الرصيد</th><th>الحد الأدنى</th><th>الحالة</th></tr>
+{% for r in rows %}<tr><td><a href="{{ url_for('inv_card', code=r.item_code) }}"><b>{{ r.item_code }}</b></a></td><td>{{ r.name_ar or r.description }}</td><td>{{ r.category_ar or '—' }}</td><td>{{ r.uom or '—' }}</td>
+<td class="{{ 'neg' if r.min_stock and r.bal < r.min_stock }}">{{ fmt(r.bal) }}</td><td>{{ fmt(r.min_stock) if r.min_stock else '—' }}</td><td>{{ r.status }}</td></tr>{% endfor %}</table></div>
+{% endblock %}

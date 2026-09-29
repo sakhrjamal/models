@@ -1,0 +1,7 @@
+{% extends "base.html" %}{% block title %}Sub Roll Master{% endblock %}{% block body %}
+<h1>Sub Roll Master (من Excel)</h1><div class="sub">أكواد السب رول كما في ملف Excel. العرض المرجعي مستخرج من نص الوصف؛ عدّله فقط إن كان الاستخراج خاطئًا.</div>
+{% if orphans %}<div class="msg warn">{{ orphans|length }} منتج بلا Sub Roll مطابق: {{ orphans|join('، ') }}</div>{% endif %}
+<div class="tablewrap"><table><tr><th>الكود</th><th>الوصف</th><th>Mesh</th><th>X-Ray</th><th>العرض المرجعي (سم)</th><th>منتجات مطابقة</th></tr>
+{% for r in rows %}<tr><td><b>{{ r.item_code }}</b></td><td>{{ r.description }}</td><td>{{ r.mesh or '—' }}</td><td>{{ r.xray or '—' }}</td>
+<td><form method="post" class="actions" style="margin:0"><input type="hidden" name="code" value="{{ r.item_code }}"><input name="ref_width_cm" type="number" step="any" value="{{ r.ref_width_cm or '' }}" style="width:90px"><button class="btn back">حفظ</button></form></td>
+<td class="mini">{{ r.products|join('، ') if r.products else '—' }}</td></tr>{% endfor %}</table></div>{% endblock %}

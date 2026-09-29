@@ -7,6 +7,13 @@
 <div><label>وحدة الإنتاج الأساسية</label><select name="uom">{% for u in uoms %}<option {{ 'selected' if it.uom==u }}>{{ u }}</option>{% endfor %}</select></div>
 <div><label>معقم / غير معقم</label><div class="lockedfield">{{ it.sterile or '—' }}</div></div>
 <div class="full"><label>الوصف</label><input name="description" value="{{ it.description or '' }}"></div>
+<div><label>الاسم بالعربي</label><input name="name_ar" value="{{ it.name_ar or '' }}"></div>
+<div><label>الاسم بالإنجليزي</label><input name="name_en" value="{{ it.name_en or '' }}"></div>
+<div><label>الباركود</label><input name="barcode" value="{{ it.barcode or '' }}"></div>
+<div><label>كود SP المقابل (Master Data)</label><input name="sp_item" value="{{ it.sp_item or '' }}"></div>
+<div><label>العرض المرجعي (سم) — للرولات/السب رول</label><input type="number" step="any" name="ref_width_cm" value="{{ it.ref_width_cm or '' }}"></div>
+<div><label>حد الهدر المسموح %</label><input type="number" step="any" name="waste_limit_pct" value="{{ it.waste_limit_pct or '' }}"></div>
+<div class="full"><label>ملاحظات</label><input name="notes" value="{{ it.notes or '' }}"></div>
 <div class="full sectionline"><b>ما يُعبَّأ تلقائيًا في أمر الإنتاج</b><span class="mini">لا يُكتب أي منها عند إصدار الأمر أو في السليتر أو الطي</span></div>
 <div><label>ماكينة الطي</label><select name="machine_code"><option value="">—</option>{% for m in machines %}<option value="{{ m.machine_code }}" {{ 'selected' if it.machine_code==m.machine_code }}>{{ m.machine_code }} — {{ m.name }}</option>{% endfor %}</select></div>
 <div><label>عرض السب رول (سم)</label><input type="number" step="any" min="0" name="sub_roll_width_cm" value="{{ ('%g' % it.sub_roll_width_cm) if it.sub_roll_width_cm is not none else '' }}"></div>
@@ -23,5 +30,10 @@
 <div><label>المستوى {{ lv }} — الوحدة</label><select name="pc_unit_{{ lv }}"><option value="">—</option>{% for k,v in units.items() %}<option value="{{ k }}" {{ 'selected' if p and p.unit==k }}>{{ v }}</option>{% endfor %}</select></div>
 <div><label>عدد وحدات المستوى الأدنى فيها</label><input type="number" step="any" min="0" name="pc_per_{{ lv }}" value="{{ p.per_parent|int if p and p.per_parent==p.per_parent|int else (p.per_parent if p else '') }}"></div>
 <div style="align-self:end"><label><input type="checkbox" name="pc_part_{{ lv }}" style="width:auto" {{ 'checked' if (not p) or p.allow_partial }}> يسمح بعبوة جزئية</label></div>{% endfor %}
-<div class="full wizard-actions"><div class="l"><a class="btn back" href="{{ url_for('master_products') }}">رجوع</a></div><button class="btn big">حفظ</button></div></form>
+<div class="full wizard-actions"><div class="l"><a class="btn back" href="{{ url_for('master_products') }}">رجوع</a> <a class="btn back" href="{{ url_for('pack_config_edit', code=it.item_code) }}">Packaging Configuration</a></div><button class="btn big">حفظ</button></div></form>
+<h2>تغيير كود الصنف</h2>
+<form method="post" action="{{ url_for('master_rename', code=it.item_code) }}" class="card" onsubmit="return confirm('تغيير الكود يُحدَّث في كل الجداول ويُسجَّل في التدقيق. متابعة؟')">
+<div class="mini">المعرّف الداخلي الثابت: <code>{{ it.uid }}</code> — الربط بين الجداول لا يتأثر بتغيير الكود.</div>
+<div class="grid"><div><label>الكود الجديد</label><input name="new_code" value="{{ it.item_code }}" required></div></div>
+<div class="actions"><button class="btn warnb">تغيير الكود</button></div></form>
 {% endblock %}

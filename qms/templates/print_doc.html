@@ -1,0 +1,41 @@
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>{{ d.title }} {{ d.no }}</title>
+<style>
+@page{size:A4;margin:{{ m.top }}mm {{ m.side }}mm {{ m.bottom }}mm {{ m.side }}mm;{% if lh %}background:url('{{ url_for('letterhead') }}') no-repeat -{{ m.side }}mm -{{ m.top }}mm/210mm 297mm;{% endif %}
+  @top-center{vertical-align:bottom;padding-bottom:2mm;content:"Page " counter(page) " / " counter(pages);font:12pt "Times New Roman","Liberation Serif",serif;color:#333}}
+*{box-sizing:border-box}
+body{font-family:"Times New Roman","Liberation Serif",Times,serif;font-size:12pt;color:#111;margin:0;background:#e5e7eb}
+.page{width:210mm;min-height:297mm;margin:10px auto;background:#fff;padding:0 {{ m.side }}mm;position:relative;box-shadow:0 2px 12px #0003}
+.frame{width:100%;border-collapse:collapse;border:0}.frame>thead>tr>td,.frame>tbody>tr>td,.frame>tfoot>tr>td{border:0;padding:0}
+.sp-top{height:{{ m.top }}mm}
+.lh{position:fixed;top:0;right:0;width:210mm;height:297mm;z-index:0;object-fit:fill;display:none}
+.lh.on{display:block}
+.content{position:relative;z-index:1}
+h1{font-size:14pt;margin:0 0 4px;text-align:center}
+.no{text-align:center;font-size:12pt;margin-bottom:10px;color:#333}
+table{width:100%;border-collapse:collapse;margin:8px 0;table-layout:auto}
+th,td{border:1px solid #444;padding:4px 6px;text-align:right;vertical-align:top;word-break:break-word}
+th{background:#eee}
+.meta td:nth-child(odd){background:#f3f4f6;font-weight:bold;width:17%}
+h2{font-size:12pt;margin:12px 0 2px}
+.sign{display:flex;gap:16px;margin-top:26px;break-inside:avoid}.sign div{flex:1;border-top:1px solid #000;padding-top:4px;text-align:center}
+.foot{margin-top:14px;font-size:12pt;color:#555;text-align:center}
+tr{break-inside:avoid}
+.bar{position:sticky;top:0;background:#0f172a;color:#fff;padding:8px 14px;display:flex;gap:10px;align-items:center}
+.bar button,.bar a{background:#0d9488;color:#fff;border:0;padding:6px 14px;border-radius:6px;text-decoration:none;cursor:pointer;font:inherit}
+.bar a.b{background:#475569}
+@media print{.lh.scr{display:none!important}body{background:none}.bar{display:none}.page{margin:0;box-shadow:none;width:210mm;min-height:0;padding:0 {{ m.side }}mm;background:none;box-sizing:border-box}.lh{display:block}}
+</style></head><body>
+<div class="bar"><button onclick="window.print()">🖨 طباعة / حفظ PDF</button><a class="b" href="{{ back or url_for('index') }}">رجوع</a>
+<span>{% if not lh %}⚠ لم يُرفع الورق الرسمي بعد — ترفعه من الإعدادات{% else %}الورق الرسمي مفعّل{% endif %}</span></div>
+{% if lh %}<img class="lh on scr" src="{{ url_for('letterhead') }}" alt="">{% endif %}
+<div class="page"><table class="frame"><thead><tr><td><div class="sp-top"></div></td></tr></thead><tbody><tr><td><div class="content">
+<h1>{{ d.title }}</h1><div class="no">رقم السند: <b>{{ d.no }}</b></div>
+<table class="meta">{% for i in range(0, d.meta|length, 2) %}<tr>
+  <td>{{ d.meta[i][0] }}</td><td>{{ d.meta[i][1] if d.meta[i][1] not in (none,'') else '—' }}</td>
+  {% if d.meta[i+1] %}<td>{{ d.meta[i+1][0] }}</td><td>{{ d.meta[i+1][1] if d.meta[i+1][1] not in (none,'') else '—' }}</td>{% else %}<td></td><td></td>{% endif %}</tr>{% endfor %}</table>
+{% for sec in d.sections %}<h2>{{ sec.title }}</h2>
+{% if sec.rows %}<table><tr>{% for h in sec.headers %}<th>{{ h }}</th>{% endfor %}</tr>
+{% for r in sec.rows %}<tr>{% for c in r %}<td>{{ c if c not in (none,'') else '—' }}</td>{% endfor %}</tr>{% endfor %}</table>{% else %}<div>—</div>{% endif %}{% endfor %}
+{% if d.sign %}<div class="sign">{% for s in d.sign %}<div>{{ s }}</div>{% endfor %}</div>{% endif %}
+<div class="foot">{{ factory }} — طُبع بواسطة {{ user }} في {{ printed }}</div>
+</div></td></tr></tbody></table></div></body></html>

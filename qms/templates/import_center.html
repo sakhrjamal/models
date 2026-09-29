@@ -1,0 +1,30 @@
+{% extends "base.html" %}{% block title %}استيراد Excel{% endblock %}{% block body %}
+<h1>مركز استيراد Excel</h1>
+<div class="mini" style="margin-bottom:10px">رفع ← قراءة الأوراق ← معاينة ← ربط الأعمدة ← تحقق ← كشف التكرار ← استيراد</div>
+{% if step==1 %}
+<form method="post" enctype="multipart/form-data" class="card"><input type="hidden" name="step" value="1">
+<label>ملف Excel (xlsx / xlsm)</label><input type="file" name="file" accept=".xlsx,.xlsm" required>
+<div class="actions"><button class="btn">رفع وقراءة الأوراق</button></div></form>
+<h2>سجل الاستيراد</h2>{% if log %}<div class="tablewrap"><table><tr><th>الوقت</th><th>بواسطة</th><th>الملف</th><th>الهدف</th><th>الوضع</th><th>مُضاف</th><th>محدّث</th><th>متخطى</th><th>مرفوض</th></tr>
+{% for l in log %}<tr><td>{{ l.ts }}</td><td>{{ l.by_user }}</td><td>{{ l.file_name }}</td><td>{{ targets[l.target].ar if l.target in targets else l.target }}</td><td>{{ {'insert':'إضافة الجديد','update':'تحديث الموجود','upsert':'إضافة وتحديث'}.get(l.mode,l.mode) }}</td><td>{{ l.inserted }}</td><td>{{ l.updated }}</td><td>{{ l.skipped }}</td><td>{{ l.rejected }}</td></tr>{% endfor %}</table></div>{% else %}<div class="empty">لا عمليات سابقة.</div>{% endif %}
+{% elif step==2 %}
+<div class="card"><b>{{ fname }}</b> — اختر الورقة والهدف ثم اربط الأعمدة</div>
+<form method="get"><input type="hidden" name="step" value="2"><input type="hidden" name="tok" value="{{ tok }}"><div class="grid">
+<div><label>الورقة</label><select name="sheet" onchange="this.form.submit()">{% for s in sheets %}<option {{ 'selected' if s==sheet }}>{{ s }}</option>{% endfor %}</select></div>
+<div><label>الهدف</label><select name="target" onchange="this.form.submit()">{% for k,v in targets.items() %}<option value="{{ k }}" {{ 'selected' if k==target }}>{{ v.ar }}</option>{% endfor %}</select></div>
+<div><label>رقم صف العناوين (يبدأ من 0)</label><input name="hdr" type="number" min="0" value="{{ hdr }}" onchange="this.form.submit()"></div></div></form>
+<h2>معاينة</h2><div class="tablewrap"><table><tr>{% for h in headers %}<th>{{ h }}</th>{% endfor %}</tr>{% for r in preview %}<tr>{% for c in r %}<td>{{ c }}</td>{% endfor %}</tr>{% endfor %}</table></div>
+<form method="get"><input type="hidden" name="step" value="3"><input type="hidden" name="tok" value="{{ tok }}"><input type="hidden" name="sheet" value="{{ sheet }}"><input type="hidden" name="target" value="{{ target }}"><input type="hidden" name="hdr" value="{{ hdr }}">
+<h2>ربط الأعمدة</h2><div class="grid">{% for f,(lab,req) in T.fields.items() %}<div><label>{{ lab }}{{ ' *' if req }}</label><select name="map_{{ f }}"><option value="">— لا شيء —</option>
+{% for h in headers %}<option value="{{ loop.index0 }}" {{ 'selected' if mapping[f]==loop.index0 }}>{{ h or ('عمود ' ~ loop.index) }}</option>{% endfor %}</select></div>{% endfor %}</div>
+<div class="actions"><button class="btn">تحقق وكشف التكرار ◀</button></div></form>
+{% elif step==3 %}
+<div class="stat"><div><b>{{ total }}</b><span>سطر</span></div><div><b>{{ cnt.new }}</b><span>جديد</span></div><div><b>{{ cnt.update }}</b><span>موجود (تحديث)</span></div><div><b>{{ cnt.dup_in_file }}</b><span>مكرر داخل الملف</span></div><div><b>{{ cnt.error }}</b><span>أخطاء</span></div></div>
+{% if cnt.error %}<h2>الأخطاء</h2><div class="tablewrap"><table><tr><th>السطر</th><th>الخطأ</th></tr>{% for r in recs if r.status=='error' %}<tr><td>{{ r.line }}</td><td>{{ r.err }}</td></tr>{% endfor %}</table></div>{% endif %}
+<h2>معاينة أول السجلات</h2><div class="tablewrap"><table><tr><th>السطر</th><th>الحالة</th>{% for f in T.fields if mapping[f] is not none %}<th>{{ T.fields[f][0] }}</th>{% endfor %}</tr>
+{% for r in recs[:40] %}<tr><td>{{ r.line }}</td><td>{{ {'new':'جديد','update':'تحديث','dup_in_file':'مكرر','error':'خطأ'}[r.status] }}</td>{% for f in T.fields if mapping[f] is not none %}<td>{{ r.rec.get(f, '') }}</td>{% endfor %}</tr>{% endfor %}</table></div>
+<form method="post"><input type="hidden" name="step" value="4"><input type="hidden" name="tok" value="{{ tok }}"><input type="hidden" name="sheet" value="{{ sheet }}"><input type="hidden" name="target" value="{{ target }}"><input type="hidden" name="hdr" value="{{ hdr }}">
+{% for f,i in mapping.items() %}{% if i is not none %}<input type="hidden" name="map_{{ f }}" value="{{ i }}">{% endif %}{% endfor %}
+<div class="card"><label>وضع الاستيراد</label><select name="mode"><option value="insert">إضافة الجديد فقط (تخطي المكرر)</option><option value="update">تحديث الموجود فقط</option><option value="upsert">إضافة الجديد وتحديث الموجود</option></select></div>
+<div class="actions"><button class="btn ok" onclick="return confirm('تنفيذ الاستيراد؟')">استيراد</button><a class="btn back" href="{{ url_for('import_center') }}">إلغاء</a></div></form>
+{% endif %}{% endblock %}

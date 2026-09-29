@@ -1,0 +1,5 @@
+{% extends "base.html" %}{% block title %}تعبئة غير المعقم{% endblock %}{% block body %}
+<h1>تعبئة غير المعقم</h1><div class="sub">أوامر فيها مسحات سليمة جاهزة للتعبئة (100 مسحة = باكت، ثم كراتين)</div>
+{% if rows %}<div class="pick-list">{% for w in rows %}<a class="pick" href="{{ url_for('ns_pack', bn=w.batch_no) }}">
+<div class="info"><b>{{ w.batch_no }} — {{ w.item_code }}</b><span>مسحات سليمة {{ fmt(w.st.produced) }} · المطلوب {{ fmt(w.st.required) }} {{ w.st.unit }}</span></div><div class="go">◀</div></a>{% endfor %}</div>
+{% else %}<div class="empty">لا توجد أوامر جاهزة للتعبئة — أنتج مسحات من «ماكينة الطي» أولًا.</div>{% endif %}{% endblock %}

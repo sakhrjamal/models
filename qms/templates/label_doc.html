@@ -1,0 +1,19 @@
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>بطاقات {{ key }}</title>
+<style>
+@page{size:A4;margin:8mm}
+*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;margin:0;background:#e5e7eb;font-size:12px}
+.bar{position:sticky;top:0;background:#0f172a;color:#fff;padding:8px 14px;display:flex;gap:10px;align-items:center}
+.bar button,.bar a{background:#0d9488;color:#fff;border:0;padding:6px 14px;border-radius:6px;text-decoration:none;cursor:pointer;font:inherit}
+.bar a.b{background:#475569}
+.sheet{display:flex;flex-wrap:wrap;gap:6mm;padding:8mm;justify-content:flex-start}
+.lbl{width:95mm;border:1.5px solid #000;border-radius:3mm;padding:3mm;background:#fff;break-inside:avoid}
+.lbl h3{margin:0 0 2mm;font-size:14px;text-align:center;border-bottom:1px solid #000;padding-bottom:1mm}
+.lbl table{width:100%;border-collapse:collapse}.lbl td{padding:.6mm 1mm;font-size:11.5px;vertical-align:top}.lbl td:first-child{color:#444;white-space:nowrap;width:34%}
+.lbl .bc{text-align:center;margin-top:2mm}.lbl .bc svg{width:100%;height:16mm}.lbl .code{text-align:center;font:bold 14px monospace;letter-spacing:1px}
+@media print{body{background:none}.bar{display:none}.sheet{padding:0}}
+</style></head><body>
+<div class="bar"><button onclick="window.print()">🖨 طباعة البطاقات ({{ labels|length }})</button><a class="b" href="{{ back or url_for('index') }}">رجوع</a></div>
+<div class="sheet">{% for l in labels %}<div class="lbl"><h3>{{ l.title }}</h3>
+<table>{% for k,v in l.lines %}<tr><td>{{ k }}</td><td><b>{{ v if v not in (none,'') else '—' }}</b></td></tr>{% endfor %}</table>
+<div class="bc">{{ l.svg|safe }}</div><div class="code">{{ l.code }}</div></div>{% endfor %}</div>
+</body></html>

@@ -1,0 +1,8 @@
+{% extends "base.html" %}{% from "_macros.html" import op_select with context %}{% block title %}دورة تعقيم جديدة{% endblock %}{% block body %}
+<h1>دورة تعقيم جديدة</h1><div class="sub">رقم الدورة تلقائي. اختر اللوطات (المُفرجة قبل التعقيم) — يمكن أكثر من لوط في دورة واحدة</div>
+{% if not ready %}<div class="empty">لا توجد سجلات مُفرجة قبل التعقيم.</div>{% else %}
+<form method="post" class="card"><div class="subrolls">{% for r in ready %}<label><input type="checkbox" name="rec_no" value="{{ r.rec_no }}"> {{ r.rec_no }}<span class="mini">{{ r.batch_no }} · {{ r.item_code }} · {{ fmt(r.boxes_actual) }} بوكس{% if r.cartons %} · {{ fmt(r.cartons) }} كرتون{% endif %}</span></label>{% endfor %}</div>
+<div class="grid" style="margin-top:12px"><div><label>المسؤول *</label>{{ op_select('sterilization') }}</div>
+<div><label>الغرفة</label><select name="machine">{% for c in chambers %}<option value="{{ c.machine_code }}">{{ c.name or c.machine_code }}</option>{% else %}<option value="EO-01">EO-01</option>{% endfor %}</select></div>
+<div><label>بداية الدورة</label><input type="datetime-local" name="start_at" value="{{ now }}"></div></div>
+<div class="actions"><button class="btn ok">إنشاء الدورة</button><a class="btn back" href="{{ url_for('ster_cycles') }}">رجوع</a></div></form>{% endif %}{% endblock %}

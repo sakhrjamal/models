@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% block title %}الفرز والعد وتغليف المعقم{% endblock %}{% block body %}
+<h1>الفرز والعد · تغليف المعقم</h1><div class="sub">امسح باركود الكرتون الوسيط (SP مُفرَج) لفتح سجل المعالجة الموحّد</div>
+{% if can('enter') %}<form method="post" action="{{ url_for('ster_new') }}" class="card"><label>باركود كرتون وسيط (يمكن مسح أكثر من كرتون لنفس التشغيلة)</label>
+<textarea name="scan" rows="2" class="scanbox" placeholder="SPC-000001" autofocus></textarea><div class="actions"><button class="btn ok">فتح سجل الفرز والعد</button></div></form>{% endif %}
+<h2>سجلات مفتوحة</h2>
+{% if recs %}<div class="pick-list">{% for r in recs %}<a class="pick" href="{{ url_for('ster_record', rec_no=r.rec_no) }}"><div class="info"><b>{{ r.rec_no }} — {{ r.batch_no }}</b><span>{{ rec_ar.get(r.status, r.status) }} · مستلم {{ fmt(r.received_qty) }} مسحة</span></div><div class="go">◀</div></a>{% endfor %}</div>
+{% else %}<div class="empty">لا سجلات مفتوحة.</div>{% endif %}
+<h2>أوامر معقمة قيد التنفيذ</h2>
+{% if rows %}<div class="pick-list">{% for w in rows %}<a class="pick" href="{{ url_for('ster_order', bn=w.batch_no) }}"><div class="info"><b>{{ w.batch_no }} — {{ w.item_code }}</b><span>المطلوب {{ fmt(w.st.required) }} {{ w.st.unit }} · المنتج {{ fmt(w.st.produced) }}</span></div><div class="go">◀</div></a>{% endfor %}</div>
+{% else %}<div class="empty">لا أوامر.</div>{% endif %}{% endblock %}

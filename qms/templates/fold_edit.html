@@ -1,13 +1,18 @@
-{% extends "base.html" %}{% block title %}تعديل السند {{ fo.doc_no }}{% endblock %}{% block body %}
+{% extends "base.html" %}{% from "_macros.html" import op_select with context %}{% block title %}تعديل السند {{ fo.doc_no }}{% endblock %}{% block body %}
 <h1>تعديل السند {{ fo.doc_no }}</h1>
-<div class="sub">{{ w.batch_no }} — {{ w.item_code }} — التعديل يعيد احتساب الإنتاج والمخزون وحالة السب رول تلقائيًا</div>
+<div class="sub">{{ w.batch_no }} — {{ w.item_code }} — التعديل يعيد احتساب الإنتاج والنظري والهدر وتقدم الأمر والمخزون تلقائيًا</div>
+{% if need_confirm %}<div class="msg warn"><b>تحذير قبل الحفظ:</b><ul style="margin:6px 0 0">{% for r in resets %}<li>{{ r }}</li>{% endfor %}</ul>اضغط «تأكيد الحفظ» للمتابعة.</div>{% endif %}
 <form method="post" class="card">
+  {% if need_confirm %}<input type="hidden" name="confirm" value="1">{% endif %}
   <label>السب رول</label>
-  <div class="subrolls">{% for s_ in subs %}<label><input type="radio" name="tag_no" value="{{ s_.tag_no }}" {{ 'checked' if s_.tag_no==fo.tag_no }}> {{ s_.tag_no }}<span class="mini">{{ fmt(s_.width_cm) }} سم</span></label>{% endfor %}</div>
-  <div style="margin-top:14px"><label>الكمية الفعلية * ({{ fo.unit or w.uom }})</label>
-    <input type="number" name="qty_good" class="qtyinput" min="0" step="any" required value="{{ fo.qty_good }}" autofocus></div>
+  <div class="subrolls">{% for s_ in subs %}<label><input type="radio" name="tag_no" value="{{ s_.tag_no }}" {{ 'checked' if s_.tag_no==fo.tag_no }}> {{ s_.tag_no }}<span class="mini">{{ fmt(s_.width_cm) }} سم × {{ fmt(s_.length_m) }} م</span></label>{% endfor %}</div>
+  <div class="grid" style="margin-top:14px">
+    <div><label>الكمية * </label><input type="number" name="qty_good" class="qtyinput" min="0" step="any" required value="{{ fo.qty_good }}"></div>
+    <div><label>الوحدة</label><select name="unit"><option value="مسحة" {{ 'selected' if sel_unit in ('مسحة','swab') }}>مسحة</option><option value="باكت" {{ 'selected' if sel_unit=='باكت' }}>باكت</option><option value="بوكس" {{ 'selected' if sel_unit=='بوكس' }}>بوكس</option></select></div>
+    <div><label>المشغّل *</label>{{ op_select('production', sel_op) }}</div>
+    <div><label>مرفوض / سكراب فعلي</label><input type="number" name="rejected" min="0" step="any" value="{{ fo.rejected_qty or '' }}"></div>
+  </div>
   <div style="margin-top:12px"><label>ملاحظات</label><input name="notes" value="{{ fo.notes or '' }}"></div>
-  {% if w.final_status == 'PENDING_QC' %}<div class="hint">الدفعة مرسلة للجودة — التعديل يسحب طلب الاعتماد ويتطلب إعادة إنهاء الإنتاج.</div>{% endif %}
-  <div class="wizard-actions"><div class="l"><a class="btn back" href="{{ url_for('fold_work', bn=w.batch_no) }}">إلغاء</a></div><button class="btn big">حفظ التعديل</button></div>
-</form>
-{% endblock %}
+  {% if w.final_status %}<div class="hint">حالة الجودة الحالية ({{ mfg.FS_AR.get(w.final_status) }}) — التعديل يسحبها وتُنهى الدفعة من جديد.</div>{% endif %}
+  <div class="wizard-actions"><div class="l"><a class="btn back" href="{{ url_for('fold_work', bn=w.batch_no) }}">إلغاء</a></div><button class="btn big">{{ 'تأكيد الحفظ' if need_confirm else 'حفظ التعديل' }}</button></div>
+</form>{% endblock %}

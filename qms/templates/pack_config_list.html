@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% block title %}Packaging Configuration{% endblock %}{% block body %}
+<h1>تكوين التعبئة لكل صنف (Packaging Configuration)</h1><div class="sub">المصدر الوحيد لعدد المسحات في الباكت/المغلف/البوكس وعدد الباكتات أو البوكسات في الكرتون</div>
+<div class="tabs"><a href="{{ url_for('pack_config_list') }}" class="{{ 'on' if not f }}">الكل</a>
+<a href="{{ url_for('pack_config_list', f='incomplete') }}" class="{{ 'on' if f=='incomplete' }}">الناقص</a>
+<a href="{{ url_for('pack_config_list', f='non_sterile') }}" class="{{ 'on' if f=='non_sterile' }}">غير معقم</a>
+<a href="{{ url_for('pack_config_list', f='sterile') }}" class="{{ 'on' if f=='sterile' }}">معقم</a></div>
+<form class="filters" method="get"><input name="q" value="{{ q or '' }}" placeholder="بحث بالكود/الوصف"><button class="btn">بحث</button></form>
+<div class="tablewrap"><table><tr><th>المنتج</th><th>النوع</th><th>مسحات/باكت</th><th>باكت/كرتون</th><th>مسحات/مغلف</th><th>مسحات/بوكس</th><th>بوكس/كرتون</th><th>أكواد العبوة</th><th></th></tr>
+{% for r in rows %}<tr><td><b>{{ r.it.item_code }}</b><div class="mini">{{ r.it.description }}</div></td><td>{{ 'معقم' if r.ster else 'غير معقم' }}</td>
+{% if r.ster %}<td>—</td><td>—</td>{% else %}<td>{{ fmt(r.ps.swabs_per_pack) if r.ps.swabs_per_pack else '—' }}</td><td>{{ fmt(r.ps.packs_per_carton) if r.ps.packs_per_carton else 'يدوي' }}</td>{% endif %}
+{% if r.ster %}<td class="{{ 'neg' if not r.ps.swabs_per_envelope }}">{{ fmt(r.ps.swabs_per_envelope) if r.ps.swabs_per_envelope else 'ناقص' }}</td><td>{{ fmt(r.ps.swabs_per_box) if r.ps.swabs_per_box else '—' }}</td><td>{{ fmt(r.ps.boxes_per_carton) if r.ps.boxes_per_carton else 'يدوي' }}</td>{% else %}<td>—</td><td>—</td><td>—</td>{% endif %}
+<td class="mini">{{ [r.ps.pack_code, r.ps.env_code, r.ps.box_code, r.ps.carton_code]|select|join(' / ') or '—' }}</td>
+<td><a class="btn back" href="{{ url_for('pack_config_edit', code=r.it.item_code) }}">تعديل</a></td></tr>{% endfor %}</table></div>{% endblock %}

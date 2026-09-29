@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% from "_macros.html" import op_select with context %}{% block title %}{{ c.cycle_no }}{% endblock %}{% block body %}
+<div class="pagehead"><div><h1>دورة التعقيم {{ c.cycle_no }}</h1><div class="sub"><span class="pill">{{ cyc_ar.get(c.status, c.status) }}</span> · المسؤول {{ c.operator or '—' }} · الغرفة {{ c.machine_code or '—' }}</div></div>
+<div class="actions noprint"><a class="btn back" href="{{ url_for('print_doc', kind='cycle', key=c.cycle_no) }}" target="_blank">🖨 طباعة</a><a class="btn back" href="{{ url_for('ster_cycles') }}">رجوع</a></div></div>
+<div class="stat"><div><b>{{ c.start_at or '—' }}</b><span>البداية</span></div><div><b>{{ c.end_at or '—' }}</b><span>النهاية</span></div><div><b>{{ c.aer_start_at or '—' }}</b><span>بدء التهوية</span></div><div><b>{{ c.aer_end_at or '—' }}</b><span>نهاية التهوية</span></div></div>
+<h2>اللوطات في الدورة</h2><div class="tablewrap"><table><tr><th>السجل</th><th>التشغيلة</th><th>المنتج</th><th>بوكسات</th><th>الحالة</th></tr>
+{% for l in lines %}<tr><td><a href="{{ url_for('ster_record', rec_no=l.rec_no) }}">{{ l.rec_no }}</a></td><td>{{ l.batch_no }}</td><td>{{ l.item_code }}</td><td>{{ fmt(l.boxes_in) }}</td><td>{{ rec_ar.get(l.rstatus, l.rstatus) }}</td></tr>{% endfor %}</table></div>
+{% if can('enter') %}
+{% if c.status=='In Progress' %}<form method="post" class="card"><h3>إنهاء التعقيم</h3><input type="hidden" name="act" value="end"><div class="grid">
+<div><label>نهاية الدورة</label><input type="datetime-local" name="end_at" value="{{ now }}"></div><div><label>لوط الغاز</label><input name="gas_lot"></div><div><label>رقم تقرير الجهاز</label><input name="report_no"></div><div><label>ملاحظات</label><input name="notes" value="{{ c.notes or '' }}"></div></div>
+<div class="actions"><button class="btn ok">اكتمل التعقيم</button></div></form>
+{% elif c.status=='Sterilization Completed' %}<form method="post" class="card"><h3>نقل إلى التهوية</h3><input type="hidden" name="act" value="aeration"><label>بدء التهوية</label><input type="datetime-local" name="aer_start_at" value="{{ now }}"><div class="actions"><button class="btn ok">نقل إلى التهوية</button></div></form>
+{% elif c.status=='Transferred to Aeration' %}<form method="post" class="card"><h3>إنهاء التهوية</h3><input type="hidden" name="act" value="aeration_done"><div class="grid"><div><label>نهاية التهوية</label><input type="datetime-local" name="aer_end_at" value="{{ now }}"></div><div><label>المسؤول *</label>{{ op_select('sterilization') }}</div></div>
+<label style="margin-top:8px"><input type="checkbox" name="confirm" value="1" style="width:auto"> أؤكد الإنهاء إن كانت المدة أقل من الحد الأدنى ({{ min_h|int }} ساعة)</label>
+<div class="actions"><button class="btn ok">اكتملت التهوية — بانتظار الإفراج النهائي</button></div></form>
+{% elif c.status=='Aeration Completed' %}<div class="hint">اكتملت التهوية — اللوطات بانتظار الإفراج النهائي من الجودة.</div>{% endif %}
+{% if c.status=='In Progress' or can('master') %}<form method="post" action="{{ url_for('ster_cycle_delete', cycle_no=c.cycle_no) }}" onsubmit="return confirm('حذف الدورة؟ تعود اللوطات جاهزة للتعقيم.')"><button class="btn bad">حذف الدورة</button></form>{% endif %}{% endif %}
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% from "_macros.html" import op_select with context %}{% block title %}تعديل {{ r.doc_no }}{% endblock %}{% block body %}
+<h1>تعديل سند التعبئة {{ r.doc_no }}</h1><div class="sub">{{ w.batch_no }} — {{ w.item_code }} · المتاح لهذا السند {{ fmt(unpacked) if unpacked is defined else '' }} مسحة</div>
+{% if need_confirm %}<div class="msg warn">قرار الجودة الحالي سيُسحب بعد التعديل. اضغط «تأكيد الحفظ» للمتابعة.</div>{% endif %}
+<form method="post" class="card">{% if need_confirm %}<input type="hidden" name="confirm" value="1">{% endif %}<div class="grid">
+<div><label>المسحات *</label><input type="number" name="swabs_in" min="1" step="any" value="{{ r.swabs_in }}" required></div>
+<div><label>الباكتات الفعلية</label><input type="number" name="packs_actual" min="0" step="any" value="{{ r.packs_actual if not need_confirm else '' }}"></div>
+<div><label>الكراتين الفعلية</label><input type="number" name="cartons_actual" min="0" step="any" value="{{ r.cartons_actual if (r.cartons_actual is not none and not need_confirm) else '' }}"></div>
+<div><label>المشغّل *</label>{{ op_select('production', r.operator) }}</div></div>
+<div style="margin-top:12px"><label>ملاحظات</label><input name="notes" value="{{ r.notes or '' }}"></div>
+<div class="wizard-actions"><div class="l"><a class="btn back" href="{{ url_for('ns_pack', bn=w.batch_no) }}">إلغاء</a></div><button class="btn big">{{ 'تأكيد الحفظ' if need_confirm else 'حفظ التعديل' }}</button></div></form>{% endblock %}

@@ -7,7 +7,7 @@
 {% if me %}
 <header class="noprint">
   <div class="logo"><a href="{{ url_for('index') }}">نظام إدارة الإنتاج والتتبع</a></div>
-  <form class="hsearch" action="{{ url_for('trace_view') }}"><input name="b" placeholder="تتبّع رقم تشغيلة…" aria-label="تتبع تشغيلة"></form>
+  <form class="hsearch" action="{{ url_for('trace_center') }}"><input name="q" placeholder="تتبّع بأي باركود/لوط/رقم…" aria-label="تتبع تشغيلة"></form>
   <div class="usermenu">
     <a class="bell" href="{{ url_for('notifications') }}" title="الإشعارات">🔔{% if notif_unread %}<b>{{ notif_unread }}</b>{% endif %}</a>
     <a href="{{ url_for('account') }}" title="الحساب">{{ me.full_name }}
@@ -17,10 +17,16 @@
 </header>
 <div class="shell">
 <aside class="side noprint">
-  <a href="{{ url_for('index') }}" class="side-home {{ 'on' if nav=='home' }}">الرئيسية</a>
-  {% for grp in menu %}<div class="side-grp">{{ grp.title }}</div>
-    {% for it in grp['items'] %}<a href="{{ it.url }}" class="{{ 'on' if it.active or nav==it.nav }}">{{ it.label }}</a>{% endfor %}
-  {% endfor %}
+  <a href="{{ url_for('index') }}" class="s-home {{ 'on' if nav=='home' }}">{{ ico('home') }}<span>الرئيسية</span></a>
+  {% for grp in menu %}{% if grp.flat %}
+  {% for it in grp['items'] %}<a href="{{ it.url }}" class="s-top c-{{ grp.color }} {{ 'on' if it.active }}">{{ ico(it.icon) }}<span>{{ it.label }}</span></a>{% endfor %}
+  {% else %}
+  <details class="c-{{ grp.color }}" data-k="{{ grp.key }}" {{ 'open' if grp.open }}>
+    <summary>{{ ico(grp.icon) }}<span>{{ grp.title }}</span><i class="chev"></i></summary>
+    {% for it in grp['items'] %}{% if it.sub %}<div class="s-sub">{{ it.sub }}</div>
+      {% for x in it['items'] %}<a href="{{ x.url }}" class="{{ 'on' if x.active }}">{{ ico(x.icon) }}<span>{{ x.label }}</span></a>{% endfor %}
+    {% else %}<a href="{{ it.url }}" class="{{ 'on' if it.active }}">{{ ico(it.icon) }}<span>{{ it.label }}</span></a>{% endif %}{% endfor %}
+  </details>{% endif %}{% endfor %}
 </aside>
 <main class="wrap">
 {% else %}<div class="wrap">{% endif %}
@@ -34,6 +40,12 @@
   {% for b in next_actions %}<a class="btn {{ '' if b.primary else 'back' }}" href="{{ b.url }}">{{ b.label }}</a>{% endfor %}</div>{% endif %}
 {% block body %}{% endblock %}
 {% if me %}</main></div>{% else %}</div>{% endif %}
+<script>
+// حالة فتح/إغلاق مجموعات القائمة الجانبية تُحفظ في المتصفح (تسهيل فقط)
+(function(){try{var st=JSON.parse(localStorage.getItem('side')||'{}');
+ document.querySelectorAll('.side details').forEach(function(d){var k=d.dataset.k;
+  if(!d.open&&st[k]===1)d.open=true;d.addEventListener('toggle',function(){st[k]=d.open?1:0;localStorage.setItem('side',JSON.stringify(st));});});}catch(e){}})();
+</script>
 <script>
 // إضافة رمز التحقق CSRF تلقائيًا لكل نموذج POST — دون تعديل كل قالب
 (function () {

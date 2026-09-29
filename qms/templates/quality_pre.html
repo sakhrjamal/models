@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% block title %}إفراج قبل التعقيم {{ r.rec_no }}{% endblock %}{% block body %}
+<h1>الإفراج قبل التعقيم — {{ r.rec_no }}</h1><div class="sub">{{ r.batch_no }} · {{ r.item_code }} · <span class="pill">{{ rec_ar.get(r.status, r.status) }}</span></div>
+<div class="stat"><div><b>{{ fmt(r.received_qty) }}</b><span>مستلم (مسحات)</span></div><div><b>{{ fmt(r.sort_accepted) }}</b><span>مقبول بعد الفرز</span></div><div><b>{{ fmt(r.env_actual) }}</b><span>مغلفات ({{ fmt(r.ppe) }} مسحة/مغلف)</span></div><div><b>{{ fmt(r.boxes_actual) }}</b><span>بوكسات (متوقع {{ fmt(r.boxes_expected) }})</span></div><div><b>{{ fmt(r.cartons) if r.cartons is not none else '—' }}</b><span>كراتين</span></div></div>
+<div class="mini">الكراتين الوسيطة: {% for i in ins %}{{ i.barcode }}{{ '، ' if not loop.last }}{% endfor %}</div>
+{% if decidable and can('qc_sign') %}<form method="post" action="{{ url_for('quality_pre_decide', rec_no=r.rec_no) }}" class="card" style="margin-top:14px">
+<label>ملاحظة <span class="mini">(إلزامية عند الرفض/التعليق)</span></label><textarea name="note" rows="2" id="note"></textarea>
+<div class="actions"><button class="btn ok big" name="decision" value="approve">إفراج للتعقيم</button><button class="btn warnb" name="decision" value="hold" onclick="return nn()">تعليق</button><button class="btn bad" name="decision" value="reject" onclick="return nn()">رفض</button></div></form>
+<script>function nn(){var n=document.getElementById('note');if(!n.value.trim()){alert('اكتب السبب أولًا');n.focus();return false}return true}</script>{% endif %}
+{% if hist %}<h2>السجل</h2><table><tr><th>القرار</th><th>الكمية</th><th>بواسطة</th><th>الوقت</th><th>ملاحظة</th></tr>{% for h in hist %}<tr><td><span class="pill {{ dec_cls.get(h.decision,'') }}">{{ dec_ar.get(h.decision,h.decision) }}</span></td><td>{{ fmt(h.qty) }} {{ h.unit }}</td><td>{{ h.by_user }}</td><td>{{ h.ts }}</td><td>{{ h.note or '—' }}</td></tr>{% endfor %}</table>{% endif %}
+<div class="wizard-actions noprint"><div class="l"><a class="btn back" href="{{ url_for('quality_pending') }}">الإفراجات</a></div></div>{% endblock %}

@@ -6,7 +6,7 @@
 import os, secrets, datetime, re
 from flask import (Flask, render_template, request, redirect, url_for,
                    flash, abort, session, g)
-import db, trace, forms, auth, backup, constants, ncr, mfg, notify, inventory, access
+import db, trace, forms, auth, backup, constants, ncr, mfg, notify, inventory, access, ops
 
 app = Flask(__name__)
 
@@ -78,6 +78,7 @@ def _inject():
                 menu=navmenu.build() if u else [],
                 crumbs=navmenu.crumbs() if u else [],
                 next_actions=session.pop('_next', None) if u else None,
+                operators=ops.list_ops, op_default=ops.default, ico=_ico,
                 notif_unread=notify.unread_count(u) if u else 0)
 
 
@@ -128,6 +129,13 @@ def cls_for(text):
             return 'ok'
     return ''
 app.jinja_env.globals['cls_for'] = cls_for
+
+
+def _ico(name):
+    import navmenu
+    from markupsafe import Markup
+    return Markup('<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" '
+                  'stroke-linejoin="round"><path d="%s"/></svg>' % navmenu.icon(name))
 app.jinja_env.globals['today']   = lambda: datetime.date.today().isoformat()
 
 
@@ -1283,9 +1291,9 @@ def backup_admin():
 
 
 # ---------------------------------------------------------------- الجودة ولوحة المدير والتقارير
-import quality, manager, ncr, logistics, lines, genealogy, master, prod, qa, settings_page
+import quality, manager, ncr, logistics, lines, genealogy, master, prod, qa, settings_page, proc, printing, masterdata, monitor, importer, tracecenter
 import sp as sp_mod, bandage as bandage_mod
-for _m in (lines, genealogy, master, sp_mod, bandage_mod, prod, qa, settings_page):
+for _m in (lines, genealogy, master, sp_mod, bandage_mod, prod, qa, settings_page, proc, printing, masterdata, monitor, importer, tracecenter):
     _m.register(app)
 logistics.register(app)
 ncr.register(app)

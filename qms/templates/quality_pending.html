@@ -1,14 +1,19 @@
 {% extends "base.html" %}{% block title %}بانتظار الاعتماد{% endblock %}{% block body %}
-<h1>بانتظار موافقة الجودة</h1>
-<div class="sub">دفعات أنهى الإنتاج تصنيعها — افتح الدفعة ثم اعتمد للتخزين أو ارفض أو علّق</div>
+<h1>الإفراجات (5 إفراجات فقط)</h1>
+<div class="sub">خام/جامبو · منتج غير معقم · SP · قبل التعقيم · نهائي معقم — سجلات المتابعة لا توقف الإنتاج</div>
+<h2>إفراج نهائي (غير معقم / معقم)</h2>
 {% if rows %}<div class="tablewrap"><table>
-<tr><th>أمر الإنتاج</th><th>المنتج</th><th>المطلوب</th><th>المنتج فعليًا</th><th>التشغيلة</th><th>أنهاها</th><th></th></tr>
+<tr><th>أمر الإنتاج</th><th>المنتج</th><th>المطلوب</th><th>المنتج فعليًا</th><th>التشغيلة</th><th>أنهاها</th><th>الإفراج</th><th></th></tr>
 {% for w in rows %}<tr><td>{{ w.wo_no }}</td><td>{{ w.item_code }}</td><td>{{ fmt(w.qty_required) }} {{ w.uom }}</td>
-<td><b>{{ fmt(w.produced_qty) }}</b></td><td>{{ w.batch_no }}</td><td>{{ w.finished_by or '—' }}<div class="mini">{{ w.finished_at or '' }}</div></td>
+<td><b>{{ fmt(w.produced_qty) }}</b></td><td>{{ w.batch_no }}</td><td>{{ w.finished_by or '—' }}<div class="mini">{{ w.finished_at or '' }}</div></td><td class="mini">{{ stage_ar.get(w.stage_key) }}</td>
 <td><a class="btn sm" href="{{ url_for('quality_review', bn=w.batch_no) }}">فتح ومراجعة</a></td></tr>{% endfor %}</table></div>
 {% else %}<div class="empty">لا توجد دفعات بانتظار الاعتماد.</div>{% endif %}
 
-{% if raw %}<h2>خام وارد بانتظار الفحص</h2>
+{% if sp %}<h2>إفراج SP (منتج نصف مصنع)</h2><div class="tablewrap"><table><tr><th>التشغيلة</th><th>أمر</th><th>المنتج</th><th>كود SP</th><th>كراتين</th><th>مسحات</th><th></th></tr>
+{% for x in sp %}<tr><td><b>{{ x.batch_no }}</b></td><td>{{ x.wo_no }}</td><td>{{ x.item_code }}</td><td>{{ x.sp_code or '—' }}</td><td>{{ x.n }}</td><td>{{ fmt(x.qty) }}</td><td><a class="btn sm" href="{{ url_for('quality_sp_review', bn=x.batch_no) }}">مراجعة</a></td></tr>{% endfor %}</table></div>{% endif %}
+{% if pre %}<h2>إفراج قبل التعقيم</h2><div class="tablewrap"><table><tr><th>السجل</th><th>التشغيلة</th><th>المنتج</th><th>بوكسات</th><th>كراتين</th><th></th></tr>
+{% for x in pre %}<tr><td><b>{{ x.rec_no }}</b></td><td>{{ x.batch_no }}</td><td>{{ x.item_code }}</td><td>{{ fmt(x.boxes_actual) }}</td><td>{{ fmt(x.cartons) if x.cartons is not none else '—' }}</td><td><a class="btn sm" href="{{ url_for('quality_pre_review', rec_no=x.rec_no) }}">مراجعة</a></td></tr>{% endfor %}</table></div>{% endif %}
+{% if raw %}<h2>خام وارد / جامبو بانتظار الفحص</h2>
 <div class="tablewrap"><table><tr><th>الاستلام</th><th>الصنف</th><th>لوط المورد</th><th>الكمية</th><th>التاريخ</th><th></th></tr>
 {% for r in raw %}<tr><td>{{ r.grn_no }}</td><td>{{ r.item_code }}<div class="mini">{{ r.description }}</div></td><td>{{ r.supplier_lot }}</td><td>{{ fmt(r.qty) }} {{ r.uom }}</td><td>{{ r.receipt_date }}</td>
 <td><a class="btn sm back" href="{{ url_for('receipt_view', grn_no=r.grn_no) }}">فحص</a></td></tr>{% endfor %}</table></div>{% endif %}

@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block title %}المواد الخام{% endblock %}{% block body %}
+<h1>المواد الخام — الجامبو رولات</h1>
+<div class="tabs"><a href="{{ url_for('inv_raw') }}" class="{{ 'on' if not st }}">الكل</a>
+{% for s in ['متاح','محجوز','قيد القص','مستهلك'] %}<a href="{{ url_for('inv_raw', st=s) }}" class="{{ 'on' if st==s }}">{{ s }}</a>{% endfor %}</div>
+{% if rows %}<div class="tablewrap"><table><tr><th>رقم الجامبو</th><th>الكود</th><th>لوط المورد</th><th>رقم رول المورد</th><th>المورد</th><th>العرض</th><th>الطول</th><th>حالة الجودة</th><th>حالة الاستخدام</th><th></th></tr>
+{% for r in rows %}<tr><td><b>{{ r.roll_no }}</b></td><td>{{ r.item_code }}</td><td>{{ r.slot or r.supplier_lot or '—' }}</td><td>{{ r.supplier_roll_no or '—' }}</td><td>{{ r.supplier or '—' }}</td>
+<td>{{ fmt(r.actual_width_cm or r.width_cm) }}</td><td>{{ fmt(r.actual_length_m or r.length_m) }}</td><td>{{ r.stock_status }}</td><td><span class="pill">{{ r.use }}</span></td>
+<td class="noprint"><a href="{{ url_for('print_label', kind='jumbo', key=r.roll_no) }}" target="_blank">بطاقة</a> · <a href="{{ url_for('trace_center', q=r.roll_no) }}">تتبع</a></td></tr>{% endfor %}</table></div>
+{% else %}<div class="empty">لا توجد رولات.</div>{% endif %}{% endblock %}

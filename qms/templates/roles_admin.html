@@ -1,0 +1,6 @@
+{% extends "base.html" %}{% block title %}الصلاحيات{% endblock %}{% block body %}
+<h1>مصفوفة الصلاحيات</h1><div class="sub">كل دور يرى وظائفه فقط؛ غير المصرّح به لا يظهر ولا يُفتح (403 في الخادم)</div>
+<div class="tablewrap"><table><tr><th>الصلاحية</th><th>الوصف</th>{% for k,v in roles.items() %}<th>{{ v }}</th>{% endfor %}</tr>
+{% for p in perms %}<tr><td><code>{{ p }}</code></td><td>{{ desc.get(p,'') }}</td>
+{% for k in roles %}<td style="text-align:center">{{ '✔' if (P.get(k) is none or p in P.get(k, ())) else '' }}</td>{% endfor %}</tr>{% endfor %}</table></div>
+<p class="mini">الأدوار الثابتة معرّفة في النظام؛ إنشاء المستخدمين وتحديد أدوارهم من «المستخدمون».</p>{% endblock %}

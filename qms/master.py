@@ -123,6 +123,12 @@ def register(app):
                              num(f.get('sub_roll_width_cm')), num(f.get('yield_per_sr')),
                              (s(f.get('raw_item')) or '').upper() or None, s(f.get('machine_code')) or it.get('machine_code'),
                              s(f.get('pack_code')), s(f.get('box_code')), s(f.get('master_box')), code))
+                ext = {'name_ar': s(f.get('name_ar')), 'name_en': s(f.get('name_en')), 'barcode': s(f.get('barcode')),
+                       'sp_item': (s(f.get('sp_item')) or '').upper() or None, 'ref_width_cm': num(f.get('ref_width_cm')),
+                       'waste_limit_pct': num(f.get('waste_limit_pct')), 'notes': s(f.get('notes'))}
+                ext = {k: v for k, v in ext.items() if k in f}               # الحقل الغائب عن النموذج لا يُمسح
+                if ext:
+                    con.execute(f"UPDATE items SET {', '.join(k + '=?' for k in ext)} WHERE item_code=?", (*ext.values(), code))
                 con.execute('DELETE FROM pack_config WHERE item_code=?', (code,))
                 con.executemany("""INSERT INTO pack_config(item_code,level,unit,unit_ar,per_parent,allow_partial)
                                    VALUES(?,?,?,?,?,?)""", [(code,) + r for r in rows])

@@ -109,7 +109,7 @@ def seed_reference(con):
                     (code, 'CB', 'منتج تام', 'Finished Good', 'Compression Bandage', 'غير معقم', 'رول',
                      f'{wt} cm', f'Compression Bandage {wt} cm — NON-STERILE (كود مؤقت: عدّله من بيانات المنتجات)'))
         con.execute("""INSERT OR IGNORE INTO pack_config(item_code,level,unit,unit_ar,per_parent,allow_partial)
-                       VALUES(?,1,'box','بوكس',10,1)""", (code,))
+                       VALUES(?,1,'box','بوكس',12,1)""", (code,))
         con.execute("""INSERT OR IGNORE INTO pack_config(item_code,level,unit,unit_ar,per_parent,allow_partial)
                        VALUES(?,2,'carton','كرتون',10,1)""", (code,))
 

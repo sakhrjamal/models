@@ -1,0 +1,7 @@
+{% extends "base.html" %}{% block title %}حركات المخزون{% endblock %}{% block body %}
+<h1>حركات المخزون</h1>
+<form class="filters" method="get"><input name="b" value="{{ b or '' }}" placeholder="تشغيلة / سند"><select name="stage"><option value="">كل المراحل</option>
+{% for k,v in stages.items() %}<option value="{{ k }}" {{ 'selected' if stage==k }}>{{ v[0] }}</option>{% endfor %}</select><button class="btn">تصفية</button></form>
+{% if rows %}<div class="tablewrap"><table><tr><th>الوقت</th><th>المالك</th><th>المرحلة</th><th>الكمية</th><th>الوحدة</th><th>التشغيلة</th><th>المستند</th><th>ملاحظة</th></tr>
+{% for r in rows %}<tr><td>{{ r.ts }}</td><td>{{ r.owner }}</td><td>{{ stages.get(r.stage, (r.stage,))[0] }}</td><td class="{{ 'neg' if r.qty<0 }}">{{ fmt(r.qty) }}</td><td>{{ r.unit }}</td>
+<td>{{ r.batch_no or '—' }}</td><td>{{ r.ref_doc or '—' }}</td><td>{{ r.note or '' }}</td></tr>{% endfor %}</table></div>{% else %}<div class="empty">لا حركات.</div>{% endif %}{% endblock %}
