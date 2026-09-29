@@ -3,7 +3,8 @@
 import sqlite3, re, os, sys, glob
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DB   = os.environ.get('QMS_DB') or os.path.join(HERE, 'data', 'qms.db')
+DB   = os.environ.get('QMS_DB') or (os.path.join(os.environ['QMS_DATA'], 'qms.db') if os.environ.get('QMS_DATA')
+                                    else os.path.join(HERE, 'data', 'qms.db'))
 
 
 def _find_index_file():

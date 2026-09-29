@@ -19,8 +19,12 @@ def base_dir():
     return os.path.dirname(os.path.abspath(__file__))
 
 
-# QMS_DB: مسار بديل لقاعدة البيانات (للاختبارات والتجارب) — الافتراضي data/qms.db بجانب البرنامج
-DB_PATH = os.environ.get('QMS_DB') or os.path.join(base_dir(), 'data', 'qms.db')
+# مكان البيانات (القاعدة + النسخ الاحتياطية + السجلات + المفتاح + الورق الرسمي):
+#   QMS_DB   مسار ملف القاعدة مباشرة (للاختبارات)
+#   QMS_DATA مجلد البيانات (مثال D:\QMS_Data) — يضبطه ملف التشغيل ليكون على قرص آخر غير قرص البرنامج
+#   وإلا data/ بجانب البرنامج
+DB_PATH = os.environ.get('QMS_DB') or (os.path.join(os.environ['QMS_DATA'], 'qms.db') if os.environ.get('QMS_DATA')
+                                       else os.path.join(base_dir(), 'data', 'qms.db'))
 
 
 _WAL_DONE = set()

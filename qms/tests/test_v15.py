@@ -669,6 +669,17 @@ class V15(unittest.TestCase):
         self.assertEqual(db.one('SELECT COUNT(*) n FROM receipts')['n'], n)
         self.assertNotIn('لوط', body(self.op.get('/')) + body(self.qc.get('/receipts')))    # المصطلح LOT
 
+    # ================================================================== 19. البيانات على قرص/مجلد آخر (QMS_DATA)
+    def test_19_data_dir_env(self):
+        import subprocess
+        d = os.path.join(tempfile.mkdtemp(), 'QMS_Data')
+        env = {k: v for k, v in os.environ.items() if k != 'QMS_DB'}; env['QMS_DATA'] = d
+        out = subprocess.run([sys.executable, '-c', 'import db,backup,seed;print(db.DB_PATH);print(backup.backup_dir());print(seed.DB)'],
+                             cwd=os.path.dirname(HERE), env=env, capture_output=True, text=True).stdout.split('\n')
+        self.assertEqual(out[0], os.path.join(d, 'qms.db'))
+        self.assertEqual(out[1], os.path.join(d, 'backups'))
+        self.assertEqual(out[2], os.path.join(d, 'qms.db'))          # seed.py لا يكتب في مجلد البرنامج
+
     # ================================================================== 11. كل الصفحات تعمل
     def test_11_all_pages_render(self):
         bad = []
