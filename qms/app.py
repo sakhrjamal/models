@@ -158,7 +158,11 @@ def login():
         if nxt.startswith('/'):
             return redirect(nxt)
         return redirect(url_for('index'))
-    return render_template('login.html')
+    from flask import get_flashed_messages
+    msgs = get_flashed_messages(with_categories=True)
+    err = next((m for c, m in msgs if c == 'bad'), None)
+    note = next((m for c, m in msgs if c != 'bad'), None)
+    return render_template('login.html', err=err, note=note)
 
 
 @app.route('/logout')

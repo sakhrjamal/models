@@ -1,16 +1,151 @@
 {% extends "base.html" %}{% block title %}تسجيل الدخول{% endblock %}{% block body %}
-<div class="login-page">
-  <div class="card">
-    <h1>نظام إدارة الإنتاج والتتبع</h1>
-    <div class="sub">مصنع الشاش والأربطة الطبية</div>
-    <form method="post">
+<style>
+html,body{overflow:hidden;height:100%}
+.lk{--ind:#565A98;--grn:#4B7259;--red:#C61E1E;position:fixed;inset:0;z-index:9999;display:grid;grid-template-rows:1fr auto;overflow:hidden;
+  font-family:"Segoe UI",Tahoma,Arial,sans-serif;color:#23264a;
+  background:linear-gradient(125deg,#f7f8fd,#eef1fa 35%,#f3f8f5 65%,#fbf6f6);background-size:260% 260%;animation:lk-grad 26s ease-in-out infinite}
+@keyframes lk-grad{0%,100%{background-position:0% 40%}50%{background-position:100% 60%}}
+
+/* طبقات الخلفية (Parallax) */
+.lk .layer{position:absolute;inset:-6%;pointer-events:none;transition:transform .9s cubic-bezier(.2,.7,.2,1);will-change:transform}
+.lk .l1{transform:translate(calc(var(--mx,0)*-14px),calc(var(--my,0)*-10px))}
+.lk .l2{transform:translate(calc(var(--mx,0)*-30px),calc(var(--my,0)*-22px))}
+.lk .l3{transform:translate(calc(var(--mx,0)*-52px),calc(var(--my,0)*-38px))}
+.blob{position:absolute;border-radius:50%;filter:blur(70px);opacity:.42}
+.b1{width:46vmax;height:46vmax;left:-8vmax;top:-10vmax;background:radial-gradient(circle,var(--ind),transparent 65%);animation:lk-d1 30s ease-in-out infinite}
+.b2{width:40vmax;height:40vmax;right:-10vmax;top:18vh;background:radial-gradient(circle,var(--grn),transparent 65%);animation:lk-d2 36s ease-in-out infinite}
+.b3{width:26vmax;height:26vmax;left:34%;bottom:-12vmax;background:radial-gradient(circle,var(--red),transparent 68%);opacity:.20;animation:lk-d3 42s ease-in-out infinite}
+@keyframes lk-d1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(9vmax,6vmax) scale(1.12)}}
+@keyframes lk-d2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-8vmax,-5vmax) scale(1.1)}}
+@keyframes lk-d3{0%,100%{transform:translate(0,0)}50%{transform:translate(-10vmax,-6vmax)}}
+.shape{position:absolute;border:1.5px solid;border-radius:50%;opacity:.16}
+.s1{width:38vmin;height:38vmin;left:6%;top:10%;border-color:var(--ind);animation:lk-spin 90s linear infinite}
+.s2{width:24vmin;height:24vmin;right:8%;bottom:22%;border-color:var(--grn);border-radius:32%;animation:lk-spin 120s linear infinite reverse}
+.s3{width:14vmin;height:14vmin;left:18%;bottom:26%;border-color:var(--red);border-radius:22%;opacity:.12;animation:lk-spin 70s linear infinite}
+.s4{width:52vmin;height:52vmin;right:-8vmin;top:-14vmin;border-color:var(--ind);border-style:dashed;opacity:.10;animation:lk-spin 160s linear infinite reverse}
+@keyframes lk-spin{to{transform:rotate(360deg)}}
+.lk canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+
+/* الشعار — كبير، جزء من التصميم (بلا بطاقة). ملاحظة تقنية: لا يوجد أي opacity/transform على أسلاف الصورة كي يعمل multiply مع الخلفية */
+.stage{position:relative;display:flex;align-items:center;justify-content:center;min-height:0;padding:1.5vh 3vw 0}
+.logo-wrap{position:relative;height:100%;max-height:min(78vh,1100px);aspect-ratio:1/1;max-width:min(96vw,1100px);overflow:hidden}
+.logo-glow,.logo-tint,.sweep{opacity:0;animation:lk-fade 2s ease .3s forwards}
+@keyframes lk-fade{to{opacity:1}}
+.logo-glow{position:absolute;inset:6%;border-radius:50%;background:radial-gradient(closest-side,rgba(86,90,152,.16),rgba(75,114,89,.08) 55%,transparent 76%);animation:lk-fade 2s ease .3s forwards,lk-glow 7s ease-in-out 2.3s infinite}
+@keyframes lk-glow{0%,100%{transform:scale(.95);filter:none}50%{transform:scale(1.07)}}
+.logo-tint{position:absolute;inset:0;background:radial-gradient(closest-side,rgba(232,236,249,.5),rgba(232,236,249,0) 90%)}
+.logo-wrap img{position:absolute;width:150%;height:150%;left:-25%;top:-25%;object-fit:contain;mix-blend-mode:multiply;user-select:none;-webkit-user-drag:none;
+  opacity:0;transform:scale(.9);animation:lk-in 2.2s cubic-bezier(.16,.8,.24,1) .15s forwards,lk-float 12s ease-in-out 2.4s infinite}
+@keyframes lk-in{to{opacity:1;transform:scale(1)}}
+@keyframes lk-float{0%,100%{transform:scale(1) translateY(0)}50%{transform:scale(1.02) translateY(-1%)}}
+.sweep{position:absolute;inset:0;overflow:hidden;pointer-events:none;-webkit-mask-image:radial-gradient(closest-side,#000 72%,transparent 96%);mask-image:radial-gradient(closest-side,#000 72%,transparent 96%)}
+.sweep i{position:absolute;top:-10%;bottom:-10%;width:26%;left:-40%;background:linear-gradient(105deg,transparent,rgba(255,255,255,.98),transparent);
+  transform:skewX(-14deg);animation:lk-sweep 9s ease-in-out 3.2s infinite}
+@keyframes lk-sweep{0%{left:-40%}35%,100%{left:125%}}
+
+/* لوحة الدخول (زجاجية) */
+.dock{position:relative;display:flex;justify-content:center;padding:0 4vw calc(3vh + env(safe-area-inset-bottom))}
+.panel{width:min(980px,100%);display:grid;grid-template-columns:1fr 1fr auto;gap:14px;align-items:end;padding:18px 20px;border-radius:22px;
+  background:rgba(255,255,255,.52);-webkit-backdrop-filter:blur(20px) saturate(1.5);backdrop-filter:blur(20px) saturate(1.5);
+  border:1px solid rgba(255,255,255,.75);box-shadow:0 18px 50px rgba(50,56,110,.16),inset 0 1px 0 rgba(255,255,255,.9);
+  opacity:0;transform:translateY(34px);animation:lk-up 1.1s cubic-bezier(.16,.8,.24,1) 2.3s forwards}
+@keyframes lk-up{to{opacity:1;transform:none}}
+.panel .cap{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#5b5f86;letter-spacing:.2px}
+.panel .cap b{color:var(--ind);font-size:14.5px}
+.fld{position:relative;display:flex;flex-direction:column;gap:6px;opacity:0;transform:translateY(10px);animation:lk-fld .8s ease forwards}
+.fld:nth-of-type(1){animation-delay:2.9s}.fld:nth-of-type(2){animation-delay:3.05s}
+.dock .go{opacity:0;transform:translateY(10px);animation:lk-fld .8s ease 3.2s forwards}
+@keyframes lk-fld{to{opacity:1;transform:none}}
+.fld label{font-size:12.5px;color:#565a80;font-weight:600;margin:0}
+.fld input{width:100%;height:50px;padding:0 16px;font-size:16px;border-radius:14px;border:1.5px solid rgba(86,90,152,.22);background:rgba(255,255,255,.78);color:#1f2244;
+  outline:none;transition:border-color .2s,box-shadow .25s,background .2s,transform .2s;max-width:none}
+.fld input:hover{border-color:rgba(86,90,152,.45)}
+.fld input:focus{border-color:var(--ind);background:#fff;box-shadow:0 0 0 4px rgba(86,90,152,.16),0 6px 18px rgba(86,90,152,.14);transform:translateY(-1px)}
+.eye{position:absolute;left:10px;bottom:8px;width:34px;height:34px;border:0;background:none;border-radius:10px;cursor:pointer;color:#7b7fa6;display:grid;place-items:center;transition:background .2s,color .2s}
+.eye:hover{background:rgba(86,90,152,.1);color:var(--ind)}
+.eye svg{width:20px;height:20px}
+.fld input[type=password],.fld input.pw{padding-left:48px}
+.go{position:relative;height:50px;min-width:150px;padding:0 30px;border:0;border-radius:14px;cursor:pointer;color:#fff;font-size:16px;font-weight:700;letter-spacing:.3px;overflow:hidden;
+  background:linear-gradient(135deg,#6a6eb0,#4a4e8c 60%,#3f5f4c);box-shadow:0 10px 24px rgba(74,78,140,.36);transition:transform .15s,box-shadow .25s,filter .2s}
+.go:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(74,78,140,.44);filter:brightness(1.06)}
+.go:active{transform:translateY(0) scale(.965);box-shadow:0 5px 14px rgba(74,78,140,.34)}
+.go:focus-visible{outline:3px solid rgba(86,90,152,.4);outline-offset:3px}
+.go::after{content:"";position:absolute;top:0;bottom:0;width:40%;left:-60%;background:linear-gradient(105deg,transparent,rgba(255,255,255,.35),transparent);transform:skewX(-18deg)}
+.go:hover::after{animation:lk-btn .9s ease}
+@keyframes lk-btn{to{left:130%}}
+.go .spin{display:none;width:20px;height:20px;border:3px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:lk-rot .8s linear infinite;margin:0 auto}
+.go.loading{pointer-events:none;filter:none}.go.loading .txt{display:none}.go.loading .spin{display:block}
+@keyframes lk-rot{to{transform:rotate(360deg)}}
+.err{grid-column:1/-1;display:flex;align-items:center;gap:8px;color:#b3261e;background:rgba(198,30,30,.09);border:1px solid rgba(198,30,30,.22);padding:9px 14px;border-radius:12px;font-size:14px}
+.panel.shake{animation:lk-up 1.1s cubic-bezier(.16,.8,.24,1) 2.3s forwards,lk-shake .55s cubic-bezier(.36,.07,.19,.97) 3.4s 1}
+@keyframes lk-shake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-7px)}40%,60%{transform:translateX(7px)}}
+.foot{position:absolute;left:0;right:0;bottom:calc(.7vh);text-align:center;font-size:11px;color:#8b8fae;letter-spacing:.4px;pointer-events:none;opacity:0;animation:lk-fld 1s ease 3.6s forwards}
+
+@media (max-width:820px){
+  .panel{grid-template-columns:1fr;gap:12px;padding:16px}
+  .go{width:100%}
+  .logo-wrap{max-height:56vh}
+}
+@media (max-height:640px) and (min-width:821px){.logo-wrap{max-height:56vh}.panel{padding:12px 16px}.fld input,.go{height:44px}}
+@media (prefers-reduced-motion:reduce){
+  .lk,.lk *{animation-duration:.01s!important;animation-delay:0s!important;animation-iteration-count:1!important}
+  .logo-wrap img,.logo-glow,.logo-tint,.sweep,.panel,.fld,.dock .go,.foot{opacity:1!important;transform:none!important}
+}
+</style>
+
+<div class="lk" id="lk">
+  <div class="layer l1"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+  <div class="layer l2"><div class="shape s1"></div><div class="shape s2"></div><div class="shape s3"></div><div class="shape s4"></div></div>
+  <div class="layer l3" style="inset:0"><canvas id="pt"></canvas></div>
+
+  <div class="stage">
+    <div class="logo-wrap">
+      <div class="logo-glow"></div>
+      <div class="logo-tint"></div>
+      <div class="sweep"><i></i></div>
+      <img src="{{ url_for('static', filename='company_logo.jpg') }}" alt="شركة أتاكم الخير للصناعة — Atacom Al-Khair Industrial Co." draggable="false">
+    </div>
+  </div>
+
+  <div class="dock">
+    <form method="post" class="panel {{ 'shake' if err }}" id="lf" autocomplete="on">
       <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
-      <label>اسم المستخدم</label>
-      <input name="username" autofocus autocomplete="username" required>
-      <label>كلمة المرور</label>
-      <input type="password" name="password" autocomplete="current-password" required>
-      <button class="btn">دخول</button>
+      <div class="cap"><b>نظام إدارة الإنتاج والتتبع</b><span>تسجيل الدخول</span></div>
+      {% if note %}<div class="err" style="color:#2f6b45;background:rgba(75,114,89,.10);border-color:rgba(75,114,89,.25)">{{ note }}</div>{% endif %}
+      {% if err %}<div class="err" role="alert"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/></svg>{{ err }}</div>{% endif %}
+      <div class="fld"><label for="u">اسم المستخدم</label><input id="u" name="username" autofocus autocomplete="username" required></div>
+      <div class="fld"><label for="p">كلمة المرور</label><input id="p" type="password" name="password" autocomplete="current-password" required>
+        <button type="button" class="eye" id="eye" aria-label="إظهار كلمة المرور" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+      <button class="go" id="go"><span class="txt">دخول</span><span class="spin"></span></button>
     </form>
   </div>
+  <div class="foot" dir="ltr">Atacom Al-Khair Industrial Co.</div>
 </div>
+
+<script>
+(function(){
+  var lk=document.getElementById('lk'),reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Parallax خفيف مع حركة المؤشر
+  if(!reduce){window.addEventListener('mousemove',function(e){lk.style.setProperty('--mx',((e.clientX/innerWidth)*2-1).toFixed(3));lk.style.setProperty('--my',((e.clientY/innerHeight)*2-1).toFixed(3))},{passive:true});}
+  // جسيمات ناعمة بألوان الهوية
+  var cv=document.getElementById('pt'),cx=cv.getContext('2d'),P=[],W=0,H=0,dpr=Math.min(devicePixelRatio||1,2),cols=['86,90,152','75,114,89','198,30,30'];
+  function size(){W=cv.clientWidth;H=cv.clientHeight;cv.width=W*dpr;cv.height=H*dpr;cx.setTransform(dpr,0,0,dpr,0,0)}
+  function seed(){P=[];var n=Math.round(Math.min(56,Math.max(22,W*H/26000)));for(var i=0;i<n;i++){P.push({x:Math.random()*W,y:Math.random()*H,r:1.2+Math.random()*3.2,vx:(Math.random()-.5)*.16,vy:-.05-Math.random()*.16,c:cols[i%7==0?2:(i%2)],a:.14+Math.random()*.22,t:Math.random()*6.28})}}
+  var raf=0;function draw(){cx.clearRect(0,0,W,H);for(var i=0;i<P.length;i++){var p=P[i];p.x+=p.vx;p.y+=p.vy;p.t+=.008;if(p.y<-10){p.y=H+10;p.x=Math.random()*W}if(p.x<-10)p.x=W+10;if(p.x>W+10)p.x=-10;
+      var a=p.a*(.65+.35*Math.sin(p.t));cx.beginPath();cx.fillStyle='rgba('+p.c+','+a.toFixed(3)+')';cx.arc(p.x,p.y,p.r,0,6.283);cx.fill()}
+    raf=requestAnimationFrame(draw)}
+  function start(){size();seed();if(!reduce){cancelAnimationFrame(raf);draw()}else{draw();cancelAnimationFrame(raf)}}
+  addEventListener('resize',function(){clearTimeout(start.t);start.t=setTimeout(start,200)});
+  document.addEventListener('visibilitychange',function(){if(document.hidden)cancelAnimationFrame(raf);else if(!reduce)draw()});
+  start();
+  // إظهار/إخفاء كلمة المرور
+  var p=document.getElementById('p');document.getElementById('eye').addEventListener('click',function(){p.type=p.type==='password'?'text':'password';p.classList.toggle('pw',true);p.focus()});
+  // حالة التحميل أثناء التحقق (لا يغيّر منطق الإرسال)
+  var f=document.getElementById('lf'),go=document.getElementById('go');
+  f.addEventListener('submit',function(){if(f.checkValidity()){go.classList.add('loading');setTimeout(function(){go.setAttribute('aria-busy','true')},0)}});
+  addEventListener('pageshow',function(e){if(e.persisted){go.classList.remove('loading')}});
+  // التركيز: كلمة المرور بعد اسم المستخدم؛ وإن وُجد خطأ فاسم المستخدم فارغ
+  setTimeout(function(){var u=document.getElementById('u');if(u&&!u.value)u.focus()},3300);
+})();
+</script>
 {% endblock %}

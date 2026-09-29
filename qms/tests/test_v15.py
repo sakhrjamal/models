@@ -709,6 +709,21 @@ class V15(unittest.TestCase):
                              env=env, capture_output=True, text=True).stdout.split()
         self.assertEqual(out, ['5099', 'True'])
 
+    # ================================================================== 21. شاشة القفل الجديدة لا تمس منطق الدخول
+    def test_21_lock_screen(self):
+        c = app.test_client()
+        page = body(c.get('/login'))
+        for needle in ('company_logo.jpg', 'name="username"', 'name="password"', 'name="_csrf"', 'lk-in', 'backdrop-filter'):
+            self.assertIn(needle, page)
+        self.assertEqual(c.get('/static/company_logo.jpg').status_code, 200)
+        tok = re.search(r'name="csrf" content="([^"]+)"', page).group(1)
+        r = c.post('/login', data={'username': 'admin', 'password': 'wrong', '_csrf': tok}, follow_redirects=True)
+        self.assertIn('غير صحيحة', body(r).split('class="err"')[-1][:400])      # الخطأ داخل اللوحة (يهتز)
+        self.assertIn('panel shake', body(r))
+        self.assertEqual(c.post('/login', data={'username': 'admin', 'password': 'wrong'}).status_code, 400)   # CSRF كما هو
+        r = c.post('/login', data={'username': 'mgr', 'password': 'pass123', '_csrf': tok}, follow_redirects=False)
+        self.assertEqual(r.status_code, 302)
+
     # ================================================================== 11. كل الصفحات تعمل
     def test_11_all_pages_render(self):
         bad = []
