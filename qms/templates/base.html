@@ -1,12 +1,12 @@
 <!doctype html><html lang="ar" dir="rtl"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="csrf" content="{{ csrf_token() }}">
-<title>{% block title %}نظام إدارة الإنتاج والتتبع{% endblock %}</title>
+<title>{% block title %}{{ sys_name }}{% endblock %}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head><body>
 {% if me %}
 <header class="noprint">
-  <div class="logo"><a href="{{ url_for('index') }}">نظام إدارة الإنتاج والتتبع</a></div>
+  <div class="logo"><a href="{{ url_for('index') }}">{{ sys_name }}</a></div>
   <form class="hsearch" action="{{ url_for('trace_center') }}"><input name="q" placeholder="تتبّع بأي باركود/LOT/رقم…" aria-label="تتبع تشغيلة"></form>
   <div class="usermenu">
     <a class="bell" href="{{ url_for('notifications') }}" title="الإشعارات">🔔{% if notif_unread %}<b>{{ notif_unread }}</b>{% endif %}</a>

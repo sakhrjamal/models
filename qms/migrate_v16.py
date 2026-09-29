@@ -115,6 +115,7 @@ def seed(con):
             items = COMMON + EXTRA.get(key, [])
             for i, (ar_, en_) in enumerate(items, 1):
                 con.execute('INSERT INTO maint_checklist(equip_id,seq,item_ar,item_en,proposed) VALUES(?,?,?,?,1)', (eid, i, ar_, en_))
+    con.execute("INSERT OR IGNORE INTO settings(key,value,note) VALUES('system_name','نظام إدارة الإنتاج والجودة والتتبع','اسم النظام في الواجهة')")
     con.execute("INSERT OR IGNORE INTO settings(key,value,note) VALUES('maint_form_pm','XXXQP-12.F02','رقم نموذج جدول الصيانة الوقائية')")
     con.execute("INSERT OR IGNORE INTO settings(key,value,note) VALUES('maint_form_em','','رقم نموذج بلاغ/أمر الصيانة الطارئة (لم يصل بعد)')")
     con.execute("INSERT OR IGNORE INTO settings(key,value,note) VALUES('maint_form_wo','','رقم نموذج أمر الصيانة الوقائية/سجل الفحص (لم يصل بعد)')")

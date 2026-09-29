@@ -110,7 +110,7 @@ html,body{overflow:hidden;height:100%}
   <div class="dock">
     <form method="post" class="panel {{ 'shake' if err }}" id="lf" autocomplete="on">
       <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
-      <div class="cap"><b>نظام إدارة الإنتاج والتتبع</b><span>تسجيل الدخول</span></div>
+      <div class="cap"><b>{{ sys_name }}</b><span>تسجيل الدخول</span></div>
       {% if note %}<div class="err" style="color:#2f6b45;background:rgba(75,114,89,.10);border-color:rgba(75,114,89,.25)">{{ note }}</div>{% endif %}
       {% if err %}<div class="err" role="alert"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/></svg>{{ err }}</div>{% endif %}
       <div class="fld"><label for="u">اسم المستخدم</label><input id="u" name="username" autofocus autocomplete="username" required></div>

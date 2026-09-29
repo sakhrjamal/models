@@ -57,7 +57,7 @@ function Install-Qms {
     $prn = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
     $set = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) `
            -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew
-    Register-ScheduledTask -TaskName $task -Action $act -Trigger $trg -Principal $prn -Settings $set -Force -Description 'نظام إدارة الإنتاج والتتبع' | Out-Null
+    Register-ScheduledTask -TaskName $task -Action $act -Trigger $trg -Principal $prn -Settings $set -Force -Description 'نظام إدارة الإنتاج والجودة والتتبع' | Out-Null
     Get-NetFirewallRule -DisplayName $fw -ErrorAction SilentlyContinue | Remove-NetFirewallRule
     New-NetFirewallRule -DisplayName $fw -Direction Inbound -Protocol TCP -LocalPort $port -Action Allow -Profile Domain,Private | Out-Null
     Start-ScheduledTask -TaskName $task
@@ -97,7 +97,7 @@ try {
     if ($Action -ne 'menu') { Invoke-Action $Action }
     else {
         while ($true) {
-            Write-Host "`n=== إدارة خدمة نظام الانتاج والتتبع ===" 
+            Write-Host "`n=== إدارة خدمة نظام الانتاج والجودة والتتبع ===" 
             Write-Host '1) تثبيت الخدمة وتشغيلها (تعمل مع اقلاع الجهاز بلا تسجيل دخول)'
             Write-Host '2) تشغيل   3) إيقاف   4) الحالة   5) إزالة الخدمة   0) خروج'
             $c = Read-Host 'اختر'

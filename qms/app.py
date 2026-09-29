@@ -79,6 +79,7 @@ def _inject():
                 crumbs=navmenu.crumbs() if u else [],
                 next_actions=session.pop('_next', None) if u else None,
                 operators=ops.list_ops, op_default=ops.default, ico=_ico,
+                sys_name=db.setting('system_name', 'نظام إدارة الإنتاج والجودة والتتبع'),
                 notif_unread=notify.unread_count(u) if u else 0)
 
 

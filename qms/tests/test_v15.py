@@ -716,6 +716,10 @@ class V15(unittest.TestCase):
         for needle in ('company_logo.jpg', 'name="username"', 'name="password"', 'name="_csrf"', 'lk-in', 'backdrop-filter'):
             self.assertIn(needle, page)
         self.assertEqual(c.get('/static/company_logo.jpg').status_code, 200)
+        self.assertIn('نظام إدارة الإنتاج والجودة والتتبع', page)                # الاسم المعتمد
+        db.run("UPDATE settings SET value='اسم تجريبي' WHERE key='system_name'")
+        self.assertIn('اسم تجريبي', body(c.get('/login')))                         # قابل للتغيير من الإعدادات
+        db.run("UPDATE settings SET value='نظام إدارة الإنتاج والجودة والتتبع' WHERE key='system_name'")
         tok = re.search(r'name="csrf" content="([^"]+)"', page).group(1)
         r = c.post('/login', data={'username': 'admin', 'password': 'wrong', '_csrf': tok}, follow_redirects=True)
         self.assertIn('غير صحيحة', body(r).split('class="err"')[-1][:400])      # الخطأ داخل اللوحة (يهتز)
